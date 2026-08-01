@@ -5,7 +5,6 @@ import {
   setLlamaServerPath,
   setModelsDir,
 } from "./api";
-import { formatBytes } from "./format";
 import ProfileForm from "./ProfileForm";
 import type { Profile, Settings } from "./types";
 
@@ -142,10 +141,10 @@ export default function SettingsScreen({
         <h2>Memory calibration</h2>
         <p className="field-hint">
           {settings.calibrationSamples === 0
-            ? "No runs recorded yet. The estimate uses a conservative default until three runs have been observed."
+            ? "No runs recorded yet. Until three runs are observed the estimate uses the nominal figure, which over-predicts on Apple Silicon."
             : `${settings.calibrationSamples} run${settings.calibrationSamples === 1 ? "" : "s"} recorded.`}
-          {settings.fittedOverhead != null &&
-            ` Fitted overhead: ${formatBytes(settings.fittedOverhead)}.`}
+          {settings.fittedResidency != null &&
+            ` Fitted residency: ${Math.round(settings.fittedResidency * 100)}% of nominal weights plus KV cache.`}
         </p>
       </section>
 

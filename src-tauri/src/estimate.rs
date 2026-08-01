@@ -2,11 +2,15 @@ use serde::{Deserialize, Serialize};
 
 use crate::gguf::GgufMetadata;
 
-/// Used until calibration has enough samples. Deliberately generous: predicting too
-/// little is what lets a context length quietly push the machine into swap.
+/// Compute buffers and allocator slack, on top of weights and KV cache. Part of the
+/// model's nominal footprint, which is a different quantity from its machine impact.
 pub const DEFAULT_OVERHEAD_BYTES: u64 = 1_500_000_000;
 const MIN_SAMPLES: usize = 3;
 pub const MAX_SAMPLES: usize = 50;
+
+/// Ratios outside this range are not believable and are more likely to be a machine
+/// doing something else during the run than a real measurement.
+const PLAUSIBLE_RESIDENCY: std::ops::RangeInclusive<f64> = 0.1..=2.0;
 
 /// Bytes per cache element. Quantised types carry a scale per 32-element block.
 pub fn bytes_per_element(cache_type: &str) -> f64 {
@@ -28,7 +32,13 @@ pub struct Estimate {
     pub weights_bytes: u64,
     pub kv_bytes: u64,
     pub overhead_bytes: u64,
+    /// What the model nominally needs: weights + KV + overhead.
     pub total_bytes: u64,
+    /// How much machine-wide used memory is expected to grow. Lower than nominal on
+    /// Apple Silicon, where mmapped weights and Metal buffers are not all counted.
+    pub machine_impact_bytes: u64,
+    /// Fitted weights+KV residency, once enough runs have been observed.
+    pub residency: Option<f64>,
     pub calibrated: bool,
 }
 
@@ -52,17 +62,26 @@ pub fn estimate(
     ctx: u64,
     cache_k: &str,
     cache_v: &str,
-    overhead: Option<u64>,
+    residency: Option<f64>,
 ) -> Option<Estimate> {
     let kv = kv_bytes(md, ctx, cache_k, cache_v)?;
-    let overhead_bytes = overhead.unwrap_or(DEFAULT_OVERHEAD_BYTES);
+    let total_bytes = file_size + kv + DEFAULT_OVERHEAD_BYTES;
+
+    // Uncalibrated, the nominal figure is the conservative choice: on this platform it
+    // over-predicts, and over-predicting is the safe direction.
+    let machine_impact_bytes = match residency {
+        Some(ratio) => (((file_size + kv) as f64) * ratio) as u64,
+        None => total_bytes,
+    };
 
     Some(Estimate {
         weights_bytes: file_size,
         kv_bytes: kv,
-        overhead_bytes,
-        total_bytes: file_size + kv + overhead_bytes,
-        calibrated: overhead.is_some(),
+        overhead_bytes: DEFAULT_OVERHEAD_BYTES,
+        total_bytes,
+        machine_impact_bytes,
+        residency,
+        calibrated: residency.is_some(),
     })
 }
 
@@ -82,24 +101,28 @@ pub struct CalibrationSample {
     pub observed_total: u64,
 }
 
-/// Median residual between observed growth and the predicted weights+KV base.
+/// Median ratio of observed machine growth to nominal weights+KV.
 ///
-/// Negative residuals are dropped rather than clamped — a machine already under memory
-/// pressure can evict as fast as the model loads, and such a run says nothing about
-/// compute overhead.
-pub fn fit_overhead(samples: &[CalibrationSample]) -> Option<u64> {
-    let mut residuals: Vec<u64> = samples
+/// An additive overhead cannot work on Apple Silicon: measured on a 32 GB M2, loading a
+/// 15.7 GB model with a 2.7 GB KV cache grew used memory by only ~10.6 GB, because
+/// mmapped weight pages and Metal buffers are not all counted as used. The residual is
+/// therefore reliably negative and an additive fit never accumulates a single usable
+/// sample. A multiplicative residency absorbs the platform's accounting instead of
+/// fighting it.
+pub fn fit_residency(samples: &[CalibrationSample]) -> Option<f64> {
+    let mut ratios: Vec<f64> = samples
         .iter()
-        .filter(|s| s.observed_total > s.predicted_base)
-        .map(|s| s.observed_total - s.predicted_base)
+        .filter(|s| s.predicted_base > 0 && s.observed_total > 0)
+        .map(|s| s.observed_total as f64 / s.predicted_base as f64)
+        .filter(|ratio| PLAUSIBLE_RESIDENCY.contains(ratio))
         .collect();
 
-    if residuals.len() < MIN_SAMPLES {
+    if ratios.len() < MIN_SAMPLES {
         return None;
     }
 
-    residuals.sort_unstable();
-    Some(residuals[residuals.len() / 2])
+    ratios.sort_by(|a, b| a.partial_cmp(b).expect("ratios are finite"));
+    Some(ratios[ratios.len() / 2])
 }
 
 #[cfg(test)]
@@ -189,24 +212,39 @@ mod tests {
 
     #[test]
     fn calibration_needs_three_usable_samples() {
-        assert_eq!(fit_overhead(&[]), None);
-        assert_eq!(fit_overhead(&[sample(100, 200), sample(100, 300)]), None);
+        assert_eq!(fit_residency(&[]), None);
+        assert_eq!(fit_residency(&[sample(1000, 600), sample(1000, 700)]), None);
     }
 
     #[test]
-    fn calibration_takes_the_median_residual() {
-        let samples = [sample(1000, 1100), sample(1000, 1400), sample(1000, 1200)];
-        assert_eq!(fit_overhead(&samples), Some(200));
+    fn calibration_takes_the_median_ratio() {
+        let samples = [sample(1000, 500), sample(1000, 700), sample(1000, 600)];
+        assert_eq!(fit_residency(&samples), Some(0.6));
     }
 
+    /// The case that made an additive fit useless: every observed run grows the machine
+    /// by less than weights+KV, so every residual is negative. A ratio still fits.
     #[test]
-    fn runs_that_grew_less_than_predicted_are_dropped_not_clamped() {
+    fn runs_that_grow_less_than_nominal_still_calibrate() {
         let samples = [
-            sample(1000, 900),
-            sample(1000, 1100),
-            sample(1000, 1200),
-            sample(1000, 1300),
+            sample(18_400, 10_600),
+            sample(18_400, 10_400),
+            sample(18_400, 10_800),
         ];
-        assert_eq!(fit_overhead(&samples), Some(200));
+        let residency = fit_residency(&samples).expect("should calibrate");
+        assert!((residency - 0.576).abs() < 0.01, "got {residency}");
+    }
+
+    #[test]
+    fn implausible_ratios_are_discarded() {
+        let samples = [
+            sample(1000, 10),   // 0.01 — the machine was evicting, not measuring
+            sample(1000, 5000), // 5.0  — something else was loading at the same time
+            sample(1000, 600),
+            sample(1000, 620),
+            sample(1000, 640),
+        ];
+        let residency = fit_residency(&samples).expect("should calibrate");
+        assert!((residency - 0.62).abs() < 0.001, "got {residency}");
     }
 }

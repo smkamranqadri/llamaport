@@ -63,6 +63,8 @@ export interface Estimate {
   kvBytes: number;
   overheadBytes: number;
   totalBytes: number;
+  machineImpactBytes: number;
+  residency: number | null;
   calibrated: boolean;
 }
 
@@ -156,5 +158,5 @@ export interface Settings {
   capabilities: Capabilities | null;
   capabilityError: string | null;
   calibrationSamples: number;
-  fittedOverhead: number | null;
+  fittedResidency: number | null;
 }

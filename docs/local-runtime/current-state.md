@@ -2,8 +2,8 @@
 
 ## Current phase
 
-**Phase 1 — Real system memory and safety status. Code complete, awaiting manual
-UI confirmation.**
+**Phase 1 — Real system memory and safety status. Complete and confirmed in the
+running app.**
 
 ## Completed work
 
@@ -79,11 +79,11 @@ bun run build                                                 # tsc + vite, clea
 
 ## Known problems
 
-1. **Manual UI confirmation outstanding.** The memory panel has not been seen
-   rendered. computer-use cannot drive an unbundled dev binary, so a human must
-   open a model and press Run.
-2. **Calibration still has zero samples**, so overhead remains the 1.4 GB
-   placeholder and every estimate reads "(uncalibrated)".
+1. **Calibration still has zero samples.** Estimates read "not yet calibrated"
+   and use the nominal figure until three runs are recorded. Each clean
+   start-to-stop cycle banks one sample.
+2. **Residency is fitted machine-wide, not per model.** If Q3 and Q4 turn out to
+   have materially different ratios, one constant will be wrong for both (D15).
 3. **Headroom thresholds are unvalidated against real use.** 2/4 GB were chosen
    for a 32 GB machine also running an editor, browser and coding agent. They
    will fire often on this hardware; whether that is signal or noise needs a few

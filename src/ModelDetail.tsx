@@ -101,10 +101,16 @@ function MemoryBar({ plan }: { plan: LaunchPlan }) {
 
       <p className="memory-summary">
         <SafetyBadge state={assessment.state} />
-        <strong>{formatBytes(totalBytes)}</strong> predicted — weights{" "}
+        <strong>{formatBytes(plan.estimate.machineImpactBytes)}</strong> expected
+        machine impact
+      </p>
+      <p className="field-hint">
+        Model needs {formatBytes(totalBytes)} nominally — weights{" "}
         {formatBytes(weightsBytes)}, KV cache {formatBytes(kvBytes)}, overhead{" "}
-        {formatBytes(overheadBytes)}
-        {!calibrated && " (uncalibrated)"}
+        {formatBytes(overheadBytes)}.{" "}
+        {calibrated
+          ? `Scaled to ${Math.round((plan.estimate.residency ?? 0) * 100)}% from your recorded runs, because mmapped weights and Metal buffers are not all counted as used memory.`
+          : "Not yet calibrated, so the nominal figure is used — it over-predicts on Apple Silicon."}
       </p>
       <Reasons assessment={assessment} />
 

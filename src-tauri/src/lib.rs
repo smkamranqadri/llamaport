@@ -124,7 +124,7 @@ struct Settings {
     capabilities: Option<Capabilities>,
     capability_error: Option<String>,
     calibration_samples: usize,
-    fitted_overhead: Option<u64>,
+    fitted_residency: Option<f64>,
 }
 
 fn resolve(defaults: &Profile, model: &ModelEntry, patch: &ProfilePatch) -> Profile {
@@ -145,12 +145,12 @@ fn build_plan(
 ) -> Result<LaunchPlan, String> {
     let model = state.model(model_id)?;
 
-    let (defaults, patch, fitted) = {
+    let (defaults, patch, residency) = {
         let config = state.config.lock().expect("config lock");
         (
             config.default_profile.clone(),
             draft.unwrap_or_else(|| config.patch_for(&model.id)),
-            estimate::fit_overhead(&config.calibration),
+            estimate::fit_residency(&config.calibration),
         )
     };
 
@@ -169,7 +169,7 @@ fn build_plan(
             profile.ctx,
             &profile.cache_type_k,
             &profile.cache_type_v,
-            fitted,
+            residency,
         )
     });
 
@@ -204,7 +204,7 @@ fn build_plan(
             swap_used,
             pressure,
             running_model_bytes,
-            predicted_total: estimate.as_ref().map(|e| e.total_bytes),
+            predicted_total: estimate.as_ref().map(|e| e.machine_impact_bytes),
         }),
     };
 
@@ -313,7 +313,7 @@ fn settings_view(state: &AppState) -> Settings {
         llama_server_path: config.llama_server_path.clone(),
         default_profile: config.default_profile.clone(),
         calibration_samples: config.calibration.len(),
-        fitted_overhead: estimate::fit_overhead(&config.calibration),
+        fitted_residency: estimate::fit_residency(&config.calibration),
         capabilities: caps.as_ref().ok().cloned(),
         capability_error: caps.err(),
     }

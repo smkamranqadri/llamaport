@@ -101,11 +101,17 @@ pub fn assess(inputs: Inputs) -> Assessment {
     }
 
     if let Some(headroom) = headroom {
-        if headroom < HEADROOM_RED {
+        if headroom < 0 {
+            state = state.worst(SafetyState::Red);
+            reasons.push(format!(
+                "projected to exceed installed memory by {}",
+                gb(-headroom)
+            ));
+        } else if headroom < HEADROOM_RED {
             state = state.worst(SafetyState::Red);
             reasons.push(format!(
                 "only {} would be left for macOS and everything else",
-                gb(headroom.max(0))
+                gb(headroom)
             ));
         } else if headroom < HEADROOM_YELLOW {
             state = state.worst(SafetyState::Yellow);
@@ -224,6 +230,25 @@ mod tests {
         });
         assert_eq!(double_counted.projected_used_bytes, Some(46 * GIB));
         assert_eq!(double_counted.state, SafetyState::Red);
+    }
+
+    #[test]
+    fn exceeding_installed_memory_says_by_how_much() {
+        let assessment = assess(Inputs {
+            used: Some(16 * GIB),
+            predicted_total: Some(20 * GIB),
+            ..base()
+        });
+        assert_eq!(assessment.headroom_bytes, Some(-4 * GIB as i64));
+        assert_eq!(assessment.state, SafetyState::Red);
+        assert!(
+            assessment
+                .reasons
+                .iter()
+                .any(|r| r.contains("exceed installed memory by 4.0 GB")),
+            "a negative headroom must not be reported as 0.0 GB left: {:?}",
+            assessment.reasons
+        );
     }
 
     #[test]

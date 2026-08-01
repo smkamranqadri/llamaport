@@ -173,3 +173,40 @@ user's manually-started server with an over-broad `pkill`.
 
 **Implementation:** scheduled for Phase 1 alongside the other lifecycle-adjacent
 fixes, or Phase 6 if it proves larger than expected.
+
+---
+
+## D15 — Memory prediction is multiplicative, not additive
+
+**Date:** Phase 1. **Status:** settled. Supersedes the additive overhead model in D6.
+
+Measured on the 32 GB M2 while running `Qwen3.6-35B-A3B-UD-Q3_K_XL`:
+
+| | |
+| --- | --- |
+| Idle, before launch | 16.5 GB used |
+| Running | 27.1 GB used |
+| **Observed growth** | **≈10.6 GB** |
+| Nominal weights + KV | 18.4 GB (15.7 + 2.7) |
+
+The machine grew by less than the weights file alone. With mmap plus Metal, a
+large fraction of weight pages never counts as used memory, so `observed −
+nominal` is reliably negative. The additive fit discards negative residuals by
+design (D7), which meant it could never accumulate a single usable sample on
+this hardware: calibration would have sat at the placeholder constant forever
+regardless of how many models were run.
+
+The estimate now carries two distinct figures:
+
+- **Nominal** — weights + KV + overhead. What the model needs on paper.
+- **Machine impact** — `residency × (weights + KV)`, where residency is the
+  median observed ratio across recorded runs. What used memory is expected to
+  grow by, and what the safety assessment consumes.
+
+Uncalibrated, machine impact falls back to nominal, which over-predicts on this
+platform — the safe direction. Ratios outside 0.1–2.0 are discarded as
+measurement noise rather than fitted.
+
+**Reverses if:** a platform appears where the ratio is not stable across models,
+in which case residency likely needs to be per-architecture or per-quantisation
+rather than a single machine-wide constant.
