@@ -9,9 +9,12 @@ function Badges({ model }: { model: ModelEntry }) {
     <div className="badges">
       {model.quant && <span className="badge">{model.quant}</span>}
       {md?.expertCount ? <span className="badge badge-moe">MoE</span> : null}
-      {md?.hasChatTemplate && (
-        <span className="badge badge-quiet" title="Embedded chat template">
-          template
+      {md != null && !md.hasChatTemplate && (
+        <span
+          className="badge badge-warn"
+          title="No chat template embedded in the file — llama.cpp will fall back to a generic prompt format unless you supply one with --chat-template"
+        >
+          no template
         </span>
       )}
     </div>

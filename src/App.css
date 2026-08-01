@@ -950,3 +950,14 @@ input[type="range"] {
   padding: 4px 0;
   font-size: 12px;
 }
+
+.badge-warn {
+  color: #a2701a;
+  background: color-mix(in srgb, #d99b28 22%, transparent);
+}
+
+@media (prefers-color-scheme: dark) {
+  .badge-warn {
+    color: #e0aa4a;
+  }
+}

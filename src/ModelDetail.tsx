@@ -43,7 +43,7 @@ function Facts({ model }: { model: ModelEntry }) {
     ["Max context", md?.contextLength ? formatContext(md.contextLength) : "—"],
     ["Layers", md?.blockCount?.toString() ?? "—"],
     ["KV heads", md?.headCountKv?.toString() ?? "—"],
-    ["Chat template", md?.hasChatTemplate ? "embedded" : "none"],
+    ["Chat template", md?.hasChatTemplate ? "embedded" : "none — prompts may be misformatted"],
     ["Experts", md?.expertCount ? `${md.expertCount} (MoE)` : "dense"],
   ];
 
