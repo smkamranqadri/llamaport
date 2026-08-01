@@ -242,8 +242,9 @@ export default function Benchmarks() {
         <div className="empty">
           <p className="empty-title">No runs recorded yet</p>
           <p className="empty-detail">
-            Start a model and press “Run benchmark” — it prefills to a working
-            context depth before measuring, which takes about a minute.
+            Start a model and press “Run benchmark” — it prefills 16K tokens
+            before measuring, so decode speed reflects a real session rather than
+            an empty context. Takes about a minute.
           </p>
         </div>
       ) : (

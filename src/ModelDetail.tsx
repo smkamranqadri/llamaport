@@ -446,11 +446,11 @@ export default function ModelDetail({
               <button
                 className="button"
                 disabled={testing || benchmarking}
-                title="Prefills 8K tokens then generates 256, so decode speed is measured at working depth"
+                title="Prefills 16K tokens then generates 256, matching the context depth of a real coding session"
                 onClick={() => {
                   setBenchmarking(true);
                   setFailure(null);
-                  benchmarkRun(8192, 256)
+                  benchmarkRun(16384, 256)
                     .then(() =>
                       setFailure(null),
                     )
@@ -458,7 +458,7 @@ export default function ModelDetail({
                     .finally(() => setBenchmarking(false));
                 }}
               >
-                {benchmarking ? "Benchmarking…" : "Run benchmark"}
+                {benchmarking ? "Benchmarking… (~1 min)" : "Run benchmark"}
               </button>
             </span>
           </div>
