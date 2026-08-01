@@ -3,6 +3,7 @@ pub mod estimate;
 pub mod gguf;
 pub mod probe;
 pub mod profile;
+pub mod profiles;
 pub mod runner;
 pub mod safety;
 pub mod store;
@@ -20,6 +21,7 @@ use catalog::{DirInfo, ModelEntry};
 use estimate::Estimate;
 use probe::Capabilities;
 use profile::{Profile, ProfilePatch};
+use profiles::NamedProfile;
 use runner::{EventSink, LaunchSpec, Orphan, RunState, Runner, RunnerSnapshot};
 use store::Config;
 
@@ -320,6 +322,113 @@ fn settings_view(state: &AppState) -> Settings {
 }
 
 #[tauri::command]
+fn list_profiles(state: State<'_, AppState>) -> Vec<NamedProfile> {
+    let config = state.config.lock().expect("config lock");
+    profiles::resolve_all(&config.profiles)
+}
+
+/// Creates when `id` is empty, updates otherwise. A colliding name is suffixed rather
+/// than rejected, so saving never fails on a name the user cannot see.
+#[tauri::command]
+fn save_named_profile(
+    mut profile: NamedProfile,
+    state: State<'_, AppState>,
+) -> Result<Vec<NamedProfile>, String> {
+    if profile.name.trim().is_empty() {
+        return Err("a profile needs a name".into());
+    }
+
+    {
+        let mut config = state.config.lock().expect("config lock");
+        let resolved = profiles::resolve_all(&config.profiles);
+
+        let others: Vec<NamedProfile> = resolved
+            .iter()
+            .filter(|entry| entry.id != profile.id)
+            .cloned()
+            .collect();
+
+        profile.name = profiles::unique_name(profile.name.trim(), &others);
+        if profile.id.trim().is_empty() {
+            profile.id = profiles::new_id(&profile.name, &others);
+        }
+        profile.built_in = profiles::is_built_in(&profile.id);
+
+        match config
+            .profiles
+            .iter_mut()
+            .find(|entry| entry.id == profile.id)
+        {
+            Some(existing) => *existing = profile,
+            None => config.profiles.push(profile),
+        }
+    }
+
+    state.save_config()?;
+    Ok(list_profiles(state))
+}
+
+#[tauri::command]
+fn duplicate_profile(id: String, state: State<'_, AppState>) -> Result<Vec<NamedProfile>, String> {
+    {
+        let mut config = state.config.lock().expect("config lock");
+        let resolved = profiles::resolve_all(&config.profiles);
+
+        let source = resolved
+            .iter()
+            .find(|entry| entry.id == id)
+            .ok_or_else(|| format!("no profile with id {id}"))?;
+
+        let mut copy = source.clone();
+        copy.built_in = false;
+        copy.name = profiles::unique_name(&source.name, &resolved);
+        copy.id = profiles::new_id(&copy.name, &resolved);
+        config.profiles.push(copy);
+    }
+
+    state.save_config()?;
+    Ok(list_profiles(state))
+}
+
+/// Built-in templates cannot be deleted — only reset. Deleting one would leave the app
+/// permanently missing a template the UI advertises.
+#[tauri::command]
+fn delete_profile(id: String, state: State<'_, AppState>) -> Result<Vec<NamedProfile>, String> {
+    if profiles::is_built_in(&id) {
+        return Err("built-in templates cannot be deleted, only reset".into());
+    }
+
+    {
+        let mut config = state.config.lock().expect("config lock");
+        let before = config.profiles.len();
+        config.profiles.retain(|entry| entry.id != id);
+        if config.profiles.len() == before {
+            return Err(format!("no profile with id {id}"));
+        }
+    }
+
+    state.save_config()?;
+    Ok(list_profiles(state))
+}
+
+/// Drops the stored edit so the code definition applies again. User profiles are not
+/// touched.
+#[tauri::command]
+fn reset_profile(id: String, state: State<'_, AppState>) -> Result<Vec<NamedProfile>, String> {
+    if !profiles::is_built_in(&id) {
+        return Err("only built-in templates can be reset".into());
+    }
+
+    {
+        let mut config = state.config.lock().expect("config lock");
+        config.profiles.retain(|entry| entry.id != id);
+    }
+
+    state.save_config()?;
+    Ok(list_profiles(state))
+}
+
+#[tauri::command]
 fn get_settings(state: State<'_, AppState>) -> Settings {
     settings_view(&state)
 }
@@ -536,7 +645,12 @@ pub fn run() {
             runner_stop,
             orphan_status,
             orphan_stop,
-            orphan_dismiss
+            orphan_dismiss,
+            list_profiles,
+            save_named_profile,
+            duplicate_profile,
+            delete_profile,
+            reset_profile
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

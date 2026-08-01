@@ -1,5 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { getLaunchPlan, runnerStart, runnerStop, saveProfile } from "./api";
+import {
+  getLaunchPlan,
+  listProfiles,
+  runnerStart,
+  runnerStop,
+  saveNamedProfile,
+  saveProfile,
+} from "./api";
 import { formatBytes, formatContext } from "./format";
 import {
   bytesOr,
@@ -10,9 +17,11 @@ import {
   Stat,
 } from "./Memory";
 import ProfileForm, { diffProfile } from "./ProfileForm";
+import { applyPatch, workloadPatch } from "./Profiles";
 import type {
   LaunchPlan,
   ModelEntry,
+  NamedProfile,
   Profile,
   RunnerSnapshot,
   Telemetry,
@@ -266,10 +275,16 @@ export default function ModelDetail({
   const [failure, setFailure] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [showLogs, setShowLogs] = useState(false);
+  const [profiles, setProfiles] = useState<NamedProfile[]>([]);
+  const [newProfileName, setNewProfileName] = useState("");
   const history = useRef<number[]>([]);
 
   const isCurrent = runner.modelId === model.id;
   const running = isCurrent && (runner.state === "starting" || runner.state === "ready");
+
+  useEffect(() => {
+    listProfiles().then(setProfiles).catch(() => {});
+  }, []);
 
   useEffect(() => {
     getLaunchPlan(model.id)
@@ -416,6 +431,30 @@ export default function ModelDetail({
 
       <section className="panel">
         <h2>Launch settings</h2>
+
+        {profiles.length > 0 && (
+          <div className="templates">
+            <span className="field-hint">Apply a workload template:</span>
+            <span className="template-buttons">
+              {profiles.map((entry) => (
+                <button
+                  key={entry.id}
+                  className="button"
+                  title={entry.description || undefined}
+                  onClick={() => setForm(applyPatch(form, entry.settings))}
+                >
+                  {entry.name}
+                </button>
+              ))}
+            </span>
+            <span className="field-hint">
+              Templates are starting points sized for this machine, not fixed
+              answers. They change context, cache types and slots — never alias,
+              host or port.
+            </span>
+          </div>
+        )}
+
         <ProfileForm
           value={form}
           defaults={plan.effectiveDefaults}
@@ -443,6 +482,37 @@ export default function ModelDetail({
               saved overrides: {plan.overridden.join(", ")}
             </span>
           )}
+        </div>
+
+        <div className="panel-actions">
+          <input
+            value={newProfileName}
+            placeholder="name these settings as a reusable profile"
+            onChange={(e) => setNewProfileName(e.currentTarget.value)}
+          />
+          <button
+            className="button"
+            disabled={newProfileName.trim() === ""}
+            onClick={() =>
+              saveNamedProfile({
+                id: "",
+                name: newProfileName.trim(),
+                description: "",
+                builtIn: false,
+                workload: "custom",
+                modelId: null,
+                apiKeyRef: null,
+                settings: workloadPatch(form),
+              })
+                .then((next) => {
+                  setProfiles(next);
+                  setNewProfileName("");
+                })
+                .catch((e) => setFailure(String(e)))
+            }
+          >
+            Save as profile
+          </button>
         </div>
       </section>
 

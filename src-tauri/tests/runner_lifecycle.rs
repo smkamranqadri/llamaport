@@ -189,6 +189,73 @@ fn reaches_ready_reports_telemetry_and_stops() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
+/// An explicit stop is how a run normally ends. It must bank a calibration sample:
+/// the waiter thread cannot, because `stop()` takes the child out from under it.
+#[test]
+fn stopping_a_ready_server_records_a_calibration_sample() {
+    if !have_python() {
+        eprintln!("skipping: python3 not available");
+        return;
+    }
+
+    let dir = fixture_dir("calibration");
+    let port = free_port();
+    let (runner, samples) = runner_with(Arc::new(Recorder::default()));
+
+    runner
+        .start(spec(
+            "python3",
+            vec![
+                "-m".into(),
+                "http.server".into(),
+                port.to_string(),
+                "--directory".into(),
+                dir.to_string_lossy().into_owned(),
+            ],
+            port,
+        ))
+        .expect("start");
+
+    assert!(
+        wait_for(|| runner.snapshot().state == RunState::Ready, 20),
+        "never became ready"
+    );
+    assert!(
+        samples.lock().expect("samples").is_empty(),
+        "nothing should be recorded before the run ends"
+    );
+
+    runner.stop().expect("stop");
+
+    assert_eq!(
+        samples.lock().expect("samples").len(),
+        1,
+        "an explicit stop must record exactly one sample"
+    );
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn a_run_that_never_became_ready_records_nothing() {
+    let (runner, samples) = runner_with(Arc::new(Recorder::default()));
+
+    runner
+        .start(spec(
+            "/bin/sh",
+            vec!["-c".into(), "sleep 30".into()],
+            free_port(),
+        ))
+        .expect("start");
+
+    runner.stop().expect("stop");
+
+    assert!(
+        samples.lock().expect("samples").is_empty(),
+        "a server that never served says nothing about memory"
+    );
+}
+
 #[test]
 fn crash_before_ready_is_not_restarted() {
     let recorder = Arc::new(Recorder::default());

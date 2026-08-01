@@ -145,6 +145,24 @@ impl Inner {
     fn tail(&self, n: usize) -> Vec<String> {
         self.logs.iter().rev().take(n).rev().cloned().collect()
     }
+
+    /// A run that reached `Ready` is worth recording whatever it observed. Zero or
+    /// implausible growth is filtered when the residency is fitted, not here — judging
+    /// it at capture time is how the previous design ended up discarding every sample.
+    fn calibration_sample(&self) -> Option<CalibrationSample> {
+        if self.state != RunState::Ready {
+            return None;
+        }
+        let spec = self.spec.as_ref()?;
+        Some(CalibrationSample {
+            model_id: spec.model_id.clone(),
+            ctx: spec.ctx,
+            cache_type_k: spec.cache_type_k.clone(),
+            cache_type_v: spec.cache_type_v.clone(),
+            predicted_base: spec.predicted_base,
+            observed_total: self.peak_used.saturating_sub(self.baseline_used),
+        })
+    }
 }
 
 pub struct Runner {
@@ -208,20 +226,28 @@ impl Runner {
     }
 
     pub fn stop(&self) -> Result<(), String> {
-        let mut child = {
+        let (mut child, sample) = {
             let mut inner = self.inner.lock().expect("runner lock");
             if inner.child.is_none() {
                 inner.state = RunState::Idle;
                 return Ok(());
             }
+            // Captured before the state changes: an explicit stop is the normal end of a
+            // run, and the waiter thread will not see this exit because the child is
+            // taken here.
+            let sample = inner.calibration_sample();
             inner.stopping = true;
             inner.state = RunState::Stopping;
-            inner.child.take()
+            (inner.child.take(), sample)
         };
 
         if let Some(child) = child.as_mut() {
             let _ = child.kill();
             let _ = child.wait();
+        }
+
+        if let Some(sample) = sample {
+            (self.sink)(sample);
         }
 
         let mut inner = self.inner.lock().expect("runner lock");
@@ -572,27 +598,17 @@ fn spawn_waiter(
 
         let Some(code) = exit else { continue };
 
-        let (was_ready, already_restarted, observed_total) = {
+        let (was_ready, already_restarted, sample) = {
             let mut guard = inner.lock().expect("runner lock");
+            let sample = guard.calibration_sample();
             guard.child = None;
-            (
-                guard.state == RunState::Ready,
-                guard.restarted,
-                guard.peak_used.saturating_sub(guard.baseline_used),
-            )
+            (guard.state == RunState::Ready, guard.restarted, sample)
         };
 
         clear_pidfile();
 
-        if was_ready && observed_total > 0 {
-            sink(CalibrationSample {
-                model_id: spec.model_id.clone(),
-                ctx: spec.ctx,
-                cache_type_k: spec.cache_type_k.clone(),
-                cache_type_v: spec.cache_type_v.clone(),
-                predicted_base: spec.predicted_base,
-                observed_total,
-            });
+        if let Some(sample) = sample {
+            sink(sample);
         }
 
         // A crash before Ready is a configuration problem; restarting reproduces it.

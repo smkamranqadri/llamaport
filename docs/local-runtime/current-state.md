@@ -2,10 +2,40 @@
 
 ## Current phase
 
-**Phase 1 — Real system memory and safety status. Complete and confirmed in the
-running app.**
+**Phase 2 — Workload presets and improved profiles. Code complete, awaiting
+manual UI confirmation.**
 
-## Completed work
+Phase 1 complete and confirmed in the running app (process footprint read 1.3 GB
+against Activity Monitor's 1.28 GB).
+
+## Completed work — Phase 2
+
+- **Schema v2 with migration.** `schemaVersion` added; absence means v1. The
+  migration is a version stamp only — templates come from code, so nothing
+  needed rewriting. Idempotent, and unknown keys still survive.
+- **`Profile` gained `#[serde(default)]`.** Found by a migration test: a
+  `defaultProfile` missing any single field failed to deserialise, and
+  `unwrap_or_default()` then discarded the *entire* config — overrides,
+  calibration, history. Any future field addition would have done this to a
+  downgrade.
+- **Named profiles.** `profiles.rs` with four built-in workload templates
+  (Quality Coding 32K, Balanced 64K, Long Context 128K with q4_0 V cache,
+  Lightweight 8K). Built-ins live in code with stable ids; a stored entry
+  shadows one, which is what makes them editable, and reset drops the stored
+  entry. User profiles are never touched by a reset, and built-ins cannot be
+  deleted.
+- **Templates are sparse patches**, never full profiles — they set context,
+  cache types and slots, and deliberately never alias, host or port.
+- **Name collisions are suffixed, not rejected** (" copy", " copy 2"), so saving
+  cannot fail on a name the user cannot see.
+- **Calibration recording bug fixed.** `stop()` took the child out from under the
+  waiter thread, so the waiter returned before recording and *only an unexpected
+  exit* ever banked a sample. Normal use is always an explicit stop, so the
+  residency model from Phase 1 could never have calibrated. Samples are now
+  captured on both paths, and zero/implausible observations are filtered when
+  fitting rather than when capturing.
+
+## Completed work — Phase 1
 
 **Prerequisite fixes** (required before Phase 2 migration is possible)
 
@@ -61,13 +91,13 @@ Modified: `store.rs`, `runner.rs`, `lib.rs`, `estimate.rs`, `gguf.rs`,
 ```
 cargo fmt --manifest-path src-tauri/Cargo.toml -- --check     # clean
 cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings   # clean
-cargo test --manifest-path src-tauri/Cargo.toml               # 63 passed, 1 ignored
+cargo test --manifest-path src-tauri/Cargo.toml               # 80 passed, 1 ignored
 bun run build                                                 # tsc + vite, clean
 ```
 
 ## Verification results
 
-- **63 tests pass**, 1 ignored (`real_launch`, loads a real model). Up from 40.
+- **80 tests pass**, 1 ignored (`real_launch`, loads a real model). Up from 40.
   New: 5 store persistence, 7 sysmem, 11 safety.
 - clippy clean at `-D warnings` for the first time; 4 findings fixed (2
   pre-existing OR-patterns, 1 identity op, 1 of mine).
@@ -79,9 +109,8 @@ bun run build                                                 # tsc + vite, clea
 
 ## Known problems
 
-1. **Calibration still has zero samples.** Estimates read "not yet calibrated"
-   and use the nominal figure until three runs are recorded. Each clean
-   start-to-stop cycle banks one sample.
+1. **Calibration has zero samples so far**, but recording now works on the
+   normal stop path. Three start-to-stop cycles will fit a residency.
 2. **Residency is fitted machine-wide, not per model.** If Q3 and Q4 turn out to
    have materially different ratios, one constant will be wrong for both (D15).
 3. **Headroom thresholds are unvalidated against real use.** 2/4 GB were chosen
@@ -98,10 +127,11 @@ bun run build                                                 # tsc + vite, clea
 
 ## Exact next step
 
-1. Confirm the panel renders: open a model, check the pre-launch numbers, press
-   Run, check the running numbers, stop, confirm they reset.
-2. Then **Phase 2 — workload presets and improved profiles**: schema v2 with
-   migration from the current shape (absence of `schemaVersion` means v1), named
-   profiles with `builtIn`, four workload templates, duplicate/rename/reset.
-   `store.rs` is now ready for this: atomic writes and unknown-key preservation
-   are in place and tested.
+1. Confirm in the app: Settings shows four built-in templates with badges and
+   Duplicate/Reset; the model detail page shows a template row that changes
+   context and cache types but leaves alias and port alone; "Save as profile"
+   creates a user profile that then appears in both places.
+2. Then **Phase 3 — server health and model test**: `health.rs` with ordered
+   timed checks driven through the existing `EventSink`, a `Redacted` newtype so
+   secrets cannot reach logs or diagnostics, and reasoning detection by probing
+   the response shape rather than assuming a field name.

@@ -4,6 +4,7 @@ import type {
   DirInfo,
   LaunchPlan,
   ModelEntry,
+  NamedProfile,
   Profile,
   ProfilePatch,
   RunnerSnapshot,
@@ -70,6 +71,26 @@ export function runnerStart(
 
 export function runnerStop(): Promise<RunnerSnapshot> {
   return invoke<RunnerSnapshot>("runner_stop");
+}
+
+export function listProfiles(): Promise<NamedProfile[]> {
+  return invoke<NamedProfile[]>("list_profiles");
+}
+
+export function saveNamedProfile(profile: NamedProfile): Promise<NamedProfile[]> {
+  return invoke<NamedProfile[]>("save_named_profile", { profile });
+}
+
+export function duplicateProfile(id: string): Promise<NamedProfile[]> {
+  return invoke<NamedProfile[]>("duplicate_profile", { id });
+}
+
+export function deleteProfile(id: string): Promise<NamedProfile[]> {
+  return invoke<NamedProfile[]>("delete_profile", { id });
+}
+
+export function resetProfile(id: string): Promise<NamedProfile[]> {
+  return invoke<NamedProfile[]>("reset_profile", { id });
 }
 
 export function orphanStatus(): Promise<Orphan | null> {

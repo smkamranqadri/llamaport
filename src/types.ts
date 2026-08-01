@@ -58,6 +58,24 @@ export interface Profile {
 
 export type ProfilePatch = Partial<Profile>;
 
+export type Workload =
+  | "qualityCoding"
+  | "balanced"
+  | "longContext"
+  | "lightweight"
+  | "custom";
+
+export interface NamedProfile {
+  id: string;
+  name: string;
+  description: string;
+  builtIn: boolean;
+  workload: Workload;
+  modelId: string | null;
+  apiKeyRef: string | null;
+  settings: ProfilePatch;
+}
+
 export interface Estimate {
   weightsBytes: number;
   kvBytes: number;

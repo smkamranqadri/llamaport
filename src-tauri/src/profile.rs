@@ -5,8 +5,11 @@ use crate::probe::Capabilities;
 pub const DEFAULT_PORT: u16 = 8888;
 pub const DEFAULT_CTX: u64 = 65536;
 
+/// `default` matters as much as the fields: without it, a `defaultProfile` missing any
+/// single key fails to deserialise, which takes the whole config down with it and resets
+/// overrides, calibration and history. Missing keys must degrade to defaults.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", default)]
 pub struct Profile {
     pub alias: String,
     pub host: String,
