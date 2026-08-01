@@ -1,9 +1,11 @@
 pub mod catalog;
 pub mod estimate;
 pub mod gguf;
+pub mod health;
 pub mod probe;
 pub mod profile;
 pub mod profiles;
+pub mod redact;
 pub mod runner;
 pub mod safety;
 pub mod store;
@@ -498,6 +500,28 @@ fn runner_start(
     Ok(state.runner.snapshot())
 }
 
+/// Runs the health checks against whatever is currently running. Blocking on purpose —
+/// it is a user-initiated action with a visible result — but off the main thread.
+#[tauri::command]
+async fn health_test(state: State<'_, AppState>) -> Result<health::HealthReport, String> {
+    let snapshot = state.runner.snapshot();
+    if snapshot.state != RunState::Ready {
+        return Err("start a model before testing it".into());
+    }
+
+    let target = health::Target {
+        host: "127.0.0.1".to_string(),
+        port: snapshot.port.ok_or("no port recorded")?,
+        alias: snapshot.alias.unwrap_or_default(),
+        pid: snapshot.pid,
+        api_key: None,
+    };
+
+    tauri::async_runtime::spawn_blocking(move || health::run(&target))
+        .await
+        .map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 fn runner_stop(state: State<'_, AppState>) -> Result<RunnerSnapshot, String> {
     state.runner.stop()?;
@@ -643,6 +667,7 @@ pub fn run() {
             runner_logs,
             runner_start,
             runner_stop,
+            health_test,
             orphan_status,
             orphan_stop,
             orphan_dismiss,

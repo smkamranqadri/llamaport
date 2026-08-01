@@ -2,11 +2,34 @@
 
 ## Current phase
 
-**Phase 2 — Workload presets and improved profiles. Code complete, awaiting
-manual UI confirmation.**
+**Phase 3 — Server health and model test. Code complete, awaiting manual UI
+confirmation.**
 
 Phase 1 complete and confirmed in the running app (process footprint read 1.3 GB
 against Activity Monitor's 1.28 GB).
+
+## Completed work — Phase 3
+
+- **`redact.rs`** — `Redacted` newtype with no `Display`, a placeholder `Debug`
+  and `Serialize`, and the value reachable only through `expose()`. Formatting a
+  struct containing a secret therefore cannot print it, and every deliberate use
+  is greppable. Plus argv redaction (`--api-key VALUE` and `--api-key=VALUE`)
+  and header redaction, both ready for phases 6 and 8.
+- **`health.rs`** — eight ordered, individually timed checks: process alive, port
+  reachable, `/health`, `/v1/models`, alias advertised, chat completion,
+  streaming, reasoning. Verdict is Passed / Passed with warnings / Failed.
+- **Failure handling is graded, not binary.** An unadvertised alias warns (the
+  request still works); a failed stream warns; an unreachable port stops the run
+  rather than reporting later checks it never performed.
+- **Reasoning is detected, not assumed** — `reasoning_content`, `reasoning`,
+  `thinking`, or inline `<think>` tags, in that order.
+- **Timings prefer the server's own figures** (`timings.prompt_per_second`,
+  `predicted_per_second`) and fall back to wall-clock only when absent.
+- **The probe is deterministic and small**: fixed prompt, `temperature: 0`,
+  `max_tokens: 16`, with a compile-time assertion that it stays ≤ 32.
+- **UI** — "Test model" button in the Running panel; per-check status, detail
+  and duration; results cleared when the run changes so a stale report cannot be
+  read as current.
 
 ## Completed work — Phase 2
 
@@ -91,13 +114,13 @@ Modified: `store.rs`, `runner.rs`, `lib.rs`, `estimate.rs`, `gguf.rs`,
 ```
 cargo fmt --manifest-path src-tauri/Cargo.toml -- --check     # clean
 cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings   # clean
-cargo test --manifest-path src-tauri/Cargo.toml               # 80 passed, 1 ignored
+cargo test --manifest-path src-tauri/Cargo.toml               # 111 passed, 1 ignored
 bun run build                                                 # tsc + vite, clean
 ```
 
 ## Verification results
 
-- **80 tests pass**, 1 ignored (`real_launch`, loads a real model). Up from 40.
+- **111 tests pass**, 1 ignored (`real_launch`, loads a real model). Up from 40.
   New: 5 store persistence, 7 sysmem, 11 safety.
 - clippy clean at `-D warnings` for the first time; 4 findings fixed (2
   pre-existing OR-patterns, 1 identity op, 1 of mine).
@@ -127,11 +150,13 @@ bun run build                                                 # tsc + vite, clea
 
 ## Exact next step
 
-1. Confirm in the app: Settings shows four built-in templates with badges and
-   Duplicate/Reset; the model detail page shows a template row that changes
-   context and cache types but leaves alias and port alone; "Save as profile"
-   creates a user profile that then appears in both places.
-2. Then **Phase 3 — server health and model test**: `health.rs` with ordered
-   timed checks driven through the existing `EventSink`, a `Redacted` newtype so
-   secrets cannot reach logs or diagnostics, and reasoning detection by probing
-   the response shape rather than assuming a field name.
+1. Confirm in the app: start a model, press "Test model", check that every row
+   reports a status and duration and that the timings look plausible against the
+   telemetry panel.
+2. Then **Phase 4 — benchmark history**: `benchmarks.json` beside config (never
+   inside it), append-only with atomic rewrite, recording the fields listed in
+   the brief plus llama.cpp version from `Capabilities` and peak swap from the
+   Phase 1 sampling. Table, sort, filter, compare two runs, delete, export
+   JSON/CSV. No charts. The goal is an objective Q3 vs Q4 comparison; note that
+   `health.rs` already produces most of the per-run numbers a benchmark row
+   needs.

@@ -764,3 +764,60 @@ input[type="range"] {
   gap: 8px;
   font-weight: 600;
 }
+
+/* Health checks */
+
+.health {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.check-list {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.check {
+  display: grid;
+  grid-template-columns: 16px 140px minmax(0, 1fr) 64px;
+  align-items: baseline;
+  gap: 8px;
+  padding: 3px 0;
+  font-size: 12px;
+}
+
+.check-mark {
+  font-weight: 700;
+  text-align: center;
+}
+
+.check-passed .check-mark {
+  color: #2eb872;
+}
+
+.check-warning .check-mark {
+  color: #d99b28;
+}
+
+.check-failed .check-mark {
+  color: var(--danger);
+}
+
+.check-skipped {
+  color: var(--text-muted);
+}
+
+.check-detail {
+  overflow: hidden;
+  color: var(--text-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.check-duration {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+  text-align: right;
+}

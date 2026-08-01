@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import type {
   DirInfo,
+  HealthReport,
   LaunchPlan,
   ModelEntry,
   NamedProfile,
@@ -71,6 +72,10 @@ export function runnerStart(
 
 export function runnerStop(): Promise<RunnerSnapshot> {
   return invoke<RunnerSnapshot>("runner_stop");
+}
+
+export function healthTest(): Promise<HealthReport> {
+  return invoke<HealthReport>("health_test");
 }
 
 export function listProfiles(): Promise<NamedProfile[]> {

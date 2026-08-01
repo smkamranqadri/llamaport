@@ -162,6 +162,33 @@ export interface Telemetry {
   uptimeSecs: number;
 }
 
+export type CheckStatus = "passed" | "warning" | "failed" | "skipped";
+export type Verdict = "passed" | "passedWithWarnings" | "failed";
+export type Reasoning = "separateField" | "inline" | "notReturned";
+
+export interface HealthCheck {
+  name: string;
+  status: CheckStatus;
+  detail: string;
+  durationMs: number;
+}
+
+export interface HealthTimings {
+  timeToFirstTokenMs: number | null;
+  totalResponseMs: number | null;
+  promptTokens: number | null;
+  generatedTokens: number | null;
+  promptTps: number | null;
+  genTps: number | null;
+}
+
+export interface HealthReport {
+  verdict: Verdict;
+  checks: HealthCheck[];
+  timings: HealthTimings;
+  reasoning: Reasoning;
+}
+
 export interface Capabilities {
   binary: string;
   version: string | null;

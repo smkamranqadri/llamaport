@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   getLaunchPlan,
+  healthTest,
   listProfiles,
   runnerStart,
   runnerStop,
@@ -17,8 +18,10 @@ import {
   Stat,
 } from "./Memory";
 import ProfileForm, { diffProfile } from "./ProfileForm";
+import HealthPanel from "./HealthPanel";
 import { applyPatch, workloadPatch } from "./Profiles";
 import type {
+  HealthReport,
   LaunchPlan,
   ModelEntry,
   NamedProfile,
@@ -277,6 +280,8 @@ export default function ModelDetail({
   const [showLogs, setShowLogs] = useState(false);
   const [profiles, setProfiles] = useState<NamedProfile[]>([]);
   const [newProfileName, setNewProfileName] = useState("");
+  const [health, setHealth] = useState<HealthReport | null>(null);
+  const [testing, setTesting] = useState(false);
   const history = useRef<number[]>([]);
 
   const isCurrent = runner.modelId === model.id;
@@ -299,6 +304,10 @@ export default function ModelDetail({
   useEffect(() => {
     if (isCurrent && (runner.state === "starting" || runner.state === "crashed")) {
       setShowLogs(true);
+    }
+    // A report describes one run; keeping it visible across a restart would misreport.
+    if (runner.state !== "ready") {
+      setHealth(null);
     }
   }, [isCurrent, runner.state]);
 
@@ -415,12 +424,29 @@ export default function ModelDetail({
 
       {isCurrent && runner.state === "ready" && (
         <section className="panel">
-          <h2>Running</h2>
+          <div className="panel-head">
+            <h2>Running</h2>
+            <button
+              className="button"
+              disabled={testing}
+              onClick={() => {
+                setTesting(true);
+                setFailure(null);
+                healthTest()
+                  .then(setHealth)
+                  .catch((e) => setFailure(String(e)))
+                  .finally(() => setTesting(false));
+              }}
+            >
+              {testing ? "Testing…" : "Test model"}
+            </button>
+          </div>
           <TelemetryPanel
             runner={runner}
             telemetry={telemetry}
             history={history.current}
           />
+          {health && <HealthPanel report={health} />}
         </section>
       )}
 

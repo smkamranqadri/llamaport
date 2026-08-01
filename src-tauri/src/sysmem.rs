@@ -101,6 +101,11 @@ pub fn process_footprint_bytes(pid: u32) -> Option<u64> {
     Some(info.ri_phys_footprint)
 }
 
+/// Signal 0 performs the permission and existence checks without delivering anything.
+pub fn process_exists(pid: u32) -> bool {
+    unsafe { libc::kill(pid as libc::c_int, 0) == 0 }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -146,6 +151,12 @@ mod tests {
     fn own_process_reports_a_footprint() {
         let footprint = process_footprint_bytes(std::process::id()).expect("own footprint");
         assert!(footprint > 0);
+    }
+
+    #[test]
+    fn our_own_process_exists_and_an_absurd_pid_does_not() {
+        assert!(process_exists(std::process::id()));
+        assert!(!process_exists(0x7FFF_FFFF));
     }
 
     #[test]
