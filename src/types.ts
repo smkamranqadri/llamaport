@@ -230,6 +230,49 @@ export interface BenchmarkRecord {
   note: string | null;
 }
 
+export interface AgentConnectionInfo {
+  connection: {
+    baseUrl: string;
+    openaiUrl: string;
+    alias: string;
+    host: string;
+    port: number;
+    loopbackOnly: boolean;
+  } | null;
+  healthy: boolean;
+  contextTokens: number | null;
+  displayName: string | null;
+  reasoning: boolean;
+  apps: { name: string; path: string }[];
+  sessionsDir: string | null;
+}
+
+export interface PiLocalProvider {
+  name: string;
+  baseUrl: string | null;
+  api: string | null;
+  hasApiKey: boolean;
+  modelIds: string[];
+  extraKeys: string[];
+}
+
+export interface PiInspection {
+  settingsFound: boolean;
+  modelsFound: boolean;
+  defaultProvider: string | null;
+  defaultModel: string | null;
+  providerNames: string[];
+  localProvider: PiLocalProvider | null;
+  notes: string[];
+}
+
+export interface PiPreview {
+  provider: string;
+  settings: string;
+  modelsPath: string;
+  settingsPath: string;
+}
+
 export interface Capabilities {
   binary: string;
   version: string | null;

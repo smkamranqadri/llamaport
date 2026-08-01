@@ -1,3 +1,4 @@
+pub mod agents;
 pub mod benchmarks;
 pub mod catalog;
 pub mod estimate;
@@ -627,6 +628,98 @@ fn record_benchmark(
     Ok(record)
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct AgentConnection {
+    connection: Option<agents::Connection>,
+    healthy: bool,
+    context_tokens: Option<u64>,
+    display_name: Option<String>,
+    reasoning: bool,
+    apps: Vec<agents::DetectedApp>,
+    sessions_dir: Option<String>,
+}
+
+#[tauri::command]
+fn agent_connection(state: State<'_, AppState>) -> AgentConnection {
+    let snapshot = state.runner.snapshot();
+    let healthy = snapshot.state == RunState::Ready;
+
+    let connection = match (snapshot.port, snapshot.alias.clone()) {
+        (Some(port), Some(alias)) if healthy => Some(agents::connection("127.0.0.1", port, &alias)),
+        _ => None,
+    };
+
+    let model = snapshot
+        .model_id
+        .as_ref()
+        .and_then(|id| state.model(id).ok());
+
+    AgentConnection {
+        connection,
+        healthy,
+        context_tokens: snapshot.server_ctx,
+        display_name: model.as_ref().map(|m| match &m.quant {
+            Some(quant) => format!("{} {}", m.display_name, quant),
+            None => m.display_name.clone(),
+        }),
+        // Qwen-family models in this library return reasoning; the model test confirms it
+        // per server rather than trusting this default.
+        reasoning: true,
+        apps: agents::detect_apps(),
+        sessions_dir: agents::pi_sessions_dir(),
+    }
+}
+
+/// Reads only when the user asks. Returns structure, never file contents.
+#[tauri::command]
+fn pi_inspect() -> agents::PiInspection {
+    agents::inspect_pi()
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PiPreview {
+    provider: String,
+    settings: String,
+    models_path: String,
+    settings_path: String,
+}
+
+#[tauri::command]
+fn pi_preview(
+    provider_name: Option<String>,
+    state: State<'_, AppState>,
+) -> Result<PiPreview, String> {
+    let info = agent_connection(state);
+    let connection = info
+        .connection
+        .ok_or("start a model before generating a configuration")?;
+
+    let inspection = agents::inspect_pi();
+    let existing = inspection.local_provider.as_ref();
+    let provider_name = provider_name
+        .or_else(|| existing.map(|p| p.name.clone()))
+        .unwrap_or_else(|| "local-llama".to_string());
+
+    let home = std::env::var("HOME").unwrap_or_default();
+    Ok(PiPreview {
+        provider: agents::pi_provider_preview(&agents::PreviewInput {
+            provider_name: provider_name.clone(),
+            connection: &connection,
+            display_name: info
+                .display_name
+                .unwrap_or_else(|| connection.alias.clone()),
+            context_tokens: info.context_tokens.unwrap_or(4096),
+            reasoning: info.reasoning,
+            existing,
+        }),
+        settings: agents::pi_settings_preview(&provider_name, &connection.alias),
+        models_path: format!("{home}/.pi/agent/models.json"),
+        settings_path: format!("{home}/.pi/agent/settings.json"),
+    })
+}
+
 #[tauri::command]
 fn benchmarks_list(
     query: Option<benchmarks::Query>,
@@ -842,6 +935,9 @@ pub fn run() {
             runner_stop,
             health_test,
             benchmark_run,
+            agent_connection,
+            pi_inspect,
+            pi_preview,
             benchmarks_list,
             benchmark_delete,
             benchmark_note,

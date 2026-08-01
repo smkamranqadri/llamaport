@@ -1,11 +1,14 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import type {
+  AgentConnectionInfo,
   BenchmarkQuery,
   BenchmarkRecord,
   DirInfo,
   HealthReport,
   LaunchPlan,
+  PiInspection,
+  PiPreview,
   ModelEntry,
   NamedProfile,
   Profile,
@@ -87,6 +90,20 @@ export function benchmarkRun(
   return invoke<BenchmarkRecord>("benchmark_run", {
     depthTokens,
     generateTokens,
+  });
+}
+
+export function agentConnection(): Promise<AgentConnectionInfo> {
+  return invoke<AgentConnectionInfo>("agent_connection");
+}
+
+export function piInspect(): Promise<PiInspection> {
+  return invoke<PiInspection>("pi_inspect");
+}
+
+export function piPreview(providerName?: string): Promise<PiPreview> {
+  return invoke<PiPreview>("pi_preview", {
+    providerName: providerName ?? null,
   });
 }
 

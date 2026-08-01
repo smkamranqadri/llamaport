@@ -882,3 +882,32 @@ input[type="range"] {
 .compare-head .field-hint {
   display: block;
 }
+
+/* Connect */
+
+.copyable {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.copyable code {
+  overflow: hidden;
+  font-family: ui-monospace, "SF Mono", monospace;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.preview-block {
+  margin-top: 14px;
+}
+
+.preview-block .panel-head {
+  margin-bottom: 6px;
+}
+
+.preview-block code {
+  font-family: ui-monospace, "SF Mono", monospace;
+}

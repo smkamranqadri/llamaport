@@ -2,11 +2,42 @@
 
 ## Current phase
 
-**Phase 4 — Benchmark history. Complete, then reworked after the first real use
-exposed three defects (see below).**
+**Phase 5 — Pi and Picot integration. Code complete, awaiting manual UI
+confirmation.**
+
+Phase 4 complete, then reworked after first real use exposed three defects (see
+below).
 
 Phase 1 complete and confirmed in the running app (process footprint read 1.3 GB
 against Activity Monitor's 1.28 GB).
+
+## Completed work — Phase 5
+
+- **`agents.rs`** — endpoint details, permission-gated Pi inspection, configuration
+  preview generation, application detection. **Never writes a Pi file.**
+- **Inspection returns structure, never contents.** `models.json` holds API keys
+  for cloud providers, so returning the file would leak unrelated secrets into
+  event payloads and logs. The app reports provider names, base URLs, model ids
+  and *whether* a key is set — with a test asserting a cloud key cannot appear in
+  the serialised result.
+- **The preview mirrors the installed Pi version** rather than a schema this app
+  invented: `api` and extra keys such as `compat` are copied from the existing
+  local provider when one is found, and omitted when it is not.
+- **The generated key is always a placeholder.** Echoing a real key into text the
+  user will copy and possibly paste elsewhere is the leak `Redacted` exists to
+  prevent.
+- **Port mismatch is surfaced.** The user's Pi points at 8888; the app frequently
+  ends up on 8889 or 8890 after a port fallback, which silently breaks Pi. The
+  Connect screen now says so explicitly.
+- **Applications are detected, not hard-coded** — Picot, VS Code, Cursor, iTerm
+  in /Applications and ~/Applications, with the Pi session folder if present.
+- Fixed a **flaky test**: four tests shared one scratch directory keyed by process
+  id and ran in parallel, so one could delete another's fixture mid-read.
+  Directories are now unique per call; verified over three consecutive runs.
+
+Known shape of the user's Pi setup, from the granted inspection: provider
+`local-llama`, `api: openai-completions`, `baseUrl: http://127.0.0.1:8888/v1`,
+`compat` block present, `contextWindow: 64512` (1024 below the served 65536).
 
 ## Phase 4 rework — what the first real benchmark exposed
 
@@ -169,13 +200,13 @@ Modified: `store.rs`, `runner.rs`, `lib.rs`, `estimate.rs`, `gguf.rs`,
 ```
 cargo fmt --manifest-path src-tauri/Cargo.toml -- --check     # clean
 cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings   # clean
-cargo test --manifest-path src-tauri/Cargo.toml               # 124 passed, 1 ignored
+cargo test --manifest-path src-tauri/Cargo.toml               # 135 passed, 1 ignored
 bun run build                                                 # tsc + vite, clean
 ```
 
 ## Verification results
 
-- **124 tests pass**, 1 ignored (`real_launch`, loads a real model). Up from 40.
+- **135 tests pass**, 1 ignored (`real_launch`, loads a real model). Up from 40.
   New: 5 store persistence, 7 sysmem, 11 safety.
 - clippy clean at `-D warnings` for the first time; 4 findings fixed (2
   pre-existing OR-patterns, 1 identity op, 1 of mine).
@@ -211,7 +242,12 @@ bun run build                                                 # tsc + vite, clea
 
 1. Confirm in the app: run "Test model" on the Q3 and then the Q4 variant, open
    Benchmarks, select both and check the comparison reads sensibly.
-2. Then **Phase 5 — Pi and Picot integration**: read-only, permission-gated
+2. Then **Phase 6 — security guardrails**: validate the *effective* argv rather
+   than the form fields, since `rawArgs` can still reintroduce `--host 0.0.0.0`
+   past every structured guard; add API key storage, which the Connect screen
+   currently has to describe as "none"; port validation and conflict detection.
+
+Superseded — Phase 5 was **Pi and Picot integration**: read-only, permission-gated
    inspection of `~/.pi/agent/settings.json`, preview and copy only, never a
    write, with configurable application paths. Note the app still has no API key
    storage, so the "connect" surface can only describe an unauthenticated
