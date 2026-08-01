@@ -1,0 +1,7 @@
+interface:
+  display_name: "KIS"
+  short_description: "Operate project memory with KIS"
+  default_prompt: "Use $kis to recover project context, choose the right work mode, and keep Knowledge, Intent, and State synchronized."
+
+policy:
+  allow_implicit_invocation: true

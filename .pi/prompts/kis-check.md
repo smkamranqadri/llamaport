@@ -1,0 +1,1 @@
+../../.agents/skills/kis/commands/check.md
