@@ -81,6 +81,8 @@ pub struct Telemetry {
     pub process_footprint_bytes: Option<u64>,
     pub pressure: Pressure,
     pub safety: Option<Assessment>,
+    /// Whether the server answered *just now*, as distinct from the process being alive.
+    pub health_ok: bool,
     pub uptime_secs: u64,
 }
 
@@ -282,6 +284,35 @@ fn emit_state(events: &Events, inner: &Arc<Mutex<Inner>>) {
     }
 }
 
+/// Who, if anyone, already holds a port. Distinguishes "another llama-server" from
+/// "something else entirely", because the remedy differs: the first is usually an
+/// orphan of this app, the second is not ours to touch.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PortConflict {
+    pub port: u16,
+    pub responds_to_health: bool,
+    pub is_llama_server: bool,
+}
+
+pub fn inspect_port(host: &str, port: u16) -> Option<PortConflict> {
+    if TcpListener::bind((host, port)).is_ok() {
+        return None;
+    }
+
+    let responds_to_health = http_get(&format!("http://{host}:{port}/health")).is_ok();
+    // /props is llama.cpp specific, so a positive answer identifies the occupant.
+    let is_llama_server = http_get(&format!("http://{host}:{port}/props"))
+        .map(|body| body.contains("default_generation_settings") || body.contains("model_path"))
+        .unwrap_or(false);
+
+    Some(PortConflict {
+        port,
+        responds_to_health,
+        is_llama_server,
+    })
+}
+
 fn find_free_port(host: &str, start: u16) -> Option<u16> {
     (start..start.saturating_add(PORT_SEARCH_RANGE))
         .find(|port| TcpListener::bind((host, *port)).is_ok())
@@ -341,6 +372,7 @@ fn spawn_run(
             .map(|d| d.as_secs());
         if !is_restart {
             guard.logs.clear();
+            reset_log_file();
         }
         guard.spec = Some(spec.clone());
         guard.child = Some(child);
@@ -393,6 +425,7 @@ fn spawn_log_reader<R: std::io::Read + Send + 'static>(
                 }
                 guard.push_log(line.clone());
             }
+            append_log_line(&line);
             events.emit("runner:log", serde_json::Value::String(line));
         }
     });
@@ -563,6 +596,8 @@ fn telemetry_loop(
             predicted_total: None,
         }));
 
+        telemetry.health_ok = http_get(&format!("{base}/health")).is_ok();
+
         if let Ok(body) = http_get(&format!("{base}/metrics")) {
             let metrics = parse_metrics(&body);
             telemetry.kv_cache_usage = kv_usage(&metrics, ctx);
@@ -714,6 +749,41 @@ struct PidFile {
 
 fn pidfile_path() -> std::path::PathBuf {
     crate::store::config_dir().join("runner.pid")
+}
+
+pub fn log_path() -> std::path::PathBuf {
+    crate::store::config_dir().join("last-run.log")
+}
+
+/// Logs are mirrored to disk as they arrive so the last run survives a crash of either
+/// the server or the app itself — the in-memory ring buffer dies with the process, and
+/// the lines that explain a crash are exactly the ones worth keeping.
+fn append_log_line(line: &str) {
+    use std::io::Write;
+    let path = log_path();
+    let _ = std::fs::create_dir_all(crate::store::config_dir());
+    if let Ok(mut file) = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&path)
+    {
+        let _ = writeln!(file, "{line}");
+    }
+}
+
+fn reset_log_file() {
+    let _ = std::fs::write(log_path(), "");
+}
+
+/// The previous run's output, for showing after an unexpected exit.
+pub fn previous_logs() -> Vec<String> {
+    std::fs::read_to_string(log_path())
+        .map(|text| {
+            let lines: Vec<String> = text.lines().map(String::from).collect();
+            let start = lines.len().saturating_sub(LOG_CAPACITY);
+            lines[start..].to_vec()
+        })
+        .unwrap_or_default()
 }
 
 fn write_pidfile(pid: u32, port: u16, model_id: &str) {

@@ -4,6 +4,7 @@ import {
   getLaunchPlan,
   healthTest,
   listProfiles,
+  revealPath,
   runnerStart,
   runnerStop,
   saveNamedProfile,
@@ -249,6 +250,16 @@ function TelemetryPanel({
         </div>
       )}
 
+      <div className="telemetry-row">
+        <span className="telemetry-label">Health</span>
+        <span className="telemetry-value">
+          <span className={`dot state-${telemetry?.healthOk ? "ready" : "starting"}`} />
+          {telemetry?.healthOk
+            ? " responding now"
+            : " process alive, endpoint not answering"}
+        </span>
+      </div>
+
       {runner.serverCtx != null && (
         <p className="field-hint">
           server reports {runner.serverCtx.toLocaleString()} tokens of context
@@ -371,8 +382,16 @@ export default function ModelDetail({
           <button className="link-back" onClick={onBack}>
             ← Library
           </button>
-          <h1>{model.displayName}</h1>
-          <p className="screen-subtitle">{model.path}</p>
+          <h1 title={model.fileName}>{model.displayName}</h1>
+          <p className="screen-subtitle" title={model.path}>
+            {model.path}{" "}
+            <button
+              className="link-stop"
+              onClick={() => void revealPath(model.path).catch(() => {})}
+            >
+              reveal in Finder
+            </button>
+          </p>
         </div>
         <div className="actions">
           {running ? (
@@ -405,6 +424,17 @@ export default function ModelDetail({
       </header>
 
       {blocked && <p className="notice notice-error">{blocked}</p>}
+
+      {!running && (preview ?? plan).portConflict && (
+        <p className="notice">
+          Port {(preview ?? plan).portConflict!.port} is already in use
+          {(preview ?? plan).portConflict!.isLlamaServer
+            ? " by another llama-server — probably one this app lost track of."
+            : " by another process."}{" "}
+          This launch will fall forward to the next free port, which will break any
+          client configured for {(preview ?? plan).portConflict!.port}.
+        </p>
+      )}
       {failure && <p className="notice notice-error">{failure}</p>}
 
       {isCurrent && runner.state === "crashed" && (
@@ -477,6 +507,33 @@ export default function ModelDetail({
       </section>
 
       <section className="panel">
+        <h2>Context</h2>
+        <div className="telemetry-stats">
+          <Stat
+            label="Model maximum"
+            value={
+              plan.maxCtx == null ? "Unavailable" : plan.maxCtx.toLocaleString()
+            }
+            hint="from the file's metadata"
+          />
+          <Stat
+            label="Current profile"
+            value={form.ctx.toLocaleString()}
+            hint="what this launch will request"
+          />
+          <Stat
+            label="Estimated practical range"
+            value={
+              plan.practicalCtx == null
+                ? "Unavailable"
+                : `up to ${plan.practicalCtx.toLocaleString()}`
+            }
+            hint="for this machine as it is right now — an estimate, not a guarantee"
+          />
+        </div>
+      </section>
+
+      <section className="panel">
         <h2>Launch settings</h2>
 
         {profiles.length > 0 && (
@@ -506,6 +563,8 @@ export default function ModelDetail({
           value={form}
           defaults={plan.effectiveDefaults}
           maxCtx={plan.maxCtx}
+          practicalCtx={(preview ?? plan).practicalCtx}
+          riskyCtx={(preview ?? plan).riskyCtx}
           onChange={setForm}
         />
         <div className="panel-actions">

@@ -44,7 +44,9 @@ function ModelRow({
             {isRunning && <span className={`dot state-${runner.state}`} />}
             {model.displayName}
           </span>
-          <span className="model-file">{model.fileName}</span>
+          <span className="model-file" title={model.fileName}>
+            {model.fileName}
+          </span>
           {model.error && <span className="model-error">{model.error}</span>}
           {incomplete && (
             <span className="model-error">

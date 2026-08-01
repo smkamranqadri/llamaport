@@ -106,7 +106,14 @@ struct LaunchPlan {
     estimate: Option<Estimate>,
     total_memory: u64,
     memory: PlanMemory,
+    /// Model metadata: the ceiling the file declares.
     max_ctx: Option<u64>,
+    /// Hardware estimate: the largest context that still leaves the machine comfortable.
+    /// Depends on what else is running, so it moves.
+    practical_ctx: Option<u64>,
+    /// Beyond this the prediction turns red for this machine.
+    risky_ctx: Option<u64>,
+    port_conflict: Option<runner::PortConflict>,
     capability_error: Option<String>,
 }
 
@@ -216,9 +223,34 @@ fn build_plan(
         }),
     };
 
+    // Budgets for the two context markers: what fits while staying comfortable, and
+    // what fits before the prediction turns red.
+    let spare = |reserve: i64| -> Option<i64> {
+        let installed = installed? as i64;
+        let used = used? as i64;
+        let running = running_model_bytes.unwrap_or(0) as i64;
+        Some(installed - (used - running) - reserve)
+    };
+
+    let context_for = |reserve: i64| -> Option<u64> {
+        let md = model.metadata.as_ref()?;
+        estimate::context_within_budget(
+            md,
+            model.size_bytes,
+            &profile.cache_type_k,
+            &profile.cache_type_v,
+            residency,
+            spare(reserve)?,
+            md.context_length.unwrap_or(profile.ctx),
+        )
+    };
+
     Ok(LaunchPlan {
         total_memory: installed.unwrap_or_else(|| system.total_memory()),
         memory,
+        practical_ctx: context_for(safety::HEADROOM_YELLOW),
+        risky_ctx: context_for(safety::HEADROOM_RED),
+        port_conflict: runner::inspect_port(&profile.host, profile.port),
         max_ctx: model.metadata.as_ref().and_then(|m| m.context_length),
         profile,
         effective_defaults,
@@ -444,9 +476,28 @@ fn runner_status(state: State<'_, AppState>) -> RunnerSnapshot {
     state.runner.snapshot()
 }
 
+/// Falls back to the previous run's file when memory is empty, so the output that
+/// explains a crash survives the app restarting.
 #[tauri::command]
 fn runner_logs(state: State<'_, AppState>) -> Vec<String> {
-    state.runner.logs()
+    let live = state.runner.logs();
+    if live.is_empty() {
+        runner::previous_logs()
+    } else {
+        live
+    }
+}
+
+/// Selects the file in Finder rather than opening it — a 20 GB GGUF should not be
+/// handed to whatever application claims the extension.
+#[tauri::command]
+fn reveal_path(path: String) -> Result<(), String> {
+    std::process::Command::new("open")
+        .arg("-R")
+        .arg(&path)
+        .spawn()
+        .map(|_| ())
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -935,6 +986,7 @@ pub fn run() {
             get_settings,
             runner_status,
             runner_logs,
+            reveal_path,
             runner_start,
             runner_stop,
             health_test,

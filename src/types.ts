@@ -96,6 +96,13 @@ export interface LaunchPlan {
   totalMemory: number;
   memory: PlanMemory;
   maxCtx: number | null;
+  practicalCtx: number | null;
+  riskyCtx: number | null;
+  portConflict: {
+    port: number;
+    respondsToHealth: boolean;
+    isLlamaServer: boolean;
+  } | null;
   capabilityError: string | null;
 }
 
@@ -159,6 +166,7 @@ export interface Telemetry {
   processFootprintBytes: number | null;
   pressure: Pressure;
   safety: Assessment | null;
+  healthOk: boolean;
   uptimeSecs: number;
 }
 

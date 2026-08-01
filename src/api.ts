@@ -79,6 +79,10 @@ export function runnerStop(): Promise<RunnerSnapshot> {
   return invoke<RunnerSnapshot>("runner_stop");
 }
 
+export function revealPath(path: string): Promise<void> {
+  return invoke<void>("reveal_path", { path });
+}
+
 export function healthTest(): Promise<HealthReport> {
   return invoke<HealthReport>("health_test");
 }

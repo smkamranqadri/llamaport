@@ -911,3 +911,27 @@ input[type="range"] {
 .preview-block code {
   font-family: ui-monospace, "SF Mono", monospace;
 }
+
+/* Context markers */
+
+.ctx-scale {
+  position: relative;
+  display: block;
+  height: 8px;
+}
+
+.ctx-mark {
+  position: absolute;
+  top: 0;
+  width: 2px;
+  height: 6px;
+  border-radius: 1px;
+}
+
+.ctx-mark-comfortable {
+  background: #d99b28;
+}
+
+.ctx-mark-risky {
+  background: var(--danger);
+}

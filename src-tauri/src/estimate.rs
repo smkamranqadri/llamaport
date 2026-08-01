@@ -125,6 +125,60 @@ pub fn fit_residency(samples: &[CalibrationSample]) -> Option<f64> {
     Some(ratios[ratios.len() / 2])
 }
 
+/// Bytes of KV cache per token of context, independent of how long the context is.
+pub fn kv_bytes_per_token(md: &GgufMetadata, cache_k: &str, cache_v: &str) -> Option<f64> {
+    let layers = md.block_count? as f64;
+    let kv_heads = md.head_count_kv? as f64;
+    let k_dim = md.head_dim()? as f64;
+    let v_dim = md.value_head_dim()? as f64;
+
+    Some(
+        layers
+            * kv_heads
+            * ((k_dim * bytes_per_element(cache_k)) + (v_dim * bytes_per_element(cache_v))),
+    )
+}
+
+/// The largest context whose predicted machine impact still fits in `budget_bytes`.
+///
+/// Deliberately reported as a range-finder rather than a limit: it depends on what else
+/// is running right now, which is why the UI calls it an estimate for this machine and
+/// not a property of the model.
+pub fn context_within_budget(
+    md: &GgufMetadata,
+    file_size: u64,
+    cache_k: &str,
+    cache_v: &str,
+    residency: Option<f64>,
+    budget_bytes: i64,
+    max_ctx: u64,
+) -> Option<u64> {
+    let per_token = kv_bytes_per_token(md, cache_k, cache_v)?;
+    if per_token <= 0.0 {
+        return None;
+    }
+
+    let scale = residency.unwrap_or(1.0);
+    // Uncalibrated the nominal figure also carries a fixed overhead; calibrated, the
+    // ratio absorbs it.
+    let fixed = if residency.is_some() {
+        file_size as f64 * scale
+    } else {
+        file_size as f64 + DEFAULT_OVERHEAD_BYTES as f64
+    };
+
+    let remaining = budget_bytes as f64 - fixed;
+    if remaining <= 0.0 {
+        return Some(0);
+    }
+
+    let tokens = (remaining / (per_token * scale)).floor();
+    if tokens <= 0.0 {
+        return Some(0);
+    }
+    Some((tokens as u64).min(max_ctx))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -208,6 +262,90 @@ mod tests {
             predicted_base: predicted,
             observed_total: observed,
         }
+    }
+
+    #[test]
+    fn a_bigger_budget_allows_more_context() {
+        let md = metadata(8, 128, None);
+        let small = context_within_budget(
+            &md,
+            15_000_000_000,
+            "q8_0",
+            "q8_0",
+            Some(0.6),
+            20_000_000_000,
+            262144,
+        );
+        let large = context_within_budget(
+            &md,
+            15_000_000_000,
+            "q8_0",
+            "q8_0",
+            Some(0.6),
+            28_000_000_000,
+            262144,
+        );
+        assert!(large > small, "{large:?} should exceed {small:?}");
+    }
+
+    #[test]
+    fn a_budget_below_the_weights_allows_no_context() {
+        let md = metadata(8, 128, None);
+        let found = context_within_budget(
+            &md,
+            20_000_000_000,
+            "q8_0",
+            "q8_0",
+            Some(1.0),
+            5_000_000_000,
+            262144,
+        );
+        assert_eq!(found, Some(0), "weights alone do not fit");
+    }
+
+    #[test]
+    fn the_model_maximum_is_never_exceeded() {
+        let md = metadata(8, 128, None);
+        let found = context_within_budget(
+            &md,
+            1_000_000,
+            "q8_0",
+            "q8_0",
+            Some(0.5),
+            900_000_000_000,
+            32768,
+        );
+        assert_eq!(
+            found,
+            Some(32768),
+            "hardware headroom cannot raise a model's ceiling"
+        );
+    }
+
+    #[test]
+    fn a_quantised_cache_buys_more_context_than_f16() {
+        let md = metadata(8, 128, None);
+        let budget = 25_000_000_000;
+        let q8 = context_within_budget(
+            &md,
+            15_000_000_000,
+            "q8_0",
+            "q8_0",
+            Some(0.6),
+            budget,
+            262144,
+        );
+        let f16 =
+            context_within_budget(&md, 15_000_000_000, "f16", "f16", Some(0.6), budget, 262144);
+        assert!(q8 > f16, "q8_0 {q8:?} should allow more than f16 {f16:?}");
+    }
+
+    #[test]
+    fn per_token_cost_is_independent_of_context_length() {
+        let md = metadata(2, 128, None);
+        let per_token = kv_bytes_per_token(&md, "q8_0", "q8_0").expect("per token");
+        let at_8k = kv_bytes(&md, 8192, "q8_0", "q8_0").expect("kv") as f64;
+        assert!((per_token * 8192.0 - at_8k).abs() < 1.0);
     }
 
     #[test]

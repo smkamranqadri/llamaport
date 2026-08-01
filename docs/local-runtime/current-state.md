@@ -2,14 +2,34 @@
 
 ## Current phase
 
-**Phase 5 — Pi and Picot integration. Code complete, awaiting manual UI
-confirmation.**
+**Phase 7 — UI and usability, plus the one carried-over Phase 6 item. Code
+complete, awaiting manual UI confirmation.**
 
 Phase 4 complete, then reworked after first real use exposed three defects (see
 below).
 
 Phase 1 complete and confirmed in the running app (process footprint read 1.3 GB
 against Activity Monitor's 1.28 GB).
+
+## Completed work — Phase 7
+
+- **Three context figures, worded as three different kinds of claim**: "Model
+  maximum" (file metadata), "Current profile" (the runtime value this launch will
+  request), "Estimated practical range" (a hardware estimate for the machine as
+  it is right now, explicitly not a guarantee). Markers on the context slider
+  show where the prediction turns amber and where it turns red.
+- **Port conflict detection before launch** (carried from the skipped Phase 6).
+  Distinguishes another llama-server from an unrelated process, because the
+  remedy differs, and says plainly that falling forward will break clients
+  configured for the original port — the failure that hit Pi twice tonight.
+- **Logs survive a crash.** Output is mirrored to `last-run.log` as it arrives;
+  when the in-memory buffer is empty the previous run's file is served instead,
+  so the lines that explain a crash outlive the process that produced them.
+- **Health is shown separately from process state** — "responding now" versus
+  "process alive, endpoint not answering" — sampled each second rather than
+  inferred from the state machine.
+- Reveal in Finder (selects the file rather than opening a 20 GB GGUF with
+  whatever claims the extension), full filenames on hover in Library and detail.
 
 ## Completed work — Phase 5
 
@@ -200,13 +220,13 @@ Modified: `store.rs`, `runner.rs`, `lib.rs`, `estimate.rs`, `gguf.rs`,
 ```
 cargo fmt --manifest-path src-tauri/Cargo.toml -- --check     # clean
 cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings   # clean
-cargo test --manifest-path src-tauri/Cargo.toml               # 135 passed, 1 ignored
+cargo test --manifest-path src-tauri/Cargo.toml               # 140 passed, 1 ignored
 bun run build                                                 # tsc + vite, clean
 ```
 
 ## Verification results
 
-- **135 tests pass**, 1 ignored (`real_launch`, loads a real model). Up from 40.
+- **140 tests pass**, 1 ignored, stable across repeated runs (`real_launch`, loads a real model). Up from 40.
   New: 5 store persistence, 7 sysmem, 11 safety.
 - clippy clean at `-D warnings` for the first time; 4 findings fixed (2
   pre-existing OR-patterns, 1 identity op, 1 of mine).
@@ -242,7 +262,8 @@ bun run build                                                 # tsc + vite, clea
 
 1. Confirm in the app: run "Test model" on the Q3 and then the Q4 variant, open
    Benchmarks, select both and check the comparison reads sensibly.
-2. **Phase 6 skipped by decision (D16)** — see decisions.md for what stays open.
+2. Next: **Phase 8 — documentation and diagnostics**, the last planned phase.
+   Phase 6 skipped by decision (D16) — see decisions.md for what stays open.
    Superseded plan was: validate the *effective* argv rather
    than the form fields, since `rawArgs` can still reintroduce `--host 0.0.0.0`
    past every structured guard; add API key storage, which the Connect screen
