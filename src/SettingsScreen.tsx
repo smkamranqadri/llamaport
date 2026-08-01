@@ -129,17 +129,6 @@ export default function SettingsScreen({
         )}
       </section>
 
-      <section className="panel">
-        <h2>Memory calibration</h2>
-        <p className="field-hint">
-          {settings.calibrationSamples === 0
-            ? "No runs recorded yet. Until three runs are observed the estimate uses the nominal figure, which over-predicts on Apple Silicon."
-            : `${settings.calibrationSamples} run${settings.calibrationSamples === 1 ? "" : "s"} recorded.`}
-          {settings.fittedResidency != null &&
-            ` Fitted residency: ${Math.round(settings.fittedResidency * 100)}% of nominal weights plus KV cache.`}
-        </p>
-      </section>
-
     </>
   );
 }

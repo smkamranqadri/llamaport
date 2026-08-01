@@ -36,9 +36,8 @@ catalog.rs   scan the models directory, group shard sets
 gguf.rs      hand-rolled GGUF header parser
 probe.rs     locate llama-server, parse --help into a capability set
 profile.rs   the values one launch uses, rendered to argv
-estimate.rs  memory prediction and residency calibration
+estimate.rs  weights and KV cache arithmetic
 sysmem.rs    native macOS memory readings — the only unsafe in the project
-safety.rs    green/amber/red judgement over those readings
 runner.rs    supervise one child: health gate, telemetry, orphan detection
 health.rs    the model test
 store.rs     config, atomic writes, schema migration
@@ -48,11 +47,11 @@ store.rs     config, atomic writes, schema migration
 Library → ModelDetail
   launch_plan(model_id, draft?) → resolve alias and clamp context
                                 → argv + command preview
-                                → memory estimate + safety verdict
+                                → allocation arithmetic
                                 → port conflict check
   Run → Runner::start → spawn + reader/health/waiter threads
                       → EventSink → Tauri events → React
-  Exit → classified by phase → calibration sample
+  Exit → classified by phase
 ```
 
 `launch_plan` runs on every keystroke. It must read cached catalog and cached
@@ -88,40 +87,41 @@ One running model, three sources, all correct and all different:
 | Activity Monitor / `ri_phys_footprint` | 1.28 GB |
 | System wired memory | 20.0 GB |
 
-`-ngl all` puts weights and KV cache in Metal buffers the kernel owns. Predict
-and calibrate **machine-wide**; show the process footprint only if it is labelled
-as excluding GPU-resident weights.
+`-ngl all` puts weights and KV cache in Metal buffers the kernel owns. Report
+**machine-wide** figures; show the process footprint only if it is labelled as
+excluding GPU-resident weights.
 
 Readings come from `sysctl` and `proc_pid_rusage` via `libc`, not from parsing
 `vm_stat` or `memory_pressure`. Every accessor returns `Option`; a size mismatch
 returns `None` rather than trusting the bytes. One unavailable metric must render
 "Unavailable" without blanking the rest.
 
-### Calibrate a ratio, not an overhead
+### Report memory; do not forecast it
 
-Loading a 15.7 GB model with a 2.7 GB KV cache grew machine memory by ~10.6 GB —
-less than the weights alone, because mmapped pages and Metal buffers are not all
-counted as used. An additive fit therefore sees a negative residual on every run
-and never accumulates a sample.
+Two numbers are exact and worth showing: the weights (the file size) and the KV
+cache for a chosen context (`layers × ctx × kv_heads × (k_dim×bpe_k +
+v_dim×bpe_v)`). Both come from the header and neither depends on the machine.
+They answer the question actually being asked: what does this `-c` cost, and what
+does q8_0 versus q4_0 cache save.
 
-Predict two distinct quantities: **nominal** (`weights + KV + overhead`, what the
-model needs on paper) and **machine impact** (`residency × (weights + KV)`, what
-used memory will grow by). The safety verdict consumes machine impact.
-Uncalibrated it falls back to nominal, which over-predicts here — the safe
-direction. Discard ratios outside 0.1–2.0 as measurement noise.
+Everything beyond that was tried and removed. A ratio fitted from observed runs —
+machine growth over nominal weights+KV — was calibrated from four runs of the
+same model at the same context:
 
-Record a sample on **both** exit paths. An explicit stop takes the child out from
-under the waiter thread, so a waiter-only implementation records nothing during
-normal use and calibration never converges.
+| Observed ratio |
+| --- |
+| 0.49, 0.49, 0.42, 0.85 |
 
-### The kernel's pressure signal outranks any percentage
+A spread of 0.42 to 0.85 means residency is a property of the *moment*, not the
+model: how much is already resident, whether the page cache is warm, what macOS
+chooses to evict. The fitted median of 0.49 would predict 9.7 GB for a run that
+cost 17.1 GB — wrong by 76%, and wrong in the optimistic direction precisely when
+the machine is loaded, which is the only time a warning matters.
 
-`kern.memorystatus_vm_pressure_level` is authoritative when it reports warning or
-critical. Projected headroom and swap are heuristics on top. Worst signal wins.
-
-Subtract memory attributable to a running model before projecting a replacement —
-one model runs at a time, and double-counting reports an ordinary model swap as
-impossible.
+So: show live system memory, swap and pressure beside the running model, and show
+the exact allocation arithmetic before launch. Do not compute a verdict, a
+headroom projection or a "practical context" from them. A forecast that can be
+off by 2× is worse than no forecast, because it will be believed.
 
 ### Metric names vanish between builds
 
@@ -175,7 +175,7 @@ and must disable prompt caching with a per-run nonce or it measures nothing.
 
 One file, `~/Library/Application Support/llama-cpp-hub/config.json`, written to a
 temporary path and renamed. Holds the models directory, the llama-server path,
-calibration samples, and the settings each model was last launched with.
+and the settings each model was last launched with.
 
 `Profile` carries `#[serde(default)]` per field: without it, one missing key
 fails the whole document and `unwrap_or_default()` silently discards every other
@@ -206,11 +206,8 @@ deliberately.
 
 ## Known gaps
 
-- Calibration has no samples yet, so estimates use the pessimistic nominal figure.
 - MLA architectures (`deepseek2`) over-count KV — the compressed latent is not
   per-head.
-- Headroom thresholds (2 GB red, 4 GB amber) are a judgement call, unvalidated
-  against daily use.
 - `rawArgs` bypasses structured validation; `--host 0.0.0.0` typed there would
   expose an unauthenticated server. Default binding is loopback.
 - No API keys, so a server behind authentication cannot be tested.

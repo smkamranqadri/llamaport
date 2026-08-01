@@ -25,15 +25,11 @@ function Field({
 export default function ProfileForm({
   value,
   maxCtx,
-  practicalCtx,
-  riskyCtx,
   showAlias = true,
   onChange,
 }: {
   value: Profile;
   maxCtx: number | null;
-  practicalCtx?: number | null;
-  riskyCtx?: number | null;
   showAlias?: boolean;
   onChange: (next: Profile) => void;
 }) {
@@ -78,24 +74,6 @@ export default function ProfileForm({
             value={Math.min(value.ctx, ctxCeiling)}
             onChange={(e) => set("ctx", Number(e.currentTarget.value))}
           />
-          {(practicalCtx != null || riskyCtx != null) && (
-            <span className="ctx-scale">
-              {practicalCtx != null && (
-                <span
-                  className="ctx-mark ctx-mark-comfortable"
-                  style={{ left: `${Math.min(100, (practicalCtx / ctxCeiling) * 100)}%` }}
-                  title={`Comfortable up to about ${practicalCtx.toLocaleString()} tokens on this machine right now`}
-                />
-              )}
-              {riskyCtx != null && (
-                <span
-                  className="ctx-mark ctx-mark-risky"
-                  style={{ left: `${Math.min(100, (riskyCtx / ctxCeiling) * 100)}%` }}
-                  title={`Beyond about ${riskyCtx.toLocaleString()} tokens the prediction turns red`}
-                />
-              )}
-            </span>
-          )}
         </>
       </Field>
 

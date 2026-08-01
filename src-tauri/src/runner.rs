@@ -9,8 +9,6 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use serde::{Deserialize, Serialize};
 use sysinfo::{Pid, ProcessesToUpdate, System};
 
-use crate::estimate::CalibrationSample;
-use crate::safety::{self, Assessment, Inputs};
 use crate::sysmem::{self, Pressure};
 
 /// The runner reports through this rather than talking to Tauri directly, so its
@@ -26,8 +24,6 @@ const CRASH_TAIL: usize = 20;
 const HEALTH_INTERVAL: Duration = Duration::from_millis(500);
 const TELEMETRY_INTERVAL: Duration = Duration::from_secs(1);
 const START_TIMEOUT: Duration = Duration::from_secs(900);
-
-pub type SampleSink = Arc<dyn Fn(CalibrationSample) + Send + Sync>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -75,11 +71,9 @@ pub struct Telemetry {
     pub system_used_bytes: Option<u64>,
     pub system_total_bytes: Option<u64>,
     pub swap_used_bytes: Option<u64>,
-    pub model_delta_bytes: Option<u64>,
     /// Activity Monitor's Memory column for the child. Undercounts GPU-resident weights.
     pub process_footprint_bytes: Option<u64>,
     pub pressure: Pressure,
-    pub safety: Option<Assessment>,
     /// Whether the server answered *just now*, as distinct from the process being alive.
     pub health_ok: bool,
     pub uptime_secs: u64,
@@ -110,10 +104,6 @@ struct Inner {
     crash_tail: Vec<String>,
     restarted: bool,
     stopping: bool,
-    baseline_used: u64,
-    peak_used: u64,
-    peak_footprint: u64,
-    peak_swap: u64,
     started_secs: Option<u64>,
     port: Option<u16>,
     requested_port: Option<u16>,
@@ -148,34 +138,15 @@ impl Inner {
     fn tail(&self, n: usize) -> Vec<String> {
         self.logs.iter().rev().take(n).rev().cloned().collect()
     }
-
-    /// A run that reached `Ready` is worth recording whatever it observed. Zero or
-    /// implausible growth is filtered when the residency is fitted, not here — judging
-    /// it at capture time is how the previous design ended up discarding every sample.
-    fn calibration_sample(&self) -> Option<CalibrationSample> {
-        if self.state != RunState::Ready {
-            return None;
-        }
-        let spec = self.spec.as_ref()?;
-        Some(CalibrationSample {
-            model_id: spec.model_id.clone(),
-            ctx: spec.ctx,
-            cache_type_k: spec.cache_type_k.clone(),
-            cache_type_v: spec.cache_type_v.clone(),
-            predicted_base: spec.predicted_base,
-            observed_total: self.peak_used.saturating_sub(self.baseline_used),
-        })
-    }
 }
 
 pub struct Runner {
     inner: Arc<Mutex<Inner>>,
-    sink: SampleSink,
     events: Events,
 }
 
 impl Runner {
-    pub fn new(events: Events, sink: SampleSink) -> Self {
+    pub fn new(events: Events) -> Self {
         Self {
             events,
             inner: Arc::new(Mutex::new(Inner {
@@ -188,16 +159,11 @@ impl Runner {
                 crash_tail: Vec::new(),
                 restarted: false,
                 stopping: false,
-                baseline_used: 0,
-                peak_used: 0,
-                peak_footprint: 0,
-                peak_swap: 0,
                 started_secs: None,
                 port: None,
                 requested_port: None,
                 server_ctx: None,
             })),
-            sink,
         }
     }
 
@@ -210,54 +176,26 @@ impl Runner {
         inner.logs.iter().cloned().collect()
     }
 
-    /// Peak values seen across the current run, for the benchmark record. `None` when
-    /// telemetry has not sampled yet.
-    pub fn peaks(&self) -> (Option<u64>, Option<u64>) {
-        let guard = self.inner.lock().expect("runner lock");
-        (
-            Some(guard.peak_footprint).filter(|v| *v > 0),
-            Some(guard.peak_swap).filter(|v| *v > 0),
-        )
-    }
-
-    /// Machine-wide memory growth attributable to the running model, for subtracting
-    /// before projecting a replacement launch. `None` when nothing is running.
-    pub fn current_model_bytes(&self) -> Option<u64> {
-        let guard = self.inner.lock().expect("runner lock");
-        if guard.state != RunState::Ready {
-            return None;
-        }
-        Some(guard.peak_used.saturating_sub(guard.baseline_used))
-    }
-
     pub fn start(&self, spec: LaunchSpec) -> Result<(), String> {
         self.stop()?;
-        spawn_run(&self.inner, &self.sink, &self.events, spec, false)
+        spawn_run(&self.inner, &self.events, spec, false)
     }
 
     pub fn stop(&self) -> Result<(), String> {
-        let (mut child, sample) = {
+        let mut child = {
             let mut inner = self.inner.lock().expect("runner lock");
             if inner.child.is_none() {
                 inner.state = RunState::Idle;
                 return Ok(());
             }
-            // Captured before the state changes: an explicit stop is the normal end of a
-            // run, and the waiter thread will not see this exit because the child is
-            // taken here.
-            let sample = inner.calibration_sample();
             inner.stopping = true;
             inner.state = RunState::Stopping;
-            (inner.child.take(), sample)
+            inner.child.take()
         };
 
         if let Some(child) = child.as_mut() {
             let _ = child.kill();
             let _ = child.wait();
-        }
-
-        if let Some(sample) = sample {
-            (self.sink)(sample);
         }
 
         let mut inner = self.inner.lock().expect("runner lock");
@@ -324,7 +262,6 @@ fn describe_conflict(conflict: &PortConflict) -> String {
 
 fn spawn_run(
     inner: &Arc<Mutex<Inner>>,
-    sink: &SampleSink,
     events: &Events,
     spec: LaunchSpec,
     is_restart: bool,
@@ -337,12 +274,6 @@ fn spawn_run(
         return Err(describe_conflict(&conflict));
     }
     let port = spec.port;
-
-    let baseline_used = {
-        let mut system = System::new();
-        system.refresh_memory();
-        system.used_memory()
-    };
 
     let mut child = Command::new(&spec.binary)
         .args(&spec.args)
@@ -362,10 +293,6 @@ fn spawn_run(
         guard.error = None;
         guard.crash_tail.clear();
         guard.stopping = false;
-        guard.baseline_used = baseline_used;
-        guard.peak_used = 0;
-        guard.peak_footprint = 0;
-        guard.peak_swap = 0;
         guard.port = Some(port);
         guard.requested_port = Some(port);
         guard.server_ctx = None;
@@ -394,13 +321,7 @@ fn spawn_run(
     }
 
     spawn_health_and_telemetry(inner.clone(), events.clone(), generation, spec.clone());
-    spawn_waiter(
-        inner.clone(),
-        sink.clone(),
-        events.clone(),
-        generation,
-        spec,
-    );
+    spawn_waiter(inner.clone(), events.clone(), generation, spec);
 
     Ok(())
 }
@@ -566,31 +487,11 @@ fn telemetry_loop(
         telemetry.pressure = sysmem::pressure();
 
         let pid = {
-            let mut guard = inner.lock().expect("runner lock");
-            guard.peak_used = guard.peak_used.max(used);
-            telemetry.model_delta_bytes = Some(used.saturating_sub(guard.baseline_used));
+            let guard = inner.lock().expect("runner lock");
             guard.child.as_ref().map(|c| c.id())
         };
 
         telemetry.process_footprint_bytes = pid.and_then(sysmem::process_footprint_bytes);
-
-        {
-            let mut guard = inner.lock().expect("runner lock");
-            if let Some(footprint) = telemetry.process_footprint_bytes {
-                guard.peak_footprint = guard.peak_footprint.max(footprint);
-            }
-            if let Some(swap) = swap {
-                guard.peak_swap = guard.peak_swap.max(swap);
-            }
-        }
-        telemetry.safety = Some(safety::assess(Inputs {
-            installed,
-            used: Some(used),
-            swap_used: swap,
-            pressure: telemetry.pressure,
-            running_model_bytes: None,
-            predicted_total: None,
-        }));
 
         telemetry.health_ok = http_get(&format!("{base}/health")).is_ok();
 
@@ -628,13 +529,7 @@ fn telemetry_loop(
     }
 }
 
-fn spawn_waiter(
-    inner: Arc<Mutex<Inner>>,
-    sink: SampleSink,
-    events: Events,
-    generation: u64,
-    spec: LaunchSpec,
-) {
+fn spawn_waiter(inner: Arc<Mutex<Inner>>, events: Events, generation: u64, spec: LaunchSpec) {
     thread::spawn(move || loop {
         thread::sleep(Duration::from_millis(250));
 
@@ -655,25 +550,20 @@ fn spawn_waiter(
 
         let Some(code) = exit else { continue };
 
-        let (was_ready, already_restarted, sample) = {
+        let (was_ready, already_restarted) = {
             let mut guard = inner.lock().expect("runner lock");
-            let sample = guard.calibration_sample();
             guard.child = None;
-            (guard.state == RunState::Ready, guard.restarted, sample)
+            (guard.state == RunState::Ready, guard.restarted)
         };
 
         clear_pidfile();
-
-        if let Some(sample) = sample {
-            sink(sample);
-        }
 
         // A crash before Ready is a configuration problem; restarting reproduces it.
         if was_ready && !already_restarted {
             let mut guard = inner.lock().expect("runner lock");
             guard.push_log("[hub] server exited unexpectedly, restarting once".into());
             drop(guard);
-            if spawn_run(&inner, &sink, &events, spec.clone(), true).is_ok() {
+            if spawn_run(&inner, &events, spec.clone(), true).is_ok() {
                 return;
             }
         }

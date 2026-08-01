@@ -7,14 +7,7 @@ import {
   runnerStop,
 } from "./api";
 import { formatBytes, formatContext } from "./format";
-import {
-  bytesOr,
-  headroomText,
-  pressureText,
-  Reasons,
-  SafetyBadge,
-  Stat,
-} from "./Memory";
+import { bytesOr, pressureText, Stat } from "./Memory";
 import ProfileForm from "./ProfileForm";
 import HealthPanel from "./HealthPanel";
 import type {
@@ -57,41 +50,28 @@ function Facts({ model }: { model: ModelEntry }) {
 
 function MemoryBar({ plan }: { plan: LaunchPlan }) {
   const { memory } = plan;
-  const { assessment } = memory;
 
   const machine = (
-    <>
-      <div className="telemetry-stats">
-        <Stat label="Installed" value={bytesOr(memory.installedBytes)} />
-        <Stat label="In use now" value={bytesOr(memory.usedBytes)} />
-        <Stat label="Swap in use" value={bytesOr(memory.swapUsedBytes)} />
-        <Stat label="macOS pressure" value={pressureText(memory.pressure)} />
-        <Stat
-          label="Headroom after launch"
-          value={headroomText(assessment.headroomBytes)}
-          hint="estimate, not a guarantee"
-        />
-      </div>
-      <p className="field-hint">
-        Predicted before launch. Actual usage is measured once the server is
-        running, and the two will differ.
-      </p>
-    </>
+    <div className="telemetry-stats">
+      <Stat label="Installed" value={bytesOr(memory.installedBytes)} />
+      <Stat label="In use now" value={bytesOr(memory.usedBytes)} />
+      <Stat label="Swap in use" value={bytesOr(memory.swapUsedBytes)} />
+      <Stat label="macOS pressure" value={pressureText(memory.pressure)} />
+    </div>
   );
 
   if (!plan.estimate) {
     return (
       <div className="memory">
         <p className="empty-detail">
-          Not enough header metadata to estimate this model's memory.
+          Not enough header metadata to size this model's cache.
         </p>
         {machine}
       </div>
     );
   }
 
-  const { weightsBytes, kvBytes, overheadBytes, totalBytes, calibrated } =
-    plan.estimate;
+  const { weightsBytes, kvBytes, totalBytes } = plan.estimate;
   const scale = Math.max(plan.totalMemory, totalBytes);
   const width = (n: number) => `${(n / scale) * 100}%`;
 
@@ -100,7 +80,6 @@ function MemoryBar({ plan }: { plan: LaunchPlan }) {
       <div className="memory-bar">
         <span className="seg seg-weights" style={{ width: width(weightsBytes) }} />
         <span className="seg seg-kv" style={{ width: width(kvBytes) }} />
-        <span className="seg seg-overhead" style={{ width: width(overheadBytes) }} />
         <span
           className="memory-limit"
           style={{ left: `${(plan.totalMemory / scale) * 100}%` }}
@@ -108,19 +87,15 @@ function MemoryBar({ plan }: { plan: LaunchPlan }) {
       </div>
 
       <p className="memory-summary">
-        <SafetyBadge state={assessment.state} />
-        <strong>{formatBytes(plan.estimate.machineImpactBytes)}</strong> expected
-        machine impact
+        <strong>{formatBytes(totalBytes)}</strong> to allocate — weights{" "}
+        {formatBytes(weightsBytes)} plus {formatBytes(kvBytes)} of KV cache at{" "}
+        {plan.profile.ctx.toLocaleString()} tokens.
       </p>
       <p className="field-hint">
-        Model needs {formatBytes(totalBytes)} nominally — weights{" "}
-        {formatBytes(weightsBytes)}, KV cache {formatBytes(kvBytes)}, overhead{" "}
-        {formatBytes(overheadBytes)}.{" "}
-        {calibrated
-          ? `Scaled to ${Math.round((plan.estimate.residency ?? 0) * 100)}% from your recorded runs, because mmapped weights and Metal buffers are not all counted as used memory.`
-          : "Not yet calibrated, so the nominal figure is used — it over-predicts on Apple Silicon."}
+        Exact figures from the model's header. How much of it stays resident, and
+        what that costs the machine, depends on what else is running — the numbers
+        below are the machine as it is now.
       </p>
-      <Reasons assessment={assessment} />
 
       {machine}
     </div>
@@ -227,22 +202,12 @@ function TelemetryPanel({
         />
         <Stat label="Swap in use" value={bytesOr(telemetry?.swapUsedBytes)} />
         <Stat
-          label="Headroom"
-          value={headroomText(telemetry?.safety?.headroomBytes)}
-        />
-        <Stat
           label="Process footprint"
           value={bytesOr(telemetry?.processFootprintBytes)}
           hint="excludes GPU-resident weights"
         />
       </div>
 
-      {telemetry?.safety && (
-        <div className="telemetry-verdict">
-          <SafetyBadge state={telemetry.safety.state} />
-          <Reasons assessment={telemetry.safety} />
-        </div>
-      )}
 
       <div className="telemetry-row">
         <span className="telemetry-label">Health</span>
@@ -490,13 +455,13 @@ export default function ModelDetail({
             hint="what this launch will request"
           />
           <Stat
-            label="Estimated practical range"
+            label="KV cache at this context"
             value={
-              plan.practicalCtx == null
+              plan.estimate == null
                 ? "Unavailable"
-                : `up to ${plan.practicalCtx.toLocaleString()}`
+                : formatBytes(plan.estimate.kvBytes)
             }
-            hint="for this machine as it is right now — an estimate, not a guarantee"
+            hint="exact, from the model's header"
           />
         </div>
       </section>
@@ -507,8 +472,6 @@ export default function ModelDetail({
         <ProfileForm
           value={form}
           maxCtx={plan.maxCtx}
-          practicalCtx={(preview ?? plan).practicalCtx}
-          riskyCtx={(preview ?? plan).riskyCtx}
           onChange={setForm}
         />
 

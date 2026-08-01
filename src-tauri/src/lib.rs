@@ -5,7 +5,6 @@ pub mod health;
 pub mod probe;
 pub mod profile;
 pub mod runner;
-pub mod safety;
 pub mod store;
 pub mod sysmem;
 
@@ -97,11 +96,6 @@ struct LaunchPlan {
     memory: PlanMemory,
     /// Model metadata: the ceiling the file declares.
     max_ctx: Option<u64>,
-    /// Hardware estimate: the largest context that still leaves the machine comfortable.
-    /// Depends on what else is running, so it moves.
-    practical_ctx: Option<u64>,
-    /// Beyond this the prediction turns red for this machine.
-    risky_ctx: Option<u64>,
     port_conflict: Option<runner::PortConflict>,
     capability_error: Option<String>,
 }
@@ -115,8 +109,6 @@ struct PlanMemory {
     used_bytes: Option<u64>,
     swap_used_bytes: Option<u64>,
     pressure: sysmem::Pressure,
-    running_model_bytes: Option<u64>,
-    assessment: safety::Assessment,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -126,8 +118,6 @@ struct Settings {
     llama_server_path: Option<String>,
     capabilities: Option<Capabilities>,
     capability_error: Option<String>,
-    calibration_samples: usize,
-    fitted_residency: Option<f64>,
 }
 
 /// Fills in what the user has not chosen: an alias derived from the model's name, and a
@@ -150,12 +140,9 @@ fn build_plan(
 ) -> Result<LaunchPlan, String> {
     let model = state.model(model_id)?;
 
-    let (residency, remembered) = {
+    let remembered = {
         let config = state.config.lock().expect("config lock");
-        (
-            estimate::fit_residency(&config.calibration),
-            config.last_used.get(&model.id).cloned(),
-        )
+        config.last_used.get(&model.id).cloned()
     };
 
     let profile = resolve(&model, draft.or(remembered));
@@ -167,7 +154,6 @@ fn build_plan(
             profile.ctx,
             &profile.cache_type_k,
             &profile.cache_type_v,
-            residency,
         )
     });
 
@@ -188,51 +174,17 @@ fn build_plan(
     let swap_used = sysmem::swap_used_bytes().or_else(|| Some(system.used_swap()));
     let used = Some(system.used_memory());
     let pressure = sysmem::pressure();
-    let running_model_bytes = state.runner.current_model_bytes();
 
     let memory = PlanMemory {
         installed_bytes: installed,
         used_bytes: used,
         swap_used_bytes: swap_used,
         pressure,
-        running_model_bytes,
-        assessment: safety::assess(safety::Inputs {
-            installed,
-            used,
-            swap_used,
-            pressure,
-            running_model_bytes,
-            predicted_total: estimate.as_ref().map(|e| e.machine_impact_bytes),
-        }),
-    };
-
-    // Budgets for the two context markers: what fits while staying comfortable, and
-    // what fits before the prediction turns red.
-    let spare = |reserve: i64| -> Option<i64> {
-        let installed = installed? as i64;
-        let used = used? as i64;
-        let running = running_model_bytes.unwrap_or(0) as i64;
-        Some(installed - (used - running) - reserve)
-    };
-
-    let context_for = |reserve: i64| -> Option<u64> {
-        let md = model.metadata.as_ref()?;
-        estimate::context_within_budget(
-            md,
-            model.size_bytes,
-            &profile.cache_type_k,
-            &profile.cache_type_v,
-            residency,
-            spare(reserve)?,
-            md.context_length.unwrap_or(profile.ctx),
-        )
     };
 
     Ok(LaunchPlan {
         total_memory: installed.unwrap_or_else(|| system.total_memory()),
         memory,
-        practical_ctx: context_for(safety::HEADROOM_YELLOW),
-        risky_ctx: context_for(safety::HEADROOM_RED),
         port_conflict: runner::inspect_port(&profile.host, profile.port),
         max_ctx: model.metadata.as_ref().and_then(|m| m.context_length),
         profile,
@@ -305,8 +257,6 @@ fn settings_view(state: &AppState) -> Settings {
     Settings {
         models_dir: store::models_dir(&config).to_string_lossy().into_owned(),
         llama_server_path: config.llama_server_path.clone(),
-        calibration_samples: config.calibration.len(),
-        fitted_residency: estimate::fit_residency(&config.calibration),
         capabilities: caps.as_ref().ok().cloned(),
         capability_error: caps.err(),
     }
@@ -498,19 +448,8 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
             let handle = app.handle().clone();
-            let sink_handle = handle.clone();
 
-            let runner = Runner::new(
-                Arc::new(TauriEvents(handle.clone())),
-                Arc::new(move |sample| {
-                    let state = sink_handle.state::<AppState>();
-                    {
-                        let mut config = state.config.lock().expect("config lock");
-                        config.record_sample(sample);
-                    }
-                    let _ = state.save_config();
-                }),
-            );
+            let runner = Runner::new(Arc::new(TauriEvents(handle.clone())));
 
             app.manage(AppState {
                 config: Mutex::new(store::load()),

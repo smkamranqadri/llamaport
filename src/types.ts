@@ -59,11 +59,7 @@ export interface Profile {
 export interface Estimate {
   weightsBytes: number;
   kvBytes: number;
-  overheadBytes: number;
   totalBytes: number;
-  machineImpactBytes: number;
-  residency: number | null;
-  calibrated: boolean;
 }
 
 export interface LaunchPlan {
@@ -74,8 +70,6 @@ export interface LaunchPlan {
   totalMemory: number;
   memory: PlanMemory;
   maxCtx: number | null;
-  practicalCtx: number | null;
-  riskyCtx: number | null;
   portConflict: {
     port: number;
     respondsToHealth: boolean;
@@ -103,22 +97,11 @@ export interface RunnerSnapshot {
 
 export type Pressure = "normal" | "warning" | "critical" | "unknown";
 
-export type SafetyState = "unknown" | "green" | "yellow" | "red";
-
-export interface Assessment {
-  state: SafetyState;
-  projectedUsedBytes: number | null;
-  headroomBytes: number | null;
-  reasons: string[];
-}
-
 export interface PlanMemory {
   installedBytes: number | null;
   usedBytes: number | null;
   swapUsedBytes: number | null;
   pressure: Pressure;
-  runningModelBytes: number | null;
-  assessment: Assessment;
 }
 
 export interface Orphan {
@@ -140,10 +123,8 @@ export interface Telemetry {
   systemUsedBytes: number | null;
   systemTotalBytes: number | null;
   swapUsedBytes: number | null;
-  modelDeltaBytes: number | null;
   processFootprintBytes: number | null;
   pressure: Pressure;
-  safety: Assessment | null;
   healthOk: boolean;
   uptimeSecs: number;
 }
@@ -187,6 +168,4 @@ export interface Settings {
   llamaServerPath: string | null;
   capabilities: Capabilities | null;
   capabilityError: string | null;
-  calibrationSamples: number;
-  fittedResidency: number | null;
 }

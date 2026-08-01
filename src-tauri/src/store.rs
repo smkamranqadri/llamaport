@@ -7,12 +7,11 @@ use serde_json::{Map, Value};
 
 use std::collections::BTreeMap;
 
-use crate::estimate::{CalibrationSample, MAX_SAMPLES};
 use crate::profile::Profile;
 
 /// Bumped whenever the shape changes. Absence means the original shape, which had no
 /// version field at all.
-pub const CURRENT_SCHEMA: u32 = 3;
+pub const CURRENT_SCHEMA: u32 = 4;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
@@ -20,7 +19,6 @@ pub struct Config {
     pub schema_version: u32,
     pub models_dir: Option<String>,
     pub llama_server_path: Option<String>,
-    pub calibration: Vec<CalibrationSample>,
     /// The settings each model was last launched with, so the form opens where it was
     /// left rather than at a generic default. Not a profile system: there is one entry
     /// per model, it is written by launching, and nothing merges.
@@ -31,15 +29,7 @@ pub struct Config {
     pub extra: Map<String, Value>,
 }
 
-impl Config {
-    pub fn record_sample(&mut self, sample: CalibrationSample) {
-        self.calibration.push(sample);
-        if self.calibration.len() > MAX_SAMPLES {
-            let excess = self.calibration.len() - MAX_SAMPLES;
-            self.calibration.drain(0..excess);
-        }
-    }
-}
+impl Config {}
 
 fn home() -> PathBuf {
     std::env::var("HOME").map(PathBuf::from).unwrap_or_default()
@@ -70,7 +60,13 @@ pub fn migrate(mut config: Config) -> Config {
     // field claims them, and would otherwise be carried forward forever as the
     // unknown-key rule intends — correct for a key from a *newer* build, wrong for one
     // this build deliberately removed.
-    for retired in ["defaultProfile", "overrides", "lastRun", "profiles"] {
+    for retired in [
+        "defaultProfile",
+        "overrides",
+        "lastRun",
+        "profiles",
+        "calibration",
+    ] {
         config.extra.remove(retired);
     }
 
@@ -290,7 +286,13 @@ mod tests {
         .expect("seed");
 
         let loaded = load_from(&path);
-        for retired in ["defaultProfile", "overrides", "lastRun", "profiles"] {
+        for retired in [
+            "defaultProfile",
+            "overrides",
+            "lastRun",
+            "profiles",
+            "calibration",
+        ] {
             assert!(
                 !loaded.extra.contains_key(retired),
                 "{retired} should be gone"

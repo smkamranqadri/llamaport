@@ -57,7 +57,7 @@ fn launches_the_real_server_with_the_generated_command() {
     let printer = Arc::new(Printer {
         telemetry: Mutex::new(Vec::new()),
     });
-    let runner = Runner::new(printer.clone(), Arc::new(|_| {}));
+    let runner = Runner::new(printer.clone());
 
     runner
         .start(LaunchSpec {

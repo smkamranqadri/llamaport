@@ -40,6 +40,9 @@ cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
 Settings are not saved as profiles. A model's form opens with whatever it was
 last launched with, and a successful launch updates that.
 
+Memory is reported, not predicted: exact weights and KV cache arithmetic before
+launch, live system memory and swap while running, and no verdict in between.
+
 The server binds to `127.0.0.1` and has no authentication. `rawArgs` is passed
 through verbatim, so `--host 0.0.0.0` typed there would expose an unauthenticated
 server to the network — see the known gaps in the runner spec.
