@@ -32,15 +32,14 @@ cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
 
 | File | What it is |
 | --- | --- |
-| [DESIGN.md](DESIGN.md) | Architecture and what the runtime knows |
-| [docs/downloader-spec.md](docs/downloader-spec.md) | The unbuilt half, specified |
-| [docs/local-runtime/current-state.md](docs/local-runtime/current-state.md) | Where to resume |
-| [docs/local-runtime/decisions.md](docs/local-runtime/decisions.md) | Every decision and what would reverse it |
+| [docs/runner-spec.md](docs/runner-spec.md) | Listing and running models. Built, and the constraints that shaped it |
+| [docs/downloader-spec.md](docs/downloader-spec.md) | Downloading with resume. Designed, unbuilt — the next piece of work |
 
 ## Notes
 
 Settings are not saved as profiles. A model's form opens with whatever it was
 last launched with, and a successful launch updates that.
 
-The server binds to `127.0.0.1` and has no authentication. Do not change the host
-without reading D16.
+The server binds to `127.0.0.1` and has no authentication. `rawArgs` is passed
+through verbatim, so `--host 0.0.0.0` typed there would expose an unauthenticated
+server to the network — see the known gaps in the runner spec.
