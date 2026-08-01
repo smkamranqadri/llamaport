@@ -111,6 +111,8 @@ struct Inner {
     stopping: bool,
     baseline_used: u64,
     peak_used: u64,
+    peak_footprint: u64,
+    peak_swap: u64,
     started_secs: Option<u64>,
     port: Option<u16>,
     requested_port: Option<u16>,
@@ -187,6 +189,8 @@ impl Runner {
                 stopping: false,
                 baseline_used: 0,
                 peak_used: 0,
+                peak_footprint: 0,
+                peak_swap: 0,
                 started_secs: None,
                 port: None,
                 requested_port: None,
@@ -208,6 +212,16 @@ impl Runner {
     pub fn is_busy(&self) -> bool {
         let state = self.inner.lock().expect("runner lock").state;
         matches!(state, RunState::Starting | RunState::Ready)
+    }
+
+    /// Peak values seen across the current run, for the benchmark record. `None` when
+    /// telemetry has not sampled yet.
+    pub fn peaks(&self) -> (Option<u64>, Option<u64>) {
+        let guard = self.inner.lock().expect("runner lock");
+        (
+            Some(guard.peak_footprint).filter(|v| *v > 0),
+            Some(guard.peak_swap).filter(|v| *v > 0),
+        )
     }
 
     /// Machine-wide memory growth attributable to the running model, for subtracting
@@ -315,6 +329,8 @@ fn spawn_run(
         guard.stopping = false;
         guard.baseline_used = baseline_used;
         guard.peak_used = 0;
+        guard.peak_footprint = 0;
+        guard.peak_swap = 0;
         guard.port = Some(port);
         guard.requested_port = Some(requested_port);
         guard.server_ctx = None;
@@ -528,6 +544,16 @@ fn telemetry_loop(
         };
 
         telemetry.process_footprint_bytes = pid.and_then(sysmem::process_footprint_bytes);
+
+        {
+            let mut guard = inner.lock().expect("runner lock");
+            if let Some(footprint) = telemetry.process_footprint_bytes {
+                guard.peak_footprint = guard.peak_footprint.max(footprint);
+            }
+            if let Some(swap) = swap {
+                guard.peak_swap = guard.peak_swap.max(swap);
+            }
+        }
         telemetry.safety = Some(safety::assess(Inputs {
             installed,
             used: Some(used),

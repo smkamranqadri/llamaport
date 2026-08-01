@@ -9,7 +9,7 @@ use std::io::{BufRead, BufReader};
 use std::net::{TcpStream, ToSocketAddrs};
 use std::time::{Duration, Instant};
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
 use crate::redact::Redacted;
@@ -34,7 +34,7 @@ pub enum CheckStatus {
     Skipped,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum Verdict {
     Passed,

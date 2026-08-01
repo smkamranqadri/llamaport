@@ -821,3 +821,54 @@ input[type="range"] {
   color: var(--text-muted);
   text-align: right;
 }
+
+/* Benchmarks */
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.filters .field {
+  min-width: 160px;
+}
+
+.benchmark-row {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) 76px 76px 72px 76px auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.model-list li:last-child .benchmark-row {
+  border-bottom: none;
+}
+
+.benchmark-row.is-selected {
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.compare-row {
+  display: grid;
+  grid-template-columns: 160px 1fr 1fr 80px;
+  gap: 12px;
+  padding: 4px 0;
+  font-size: 12px;
+}
+
+.delta-better {
+  color: #1f8a55;
+}
+
+.delta-worse {
+  color: var(--danger);
+}
+
+@media (prefers-color-scheme: dark) {
+  .delta-better {
+    color: #4fd08c;
+  }
+}

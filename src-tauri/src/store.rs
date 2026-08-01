@@ -91,15 +91,18 @@ pub fn load_from(path: &Path) -> Config {
 }
 
 /// Writes through a temporary file and renames, so an interrupted write cannot leave a
-/// truncated config behind. Rename within a directory is atomic on APFS.
-pub fn save_to(path: &Path, config: &Config) -> io::Result<()> {
+/// truncated file behind. Rename within a directory is atomic on APFS.
+pub fn write_atomic(path: &Path, contents: &str) -> io::Result<()> {
     if let Some(dir) = path.parent() {
         fs::create_dir_all(dir)?;
     }
-    let temporary = path.with_extension("json.tmp");
-    let json = serde_json::to_string_pretty(config)?;
-    fs::write(&temporary, json)?;
+    let temporary = path.with_extension("tmp");
+    fs::write(&temporary, contents)?;
     fs::rename(&temporary, path)
+}
+
+pub fn save_to(path: &Path, config: &Config) -> io::Result<()> {
+    write_atomic(path, &serde_json::to_string_pretty(config)?)
 }
 
 pub fn load() -> Config {

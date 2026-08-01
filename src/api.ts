@@ -1,6 +1,8 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import type {
+  BenchmarkQuery,
+  BenchmarkRecord,
   DirInfo,
   HealthReport,
   LaunchPlan,
@@ -76,6 +78,27 @@ export function runnerStop(): Promise<RunnerSnapshot> {
 
 export function healthTest(): Promise<HealthReport> {
   return invoke<HealthReport>("health_test");
+}
+
+export function benchmarksList(
+  query?: BenchmarkQuery,
+): Promise<BenchmarkRecord[]> {
+  return invoke<BenchmarkRecord[]>("benchmarks_list", { query: query ?? null });
+}
+
+export function benchmarkDelete(id: string): Promise<BenchmarkRecord[]> {
+  return invoke<BenchmarkRecord[]>("benchmark_delete", { id });
+}
+
+export function benchmarkNote(
+  id: string,
+  note: string | null,
+): Promise<BenchmarkRecord[]> {
+  return invoke<BenchmarkRecord[]>("benchmark_note", { id, note });
+}
+
+export function benchmarksExport(format: "csv" | "json"): Promise<string> {
+  return invoke<string>("benchmarks_export", { format });
 }
 
 export function listProfiles(): Promise<NamedProfile[]> {

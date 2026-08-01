@@ -189,6 +189,46 @@ export interface HealthReport {
   reasoning: Reasoning;
 }
 
+export type BenchmarkSort =
+  | "timestamp"
+  | "genTps"
+  | "promptTps"
+  | "timeToFirstToken"
+  | "peakMemory";
+
+export interface BenchmarkQuery {
+  modelFile: string | null;
+  quantisation: string | null;
+  sort: BenchmarkSort;
+  descending: boolean;
+}
+
+export interface BenchmarkRecord {
+  id: string;
+  timestampSecs: number;
+  modelFile: string;
+  modelSizeBytes: number;
+  architecture: string | null;
+  quantisation: string | null;
+  profileName: string | null;
+  ctx: number;
+  cacheTypeK: string;
+  cacheTypeV: string;
+  ngl: string;
+  parallel: number;
+  llamaVersion: string | null;
+  timeToFirstTokenMs: number | null;
+  promptTokens: number | null;
+  promptTps: number | null;
+  generatedTokens: number | null;
+  genTps: number | null;
+  peakProcessBytes: number | null;
+  peakSwapBytes: number | null;
+  testDurationMs: number;
+  verdict: Verdict;
+  note: string | null;
+}
+
 export interface Capabilities {
   binary: string;
   version: string | null;

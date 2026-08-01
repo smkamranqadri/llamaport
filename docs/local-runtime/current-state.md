@@ -2,11 +2,37 @@
 
 ## Current phase
 
-**Phase 3 — Server health and model test. Code complete, awaiting manual UI
-confirmation.**
+**Phase 4 — Benchmark history. Code complete, awaiting manual UI confirmation.**
 
 Phase 1 complete and confirmed in the running app (process footprint read 1.3 GB
 against Activity Monitor's 1.28 GB).
+
+## Completed work — Phase 4
+
+- **`benchmarks.rs` with `benchmarks.json` beside the config**, never inside it
+  (D11): history grows without bound and every profile edit would otherwise
+  rewrite it, risking settings for the sake of a log. Atomic write shared with
+  the config store via `store::write_atomic`.
+- **A row records the settings, not just the result** — model file and size,
+  architecture, quantisation, context, both cache types, ngl, parallel slots and
+  the llama.cpp build — because the feature exists to compare quantisations
+  like-for-like and a number without its configuration proves nothing.
+- **Recorded automatically when a model test completes**, using the timings
+  `health.rs` already produces plus peak process footprint and peak swap now
+  tracked across the run by the telemetry loop.
+- **Query is a tested Rust function**, not frontend filtering: filter by model
+  and quantisation, sort by date, generation, prompt eval, first token or peak
+  memory. Rows missing the sort key sink to the bottom in *both* directions — a
+  missing measurement is neither fast nor slow.
+- **Export** to CSV or JSON, written into the app support directory and the path
+  returned, avoiding a file-dialog dependency. CSV escapes separators and quotes;
+  missing measurements are blank cells, never zeroes.
+- **History capped at 500 rows**, oldest first.
+- **UI** — Benchmarks screen with filters, sort, per-row note and delete, and a
+  two-run comparison showing percentage deltas with direction awareness (higher
+  generation is better, lower first-token latency is better). The comparison
+  warns when the two runs differ in more than quantisation, so a difference is
+  not silently attributed to the wrong cause.
 
 ## Completed work — Phase 3
 
@@ -114,13 +140,13 @@ Modified: `store.rs`, `runner.rs`, `lib.rs`, `estimate.rs`, `gguf.rs`,
 ```
 cargo fmt --manifest-path src-tauri/Cargo.toml -- --check     # clean
 cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings   # clean
-cargo test --manifest-path src-tauri/Cargo.toml               # 111 passed, 1 ignored
+cargo test --manifest-path src-tauri/Cargo.toml               # 122 passed, 1 ignored
 bun run build                                                 # tsc + vite, clean
 ```
 
 ## Verification results
 
-- **111 tests pass**, 1 ignored (`real_launch`, loads a real model). Up from 40.
+- **122 tests pass**, 1 ignored (`real_launch`, loads a real model). Up from 40.
   New: 5 store persistence, 7 sysmem, 11 safety.
 - clippy clean at `-D warnings` for the first time; 4 findings fixed (2
   pre-existing OR-patterns, 1 identity op, 1 of mine).
@@ -140,7 +166,11 @@ bun run build                                                 # tsc + vite, clea
    for a 32 GB machine also running an editor, browser and coding agent. They
    will fire often on this hardware; whether that is signal or noise needs a few
    days of use.
-4. **Adopt is not implemented** for orphans — only Stop and Leave running. D14
+4. **`profileName` on benchmark rows is always null.** Templates are applied to
+   the launch form rather than bound to a run, so the app does not know which
+   named profile produced it. Fixing it means recording the last applied
+   template per model at apply time.
+5. **Adopt is not implemented** for orphans — only Stop and Leave running. D14
    mentioned Adopt; it needs a runner path for a process we did not spawn (no
    stdout to attach), deferred rather than half-built.
 5. Downloads still a placeholder (D13, intentional).
@@ -150,10 +180,15 @@ bun run build                                                 # tsc + vite, clea
 
 ## Exact next step
 
-1. Confirm in the app: start a model, press "Test model", check that every row
-   reports a status and duration and that the timings look plausible against the
-   telemetry panel.
-2. Then **Phase 4 — benchmark history**: `benchmarks.json` beside config (never
+1. Confirm in the app: run "Test model" on the Q3 and then the Q4 variant, open
+   Benchmarks, select both and check the comparison reads sensibly.
+2. Then **Phase 5 — Pi and Picot integration**: read-only, permission-gated
+   inspection of `~/.pi/agent/settings.json`, preview and copy only, never a
+   write, with configurable application paths. Note the app still has no API key
+   storage, so the "connect" surface can only describe an unauthenticated
+   localhost endpoint until Phase 6.
+
+Superseded plan for reference — Phase 4 was **benchmark history**: `benchmarks.json` beside config (never
    inside it), append-only with atomic rewrite, recording the fields listed in
    the brief plus llama.cpp version from `Capabilities` and peak swap from the
    Phase 1 sampling. Table, sort, filter, compare two runs, delete, export

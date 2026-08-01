@@ -1,3 +1,4 @@
+pub mod benchmarks;
 pub mod catalog;
 pub mod estimate;
 pub mod gguf;
@@ -19,6 +20,7 @@ use tauri::menu::{Menu, MenuItem};
 use tauri::tray::TrayIconBuilder;
 use tauri::{AppHandle, Emitter, Listener, Manager, State, WindowEvent, Wry};
 
+use benchmarks::{BenchmarkRecord, Benchmarks};
 use catalog::{DirInfo, ModelEntry};
 use estimate::Estimate;
 use probe::Capabilities;
@@ -47,6 +49,7 @@ struct AppState {
     runner: Runner,
     tray: Mutex<Option<TrayHandles>>,
     orphan: Mutex<Option<Orphan>>,
+    benchmarks: Mutex<Benchmarks>,
 }
 
 impl AppState {
@@ -517,9 +520,139 @@ async fn health_test(state: State<'_, AppState>) -> Result<health::HealthReport,
         api_key: None,
     };
 
-    tauri::async_runtime::spawn_blocking(move || health::run(&target))
+    let model_id = snapshot.model_id.clone();
+    let started = std::time::Instant::now();
+    let report = tauri::async_runtime::spawn_blocking(move || health::run(&target))
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+    let test_duration_ms = started.elapsed().as_millis() as u64;
+
+    if let Some(model_id) = model_id {
+        record_benchmark(&state, &model_id, &report, test_duration_ms);
+    }
+
+    Ok(report)
+}
+
+/// A benchmark row is only useful next to the settings that produced it, so the record
+/// captures the resolved profile and the llama.cpp build alongside the numbers.
+fn record_benchmark(
+    state: &AppState,
+    model_id: &str,
+    report: &health::HealthReport,
+    test_duration_ms: u64,
+) {
+    let Ok(model) = state.model(model_id) else {
+        return;
+    };
+    let Ok(plan) = build_plan(state, model_id, None) else {
+        return;
+    };
+
+    let (peak_process_bytes, peak_swap_bytes) = state.runner.peaks();
+    let timestamp_secs = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+
+    let record = BenchmarkRecord {
+        id: format!("{timestamp_secs}-{model_id}"),
+        timestamp_secs,
+        model_file: model.file_name.clone(),
+        model_size_bytes: model.size_bytes,
+        architecture: model.metadata.as_ref().map(|m| m.architecture.clone()),
+        quantisation: model.quant.clone(),
+        profile_name: None,
+        ctx: plan.profile.ctx,
+        cache_type_k: plan.profile.cache_type_k.clone(),
+        cache_type_v: plan.profile.cache_type_v.clone(),
+        ngl: plan.profile.ngl.clone(),
+        parallel: plan.profile.parallel,
+        llama_version: state.capabilities().ok().and_then(|caps| caps.version),
+        time_to_first_token_ms: report.timings.time_to_first_token_ms,
+        prompt_tokens: report.timings.prompt_tokens,
+        prompt_tps: report.timings.prompt_tps,
+        generated_tokens: report.timings.generated_tokens,
+        gen_tps: report.timings.gen_tps,
+        peak_process_bytes,
+        peak_swap_bytes,
+        test_duration_ms,
+        verdict: report.verdict,
+        note: None,
+    };
+
+    {
+        let mut history = state.benchmarks.lock().expect("benchmarks lock");
+        benchmarks::add(&mut history, record);
+        let _ = benchmarks::save_to(&benchmarks::path(), &history);
+    }
+}
+
+#[tauri::command]
+fn benchmarks_list(
+    query: Option<benchmarks::Query>,
+    state: State<'_, AppState>,
+) -> Vec<BenchmarkRecord> {
+    let history = state.benchmarks.lock().expect("benchmarks lock");
+    benchmarks::query(&history.records, &query.unwrap_or_default())
+}
+
+#[tauri::command]
+fn benchmark_delete(
+    id: String,
+    state: State<'_, AppState>,
+) -> Result<Vec<BenchmarkRecord>, String> {
+    {
+        let mut history = state.benchmarks.lock().expect("benchmarks lock");
+        if !benchmarks::delete(&mut history, &id) {
+            return Err(format!("no benchmark with id {id}"));
+        }
+        benchmarks::save_to(&benchmarks::path(), &history).map_err(|e| e.to_string())?;
+    }
+    Ok(benchmarks_list(None, state))
+}
+
+#[tauri::command]
+fn benchmark_note(
+    id: String,
+    note: Option<String>,
+    state: State<'_, AppState>,
+) -> Result<Vec<BenchmarkRecord>, String> {
+    {
+        let mut history = state.benchmarks.lock().expect("benchmarks lock");
+        if !benchmarks::set_note(&mut history, &id, note) {
+            return Err(format!("no benchmark with id {id}"));
+        }
+        benchmarks::save_to(&benchmarks::path(), &history).map_err(|e| e.to_string())?;
+    }
+    Ok(benchmarks_list(None, state))
+}
+
+/// Writes into the app's own support directory and returns the path, rather than
+/// depending on a file dialog plugin.
+#[tauri::command]
+fn benchmarks_export(format: String, state: State<'_, AppState>) -> Result<String, String> {
+    let history = state.benchmarks.lock().expect("benchmarks lock");
+    let stamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+
+    let (name, body) = match format.as_str() {
+        "csv" => (
+            format!("benchmarks-{stamp}.csv"),
+            benchmarks::to_csv(&history.records),
+        ),
+        "json" => (
+            format!("benchmarks-{stamp}.json"),
+            serde_json::to_string_pretty(&history.records).map_err(|e| e.to_string())?,
+        ),
+        other => return Err(format!("unsupported export format: {other}")),
+    };
+
+    let path = store::config_dir().join("exports").join(name);
+    store::write_atomic(&path, &body).map_err(|e| e.to_string())?;
+    Ok(path.to_string_lossy().into_owned())
 }
 
 #[tauri::command]
@@ -604,6 +737,7 @@ pub fn run() {
                 runner,
                 tray: Mutex::new(None),
                 orphan: Mutex::new(runner::detect_orphan()),
+                benchmarks: Mutex::new(benchmarks::load_from(&benchmarks::path())),
             });
 
             let status = MenuItem::with_id(app, "status", "No model running", false, None::<&str>)?;
@@ -668,6 +802,10 @@ pub fn run() {
             runner_start,
             runner_stop,
             health_test,
+            benchmarks_list,
+            benchmark_delete,
+            benchmark_note,
+            benchmarks_export,
             orphan_status,
             orphan_stop,
             orphan_dismiss,
