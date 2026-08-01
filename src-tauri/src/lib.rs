@@ -904,6 +904,10 @@ pub fn run() {
                 *state.tray.lock().expect("tray lock") = Some(TrayHandles { status, stop });
             }
 
+            // An unbundled dev binary with a tray icon can start without activating, so
+            // the window exists but never comes to the front. Ask explicitly.
+            show_main_window(&handle);
+
             let listener_handle = handle.clone();
             handle.listen("runner:state", move |event| {
                 if let Ok(snapshot) = serde_json::from_str::<RunnerSnapshot>(event.payload()) {
