@@ -872,3 +872,13 @@ input[type="range"] {
     color: #4fd08c;
   }
 }
+
+.compare-head {
+  padding-bottom: 8px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+}
+
+.compare-head .field-hint {
+  display: block;
+}

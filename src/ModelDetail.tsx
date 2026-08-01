@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  benchmarkRun,
   getLaunchPlan,
   healthTest,
   listProfiles,
@@ -282,6 +283,7 @@ export default function ModelDetail({
   const [newProfileName, setNewProfileName] = useState("");
   const [health, setHealth] = useState<HealthReport | null>(null);
   const [testing, setTesting] = useState(false);
+  const [benchmarking, setBenchmarking] = useState(false);
   const history = useRef<number[]>([]);
 
   const isCurrent = runner.modelId === model.id;
@@ -426,20 +428,39 @@ export default function ModelDetail({
         <section className="panel">
           <div className="panel-head">
             <h2>Running</h2>
-            <button
-              className="button"
-              disabled={testing}
-              onClick={() => {
-                setTesting(true);
-                setFailure(null);
-                healthTest()
-                  .then(setHealth)
-                  .catch((e) => setFailure(String(e)))
-                  .finally(() => setTesting(false));
-              }}
-            >
-              {testing ? "Testing…" : "Test model"}
-            </button>
+            <span className="actions">
+              <button
+                className="button"
+                disabled={testing || benchmarking}
+                onClick={() => {
+                  setTesting(true);
+                  setFailure(null);
+                  healthTest()
+                    .then(setHealth)
+                    .catch((e) => setFailure(String(e)))
+                    .finally(() => setTesting(false));
+                }}
+              >
+                {testing ? "Testing…" : "Test model"}
+              </button>
+              <button
+                className="button"
+                disabled={testing || benchmarking}
+                title="Prefills 8K tokens then generates 256, so decode speed is measured at working depth"
+                onClick={() => {
+                  setBenchmarking(true);
+                  setFailure(null);
+                  benchmarkRun(8192, 256)
+                    .then(() =>
+                      setFailure(null),
+                    )
+                    .catch((e) => setFailure(String(e)))
+                    .finally(() => setBenchmarking(false));
+                }}
+              >
+                {benchmarking ? "Benchmarking…" : "Run benchmark"}
+              </button>
+            </span>
           </div>
           <TelemetryPanel
             runner={runner}

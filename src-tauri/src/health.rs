@@ -17,13 +17,15 @@ use crate::redact::Redacted;
 /// Short, deterministic, and cheap: a long prompt would distort the timings it is
 /// meant to measure and would eat context the user wanted for real work.
 const TEST_PROMPT: &str = "Reply with exactly one word: ready";
-const MAX_TOKENS: u32 = 16;
+/// Reasoning models spend tokens thinking before they answer, so a budget that only
+/// covers an answer produces an empty `content` and looks like a broken server.
+const MAX_TOKENS: u32 = 96;
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(60);
 
 /// Enforced at compile time: a probe that grew large would distort the timings it
 /// exists to measure and would consume context the user wanted for real work.
-const _: () = assert!(MAX_TOKENS <= 32);
+const _: () = assert!(MAX_TOKENS <= 128);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -201,13 +203,18 @@ fn stream_chat(base: &str, alias: &str, key: Option<&Redacted>) -> Result<Stream
             continue;
         };
 
-        let delta = value
-            .pointer("/choices/0/delta/content")
-            .and_then(Value::as_str)
-            .unwrap_or("");
-        if delta.is_empty() {
-            continue;
-        }
+        // Reasoning models emit `reasoning_content` deltas before any `content`.
+        // Counting only `content` reports a working stream as empty.
+        let delta = ["content", "reasoning_content", "reasoning", "thinking"]
+            .iter()
+            .filter_map(|field| {
+                value
+                    .pointer(&format!("/choices/0/delta/{field}"))
+                    .and_then(Value::as_str)
+            })
+            .find(|text| !text.is_empty());
+
+        let Some(_) = delta else { continue };
 
         chunks += 1;
         if first_token_ms.is_none() {
@@ -383,7 +390,15 @@ pub fn run(target: &Target) -> HealthReport {
 
             reasoning = detect_reasoning(&message);
 
-            if content.trim().is_empty() {
+            if content.trim().is_empty() && reasoning != Reasoning::NotReturned {
+                // The server answered; it simply spent the token budget reasoning.
+                checks.push(check(
+                    "Chat completion",
+                    CheckStatus::Warning,
+                    "only reasoning returned — the token budget was spent thinking",
+                    started,
+                ));
+            } else if content.trim().is_empty() {
                 checks.push(check(
                     "Chat completion",
                     CheckStatus::Failed,
@@ -446,6 +461,121 @@ pub fn run(target: &Target) -> HealthReport {
     ));
 
     finish(checks, timings, reasoning)
+}
+
+/// A benchmark, unlike the health probe, has to measure the workload the user actually
+/// runs. Decode speed falls as the KV cache fills, so a 16-token burst from an empty
+/// context reports roughly double what the same model delivers at working depth.
+///
+/// The prefill is made unique per run so llama.cpp cannot serve it from its prompt
+/// cache — a cached prefill would measure nothing and report an implausible prompt speed.
+pub struct BenchmarkSpec {
+    pub depth_tokens: u64,
+    pub generate_tokens: u32,
+    pub nonce: u64,
+}
+
+#[derive(Debug, Clone, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BenchmarkOutcome {
+    pub depth_tokens: Option<u64>,
+    pub generated_tokens: Option<u64>,
+    pub prompt_tokens: Option<u64>,
+    pub cached_prompt_tokens: Option<u64>,
+    pub prompt_tps: Option<f64>,
+    pub gen_tps: Option<f64>,
+    pub time_to_first_token_ms: Option<u64>,
+    pub total_ms: u64,
+}
+
+/// Roughly four characters per token is close enough to land within a few percent of a
+/// requested depth, and the recorded figure is what the server reports, not what we aimed
+/// for.
+fn filler(depth_tokens: u64, nonce: u64) -> String {
+    let sentence = "The quick brown fox jumps over the lazy dog near the river bank. ";
+    let target_chars = (depth_tokens * 4) as usize;
+    let mut text = format!("Document {nonce}. ");
+    while text.len() < target_chars {
+        text.push_str(sentence);
+    }
+    text
+}
+
+pub fn benchmark(target: &Target, spec: &BenchmarkSpec) -> Result<BenchmarkOutcome, String> {
+    let base = target.base();
+    let key = target.api_key.as_ref();
+    let prompt = format!(
+        "{}\n\nIn one short paragraph, summarise the document above.",
+        filler(spec.depth_tokens, spec.nonce)
+    );
+
+    let body = json!({
+        "model": target.alias,
+        "messages": [{ "role": "user", "content": prompt }],
+        "max_tokens": spec.generate_tokens,
+        "temperature": 0,
+        "stream": true,
+        // Without this the prefill can be served from cache and measures nothing.
+        "cache_prompt": false,
+    });
+
+    let started = Instant::now();
+    let response = authorised(
+        ureq::post(&format!("{base}/v1/chat/completions")).timeout(REQUEST_TIMEOUT),
+        key,
+    )
+    .set("Content-Type", "application/json")
+    .send_string(&body.to_string())
+    .map_err(|e| describe(&e))?;
+
+    let reader = BufReader::new(response.into_reader());
+    let mut outcome = BenchmarkOutcome {
+        depth_tokens: Some(spec.depth_tokens),
+        ..Default::default()
+    };
+    let mut first_token_ms = None;
+
+    for line in reader.lines().map_while(Result::ok) {
+        let Some(payload) = line.strip_prefix("data: ") else {
+            continue;
+        };
+        if payload.trim() == "[DONE]" {
+            break;
+        }
+        let Ok(value) = serde_json::from_str::<Value>(payload) else {
+            continue;
+        };
+
+        let produced = ["content", "reasoning_content", "reasoning", "thinking"]
+            .iter()
+            .filter_map(|field| {
+                value
+                    .pointer(&format!("/choices/0/delta/{field}"))
+                    .and_then(Value::as_str)
+            })
+            .any(|text| !text.is_empty());
+
+        if produced && first_token_ms.is_none() {
+            first_token_ms = Some(started.elapsed().as_millis() as u64);
+        }
+
+        // llama.cpp attaches its own timings to the final chunk; they are authoritative.
+        if let Some(timings) = value.get("timings") {
+            outcome.prompt_tokens = timings.get("prompt_n").and_then(Value::as_u64);
+            outcome.cached_prompt_tokens = timings.get("cache_n").and_then(Value::as_u64);
+            outcome.prompt_tps = timings.get("prompt_per_second").and_then(Value::as_f64);
+            outcome.gen_tps = timings.get("predicted_per_second").and_then(Value::as_f64);
+            outcome.generated_tokens = timings.get("predicted_n").and_then(Value::as_u64);
+        }
+    }
+
+    outcome.time_to_first_token_ms = first_token_ms;
+    outcome.total_ms = started.elapsed().as_millis() as u64;
+
+    if outcome.generated_tokens.unwrap_or(0) == 0 && first_token_ms.is_none() {
+        return Err("the server produced nothing".to_string());
+    }
+    Ok(outcome)
 }
 
 fn finish(checks: Vec<Check>, timings: Timings, reasoning: Reasoning) -> HealthReport {
@@ -542,6 +672,21 @@ mod tests {
             TEST_PROMPT.len() < 80,
             "the probe must not consume meaningful context"
         );
+    }
+
+    #[test]
+    fn the_prefill_lands_near_the_requested_depth() {
+        let text = filler(8192, 1);
+        let approximate_tokens = text.len() / 4;
+        assert!(
+            (7500..9000).contains(&approximate_tokens),
+            "got roughly {approximate_tokens} tokens"
+        );
+    }
+
+    #[test]
+    fn each_run_gets_a_different_prefill_so_the_cache_cannot_serve_it() {
+        assert_ne!(filler(256, 1), filler(256, 2));
     }
 
     #[test]

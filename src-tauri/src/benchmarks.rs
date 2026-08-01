@@ -37,6 +37,10 @@ pub struct BenchmarkRecord {
     pub parallel: u32,
     pub llama_version: Option<String>,
 
+    /// Context depth the decode speed was measured at. `None` marks a legacy row from
+    /// the shallow probe, which is not comparable with a real benchmark.
+    #[serde(default)]
+    pub depth_tokens: Option<u64>,
     pub time_to_first_token_ms: Option<u64>,
     pub prompt_tokens: Option<u64>,
     pub prompt_tps: Option<f64>,
@@ -169,7 +173,7 @@ pub fn query(records: &[BenchmarkRecord], query: &Query) -> Vec<BenchmarkRecord>
     out
 }
 
-const CSV_COLUMNS: [&str; 21] = [
+const CSV_COLUMNS: [&str; 22] = [
     "timestamp",
     "model_file",
     "model_size_bytes",
@@ -182,6 +186,7 @@ const CSV_COLUMNS: [&str; 21] = [
     "ngl",
     "parallel",
     "llama_version",
+    "depth_tokens",
     "time_to_first_token_ms",
     "prompt_tokens",
     "prompt_tps",
@@ -229,6 +234,7 @@ pub fn to_csv(records: &[BenchmarkRecord]) -> String {
             record.ngl.clone(),
             record.parallel.to_string(),
             optional(&record.llama_version),
+            optional(&record.depth_tokens),
             optional(&record.time_to_first_token_ms),
             optional(&record.prompt_tokens),
             optional(&record.prompt_tps),
@@ -271,6 +277,7 @@ mod tests {
             ngl: "all".into(),
             parallel: 1,
             llama_version: Some("10090 (7347430f4)".into()),
+            depth_tokens: Some(8192),
             time_to_first_token_ms: Some(300),
             prompt_tokens: Some(12),
             prompt_tps: Some(300.0),

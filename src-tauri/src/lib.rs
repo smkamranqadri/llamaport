@@ -520,18 +520,59 @@ async fn health_test(state: State<'_, AppState>) -> Result<health::HealthReport,
         api_key: None,
     };
 
-    let model_id = snapshot.model_id.clone();
-    let started = std::time::Instant::now();
-    let report = tauri::async_runtime::spawn_blocking(move || health::run(&target))
+    tauri::async_runtime::spawn_blocking(move || health::run(&target))
         .await
-        .map_err(|e| e.to_string())?;
-    let test_duration_ms = started.elapsed().as_millis() as u64;
+        .map_err(|e| e.to_string())
+}
 
-    if let Some(model_id) = model_id {
-        record_benchmark(&state, &model_id, &report, test_duration_ms);
+/// Separate from the health probe on purpose. The probe is instant and shallow; this
+/// prefills to a working depth first, because decode speed at an empty context is
+/// roughly double what the same model delivers in use, and recording that as a
+/// benchmark would be worse than recording nothing.
+#[tauri::command]
+async fn benchmark_run(
+    depth_tokens: u64,
+    generate_tokens: u32,
+    state: State<'_, AppState>,
+) -> Result<BenchmarkRecord, String> {
+    let snapshot = state.runner.snapshot();
+    if snapshot.state != RunState::Ready {
+        return Err("start a model before benchmarking it".into());
     }
+    let model_id = snapshot
+        .model_id
+        .clone()
+        .ok_or("no model recorded for the running server")?;
 
-    Ok(report)
+    let target = health::Target {
+        host: "127.0.0.1".to_string(),
+        port: snapshot.port.ok_or("no port recorded")?,
+        alias: snapshot.alias.clone().unwrap_or_default(),
+        pid: snapshot.pid,
+        api_key: None,
+    };
+
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    let spec = health::BenchmarkSpec {
+        depth_tokens,
+        generate_tokens,
+        nonce,
+    };
+
+    let started = std::time::Instant::now();
+    let outcome = tauri::async_runtime::spawn_blocking(move || health::benchmark(&target, &spec))
+        .await
+        .map_err(|e| e.to_string())??;
+
+    record_benchmark(
+        &state,
+        &model_id,
+        &outcome,
+        started.elapsed().as_millis() as u64,
+    )
 }
 
 /// A benchmark row is only useful next to the settings that produced it, so the record
@@ -539,15 +580,11 @@ async fn health_test(state: State<'_, AppState>) -> Result<health::HealthReport,
 fn record_benchmark(
     state: &AppState,
     model_id: &str,
-    report: &health::HealthReport,
+    outcome: &health::BenchmarkOutcome,
     test_duration_ms: u64,
-) {
-    let Ok(model) = state.model(model_id) else {
-        return;
-    };
-    let Ok(plan) = build_plan(state, model_id, None) else {
-        return;
-    };
+) -> Result<BenchmarkRecord, String> {
+    let model = state.model(model_id)?;
+    let plan = build_plan(state, model_id, None)?;
 
     let (peak_process_bytes, peak_swap_bytes) = state.runner.peaks();
     let timestamp_secs = std::time::SystemTime::now()
@@ -569,23 +606,25 @@ fn record_benchmark(
         ngl: plan.profile.ngl.clone(),
         parallel: plan.profile.parallel,
         llama_version: state.capabilities().ok().and_then(|caps| caps.version),
-        time_to_first_token_ms: report.timings.time_to_first_token_ms,
-        prompt_tokens: report.timings.prompt_tokens,
-        prompt_tps: report.timings.prompt_tps,
-        generated_tokens: report.timings.generated_tokens,
-        gen_tps: report.timings.gen_tps,
+        depth_tokens: outcome.depth_tokens,
+        time_to_first_token_ms: outcome.time_to_first_token_ms,
+        prompt_tokens: outcome.prompt_tokens,
+        prompt_tps: outcome.prompt_tps,
+        generated_tokens: outcome.generated_tokens,
+        gen_tps: outcome.gen_tps,
         peak_process_bytes,
         peak_swap_bytes,
         test_duration_ms,
-        verdict: report.verdict,
+        verdict: health::Verdict::Passed,
         note: None,
     };
 
     {
         let mut history = state.benchmarks.lock().expect("benchmarks lock");
-        benchmarks::add(&mut history, record);
-        let _ = benchmarks::save_to(&benchmarks::path(), &history);
+        benchmarks::add(&mut history, record.clone());
+        benchmarks::save_to(&benchmarks::path(), &history).map_err(|e| e.to_string())?;
     }
+    Ok(record)
 }
 
 #[tauri::command]
@@ -802,6 +841,7 @@ pub fn run() {
             runner_start,
             runner_stop,
             health_test,
+            benchmark_run,
             benchmarks_list,
             benchmark_delete,
             benchmark_note,

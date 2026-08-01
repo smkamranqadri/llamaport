@@ -37,6 +37,14 @@ function delta(a: number | null, b: number | null, higherIsBetter: boolean) {
   return { change, better: higherIsBetter ? change > 0 : change < 0 };
 }
 
+function identify(record: BenchmarkRecord) {
+  const depth =
+    record.depthTokens == null
+      ? "shallow probe"
+      : `${formatContext(record.depthTokens)} deep`;
+  return `${record.quantisation ?? "?"} · ${formatContext(record.ctx)} ctx · ${depth}`;
+}
+
 function Comparison({ pair }: { pair: [BenchmarkRecord, BenchmarkRecord] }) {
   const [a, b] = pair;
   const rows: [string, string, string, ReturnType<typeof delta>][] = [
@@ -59,35 +67,46 @@ function Comparison({ pair }: { pair: [BenchmarkRecord, BenchmarkRecord] }) {
       delta(a.timeToFirstTokenMs, b.timeToFirstTokenMs, false),
     ],
     [
-      "Peak process memory",
+      "Peak process footprint",
       a.peakProcessBytes == null ? "—" : formatBytes(a.peakProcessBytes),
       b.peakProcessBytes == null ? "—" : formatBytes(b.peakProcessBytes),
       delta(a.peakProcessBytes, b.peakProcessBytes, false),
     ],
     [
-      "Peak swap",
+      "Peak swap (machine-wide)",
       a.peakSwapBytes == null ? "—" : formatBytes(a.peakSwapBytes),
       b.peakSwapBytes == null ? "—" : formatBytes(b.peakSwapBytes),
-      delta(a.peakSwapBytes, b.peakSwapBytes, false),
+      null,
     ],
   ];
 
   const differs = (left: unknown, right: unknown) => left !== right;
+  const shallow = a.depthTokens == null || b.depthTokens == null;
+  const depthMismatch = !shallow && differs(a.depthTokens, b.depthTokens);
+  const otherDifferences =
+    differs(a.ctx, b.ctx) ||
+    differs(a.cacheTypeK, b.cacheTypeK) ||
+    differs(a.cacheTypeV, b.cacheTypeV) ||
+    differs(a.llamaVersion, b.llamaVersion);
 
   return (
     <section className="panel">
       <h2>Comparison</h2>
-      <p className="field-hint">
-        {a.quantisation ?? "?"} at {formatContext(a.ctx)} versus{" "}
-        {b.quantisation ?? "?"} at {formatContext(b.ctx)}.
-        {(differs(a.ctx, b.ctx) ||
-          differs(a.cacheTypeK, b.cacheTypeK) ||
-          differs(a.cacheTypeV, b.cacheTypeV) ||
-          differs(a.llamaVersion, b.llamaVersion)) &&
-          " These runs differ in more than quantisation, so the difference is not attributable to one thing."}
-      </p>
 
       <ul className="check-list">
+        <li className="compare-row compare-head">
+          <span className="check-name">Measure</span>
+          <span>
+            <strong>A</strong> {a.modelFile}
+            <span className="field-hint">{identify(a)}</span>
+          </span>
+          <span>
+            <strong>B</strong> {b.modelFile}
+            <span className="field-hint">{identify(b)}</span>
+          </span>
+          <span className="telemetry-value">B vs A</span>
+        </li>
+
         {rows.map(([label, left, right, change]) => (
           <li key={label} className="compare-row">
             <span className="check-name">{label}</span>
@@ -101,6 +120,30 @@ function Comparison({ pair }: { pair: [BenchmarkRecord, BenchmarkRecord] }) {
           </li>
         ))}
       </ul>
+
+      {shallow && (
+        <p className="memory-reasons">
+          One of these runs came from the shallow probe rather than a benchmark. Decode
+          speed measured at an empty context reads far higher than the same model
+          delivers in use, so these two are not comparable.
+        </p>
+      )}
+      {depthMismatch && (
+        <p className="memory-reasons">
+          The two runs were measured at different context depths, which alone changes
+          decode speed.
+        </p>
+      )}
+      {otherDifferences && (
+        <p className="memory-reasons">
+          These runs differ in more than quantisation, so a difference here is not
+          attributable to one thing.
+        </p>
+      )}
+      <p className="field-hint">
+        Peak process footprint excludes GPU-resident weights, and swap is machine-wide —
+        neither is a measure of what this model alone consumed.
+      </p>
     </section>
   );
 }
@@ -199,7 +242,8 @@ export default function Benchmarks() {
         <div className="empty">
           <p className="empty-title">No runs recorded yet</p>
           <p className="empty-detail">
-            Start a model and press “Test model” — each test records a row here.
+            Start a model and press “Run benchmark” — it prefills to a working
+            context depth before measuring, which takes about a minute.
           </p>
         </div>
       ) : (
@@ -273,8 +317,11 @@ export default function Benchmarks() {
                     <span className="model-name">{record.modelFile}</span>
                     <span className="model-file">
                       {when(record.timestampSecs)} · {record.quantisation ?? "?"} ·{" "}
-                      {formatContext(record.ctx)} · {record.cacheTypeK}/
-                      {record.cacheTypeV} · ngl {record.ngl} ·{" "}
+                      {formatContext(record.ctx)} ctx ·{" "}
+                      {record.depthTokens == null
+                        ? "shallow probe"
+                        : `measured ${formatContext(record.depthTokens)} deep`}{" "}
+                      · {record.cacheTypeK}/{record.cacheTypeV} · ngl {record.ngl} ·{" "}
                       {record.llamaVersion ?? "unknown build"}
                     </span>
                     {record.note && (

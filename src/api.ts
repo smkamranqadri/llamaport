@@ -80,6 +80,16 @@ export function healthTest(): Promise<HealthReport> {
   return invoke<HealthReport>("health_test");
 }
 
+export function benchmarkRun(
+  depthTokens: number,
+  generateTokens: number,
+): Promise<BenchmarkRecord> {
+  return invoke<BenchmarkRecord>("benchmark_run", {
+    depthTokens,
+    generateTokens,
+  });
+}
+
 export function benchmarksList(
   query?: BenchmarkQuery,
 ): Promise<BenchmarkRecord[]> {

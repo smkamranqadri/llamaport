@@ -2,10 +2,39 @@
 
 ## Current phase
 
-**Phase 4 — Benchmark history. Code complete, awaiting manual UI confirmation.**
+**Phase 4 — Benchmark history. Complete, then reworked after the first real use
+exposed three defects (see below).**
 
 Phase 1 complete and confirmed in the running app (process footprint read 1.3 GB
 against Activity Monitor's 1.28 GB).
+
+## Phase 4 rework — what the first real benchmark exposed
+
+Running it against the real Q3 and Q4 produced a screen the user correctly called
+unclear, and diagnosis found three separate faults:
+
+1. **The probe measured a workload nobody runs.** 16 generated tokens at a
+   context depth of 17 tokens, with 13 of 17 prompt tokens served from cache
+   (`prompt_n: 4`). It reported 33.5 tok/s where real use at ~20k context gives
+   12–15. The number was internally consistent and completely unrepresentative.
+   Benchmarks now prefill to a working depth (default 8K) with `cache_prompt`
+   disabled and a per-run nonce so the prefill cannot be cache-served, then
+   generate 256 tokens. Depth is recorded on the row; comparisons refuse to
+   treat different depths, or a legacy shallow probe, as comparable.
+2. **A healthy reasoning model was reported as FAILED.** The probe read only
+   `delta.content`, but the model emits `reasoning_content` first and spent its
+   whole 16-token budget thinking. Both the streaming reader and the completion
+   check now recognise reasoning fields; a reasoning-only answer warns rather
+   than fails, and the budget rose to 96 tokens.
+3. **The comparison had unlabelled columns** and headlined two misleading memory
+   figures. Columns are now labelled A and B with model, quantisation, context
+   and depth; peak process footprint is labelled as excluding GPU-resident
+   weights; and the swap delta is gone, because machine-wide swap is not
+   attributable to one model.
+
+The model test and the benchmark are now separate actions: the test stays
+instant and shallow and records nothing, the benchmark takes about a minute and
+is the only thing that writes a row.
 
 ## Completed work — Phase 4
 
@@ -140,13 +169,13 @@ Modified: `store.rs`, `runner.rs`, `lib.rs`, `estimate.rs`, `gguf.rs`,
 ```
 cargo fmt --manifest-path src-tauri/Cargo.toml -- --check     # clean
 cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings   # clean
-cargo test --manifest-path src-tauri/Cargo.toml               # 122 passed, 1 ignored
+cargo test --manifest-path src-tauri/Cargo.toml               # 124 passed, 1 ignored
 bun run build                                                 # tsc + vite, clean
 ```
 
 ## Verification results
 
-- **122 tests pass**, 1 ignored (`real_launch`, loads a real model). Up from 40.
+- **124 tests pass**, 1 ignored (`real_launch`, loads a real model). Up from 40.
   New: 5 store persistence, 7 sysmem, 11 safety.
 - clippy clean at `-D warnings` for the first time; 4 findings fixed (2
   pre-existing OR-patterns, 1 identity op, 1 of mine).

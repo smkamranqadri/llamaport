@@ -217,6 +217,7 @@ export interface BenchmarkRecord {
   ngl: string;
   parallel: number;
   llamaVersion: string | null;
+  depthTokens: number | null;
   timeToFirstTokenMs: number | null;
   promptTokens: number | null;
   promptTps: number | null;
