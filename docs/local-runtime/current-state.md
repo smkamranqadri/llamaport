@@ -2,14 +2,27 @@
 
 ## Current phase
 
-**Phase 7 — UI and usability, plus the one carried-over Phase 6 item. Code
-complete, awaiting manual UI confirmation.**
+**Runtime correction after Phase 7. Complete.**
+
+The app was starting duplicate servers. Fixed, and the outstanding half of the
+original goal — the resumable downloader — is now recorded as the next work
+(D18).
 
 Phase 4 complete, then reworked after first real use exposed three defects (see
 below).
 
 Phase 1 complete and confirmed in the running app (process footprint read 1.3 GB
 against Activity Monitor's 1.28 GB).
+
+## Runtime correction
+
+- **A busy port refuses the launch** instead of falling forward (D17). The old
+  behaviour produced two copies of the same 15.7 GB model on a 32 GB machine,
+  reachable by nothing, because Pi is pinned to 8888.
+- **Starting an already-running model is refused**, naming the port and pid.
+- **Orphans are found by scanning** for `llama-server` processes rather than
+  trusting a pidfile that only knew the last pid written to it. The banner now
+  lists every one, each with its model and port, and a Stop button.
 
 ## Completed work — Phase 7
 
@@ -226,7 +239,7 @@ bun run build                                                 # tsc + vite, clea
 
 ## Verification results
 
-- **140 tests pass**, 1 ignored, stable across repeated runs (`real_launch`, loads a real model). Up from 40.
+- **143 tests pass**, 1 ignored, stable across repeated runs (`real_launch`, loads a real model). Up from 40.
   New: 5 store persistence, 7 sysmem, 11 safety.
 - clippy clean at `-D warnings` for the first time; 4 findings fixed (2
   pre-existing OR-patterns, 1 identity op, 1 of mine).
@@ -262,7 +275,9 @@ bun run build                                                 # tsc + vite, clea
 
 1. Confirm in the app: run "Test model" on the Q3 and then the Q4 variant, open
    Benchmarks, select both and check the comparison reads sensibly.
-2. Next: **Phase 8 — documentation and diagnostics**, the last planned phase.
+2. Next: **the downloader** (D18) — the outstanding half of the original goal,
+   already designed in `DESIGN.md` §Downloader and never built. Phase 8
+   documentation after that.
    Phase 6 skipped by decision (D16) — see decisions.md for what stays open.
    Superseded plan was: validate the *effective* argv rather
    than the form fields, since `rawArgs` can still reintroduce `--host 0.0.0.0`

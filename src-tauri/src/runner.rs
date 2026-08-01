@@ -23,7 +23,6 @@ pub type Events = Arc<dyn EventSink>;
 
 const LOG_CAPACITY: usize = 2000;
 const CRASH_TAIL: usize = 20;
-const PORT_SEARCH_RANGE: u16 = 20;
 const HEALTH_INTERVAL: Duration = Duration::from_millis(500);
 const TELEMETRY_INTERVAL: Duration = Duration::from_secs(1);
 const START_TIMEOUT: Duration = Duration::from_secs(900);
@@ -313,26 +312,36 @@ pub fn inspect_port(host: &str, port: u16) -> Option<PortConflict> {
     })
 }
 
-fn find_free_port(host: &str, start: u16) -> Option<u16> {
-    (start..start.saturating_add(PORT_SEARCH_RANGE))
-        .find(|port| TcpListener::bind((host, *port)).is_ok())
+fn describe_conflict(conflict: &PortConflict) -> String {
+    if conflict.is_llama_server {
+        format!(
+            "port {} is already serving another llama-server — stop it first, or choose \
+             a different port",
+            conflict.port
+        )
+    } else {
+        format!(
+            "port {} is already in use by another process",
+            conflict.port
+        )
+    }
 }
 
 fn spawn_run(
     inner: &Arc<Mutex<Inner>>,
     sink: &SampleSink,
     events: &Events,
-    mut spec: LaunchSpec,
+    spec: LaunchSpec,
     is_restart: bool,
 ) -> Result<(), String> {
-    let requested_port = spec.port;
-    let port = find_free_port(&spec.host, spec.port)
-        .ok_or_else(|| format!("no free port near {}", spec.port))?;
-
-    if port != spec.port {
-        spec.port = port;
-        replace_port_arg(&mut spec.args, port);
+    // Falling forward to the next free port was the original design and it was wrong:
+    // this app runs one model at a time, and a silent substitution produces a second
+    // server on a port no client is configured for. Twice this has left two copies of
+    // the same 15 GB model resident at once.
+    if let Some(conflict) = inspect_port(&spec.host, spec.port) {
+        return Err(describe_conflict(&conflict));
     }
+    let port = spec.port;
 
     let baseline_used = {
         let mut system = System::new();
@@ -363,7 +372,7 @@ fn spawn_run(
         guard.peak_footprint = 0;
         guard.peak_swap = 0;
         guard.port = Some(port);
-        guard.requested_port = Some(requested_port);
+        guard.requested_port = Some(port);
         guard.server_ctx = None;
         guard.restarted = is_restart;
         guard.started_secs = SystemTime::now()
@@ -399,14 +408,6 @@ fn spawn_run(
     );
 
     Ok(())
-}
-
-fn replace_port_arg(args: &mut [String], port: u16) {
-    if let Some(index) = args.iter().position(|a| a == "--port") {
-        if let Some(value) = args.get_mut(index + 1) {
-            *value = port.to_string();
-        }
-    }
 }
 
 fn spawn_log_reader<R: std::io::Read + Send + 'static>(
@@ -806,8 +807,8 @@ fn clear_pidfile() {
 #[serde(rename_all = "camelCase")]
 pub struct Orphan {
     pub pid: u32,
-    pub port: u16,
-    pub model_id: String,
+    pub port: Option<u16>,
+    pub model: Option<String>,
 }
 
 /// True when the pid is alive and still looks like our server. A pid alone is weak
@@ -823,38 +824,60 @@ fn is_live_server(pid: u32) -> bool {
         .unwrap_or(false)
 }
 
-/// A live pidfile on startup means the app died without stopping its server.
-///
-/// This reports and never kills: the app must not terminate a process the user did not
-/// ask it to terminate, and a name check cannot distinguish our orphan from a server the
-/// user started by hand. A stale pidfile (process gone, or the pid now belongs to
-/// something else) is cleared silently.
-pub fn detect_orphan() -> Option<Orphan> {
-    let raw = std::fs::read_to_string(pidfile_path()).ok()?;
-    let record: PidFile = match serde_json::from_str::<PidFile>(&raw) {
-        Ok(record) => record,
-        Err(_) => {
-            clear_pidfile();
-            return None;
-        }
+/// Pulls the port and model out of a llama-server command line.
+pub fn parse_server_command(args: &[String]) -> (Option<u16>, Option<String>) {
+    let value_after = |flag: &str| -> Option<String> {
+        args.iter()
+            .position(|arg| arg == flag)
+            .and_then(|index| args.get(index + 1))
+            .cloned()
     };
 
-    if !is_live_server(record.pid) {
-        clear_pidfile();
-        return None;
-    }
-
-    Some(Orphan {
-        pid: record.pid,
-        port: record.port,
-        model_id: record.model_id,
-    })
+    let port = value_after("--port").and_then(|value| value.parse().ok());
+    let model = value_after("-m")
+        .or_else(|| value_after("--model"))
+        .map(|path| {
+            path.rsplit('/')
+                .next()
+                .map(String::from)
+                .unwrap_or(path.clone())
+        });
+    (port, model)
 }
 
-/// Stops an orphan the user explicitly chose to stop, re-verifying the process first.
+/// Finds every running llama-server, not just one this app remembers starting.
+///
+/// The pidfile only ever knew about the last process written to it, so a hard kill of
+/// the app — which `tauri dev` does on every rebuild — left servers running that nothing
+/// could see. Two 15 GB copies accumulated that way in a single evening.
+pub fn detect_orphans(exclude_pid: Option<u32>) -> Vec<Orphan> {
+    let mut system = System::new();
+    system.refresh_processes(ProcessesToUpdate::All, true);
+
+    system
+        .processes()
+        .values()
+        .filter(|process| process.name().to_string_lossy().contains("llama-server"))
+        .filter(|process| Some(process.pid().as_u32()) != exclude_pid)
+        .map(|process| {
+            let args: Vec<String> = process
+                .cmd()
+                .iter()
+                .map(|arg| arg.to_string_lossy().into_owned())
+                .collect();
+            let (port, model) = parse_server_command(&args);
+            Orphan {
+                pid: process.pid().as_u32(),
+                port,
+                model,
+            }
+        })
+        .collect()
+}
+
+/// Stops a server the user explicitly chose to stop, re-verifying it first.
 pub fn stop_orphan(pid: u32) -> Result<(), String> {
     if !is_live_server(pid) {
-        clear_pidfile();
         return Err("that process is no longer running".to_string());
     }
 
@@ -871,11 +894,6 @@ pub fn stop_orphan(pid: u32) -> Result<(), String> {
     }
     clear_pidfile();
     Ok(())
-}
-
-/// Leaves the process running and forgets about it.
-pub fn dismiss_orphan() {
-    clear_pidfile();
 }
 
 #[cfg(test)]
@@ -935,14 +953,44 @@ garbage line
     }
 
     #[test]
-    fn port_substitution_rewrites_the_rendered_args() {
-        let mut args = vec![
-            "--host".to_string(),
-            "127.0.0.1".to_string(),
-            "--port".to_string(),
-            "8888".to_string(),
-        ];
-        replace_port_arg(&mut args, 8889);
-        assert_eq!(args[3], "8889");
+    fn a_command_line_yields_its_port_and_model() {
+        let args: Vec<String> = [
+            "-m",
+            "/Users/me/models/Qwen3.6-35B-A3B-UD-Q3_K_XL.gguf",
+            "--host",
+            "127.0.0.1",
+            "--port",
+            "8889",
+        ]
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
+
+        let (port, model) = parse_server_command(&args);
+        assert_eq!(port, Some(8889));
+        assert_eq!(model.as_deref(), Some("Qwen3.6-35B-A3B-UD-Q3_K_XL.gguf"));
+    }
+
+    #[test]
+    fn a_command_line_without_the_flags_yields_nothing_rather_than_guessing() {
+        let args = vec!["llama-server".to_string()];
+        assert_eq!(parse_server_command(&args), (None, None));
+    }
+
+    #[test]
+    fn a_busy_port_is_described_by_who_holds_it() {
+        let llama = PortConflict {
+            port: 8888,
+            responds_to_health: true,
+            is_llama_server: true,
+        };
+        assert!(describe_conflict(&llama).contains("another llama-server"));
+
+        let other = PortConflict {
+            port: 8888,
+            responds_to_health: false,
+            is_llama_server: false,
+        };
+        assert!(describe_conflict(&other).contains("another process"));
     }
 }

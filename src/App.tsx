@@ -3,7 +3,6 @@ import {
   onRunnerLog,
   onRunnerState,
   onTelemetry,
-  orphanDismiss,
   orphanStatus,
   orphanStop,
   runnerLogs,
@@ -108,13 +107,15 @@ export default function App() {
   const [runner, setRunner] = useState<RunnerSnapshot>(IDLE);
   const [telemetry, setTelemetry] = useState<Telemetry | null>(null);
   const [logs, setLogs] = useState<string[]>([]);
-  const [orphan, setOrphan] = useState<Orphan | null>(null);
+  const [orphans, setOrphans] = useState<Orphan[]>([]);
   const [catalogVersion, setCatalogVersion] = useState(0);
 
   useEffect(() => {
     runnerStatus().then(setRunner).catch(() => {});
     runnerLogs().then(setLogs).catch(() => {});
-    orphanStatus().then(setOrphan).catch(() => {});
+    const scan = () => orphanStatus().then(setOrphans).catch(() => {});
+    scan();
+    const rescan = setInterval(scan, 10000);
 
     const unlisten = [
       onRunnerState((snapshot) => {
@@ -129,6 +130,7 @@ export default function App() {
     ];
 
     return () => {
+      clearInterval(rescan);
       unlisten.forEach((p) => void p.then((off) => off()));
     };
   }, []);
@@ -200,28 +202,32 @@ export default function App() {
       </nav>
 
       <main className="content">
-        {orphan && (
+        {orphans.length > 0 && (
           <div className="notice">
-            An llama-server from a previous session is still running on port{" "}
-            {orphan.port} (pid {orphan.pid}). It was not started by this window.
-            <span className="notice-actions">
-              <button
-                className="button"
-                onClick={() =>
-                  orphanStop(orphan.pid)
-                    .then(() => setOrphan(null))
-                    .catch(() => setOrphan(null))
-                }
-              >
-                Stop it
-              </button>
-              <button
-                className="button"
-                onClick={() => orphanDismiss().then(() => setOrphan(null))}
-              >
-                Leave it running
-              </button>
-            </span>
+            {orphans.length === 1
+              ? "A llama-server is running that this window did not start:"
+              : `${orphans.length} llama-servers are running that this window did not start:`}
+            <ul className="orphan-list">
+              {orphans.map((orphan) => (
+                <li key={orphan.pid}>
+                  <span>
+                    {orphan.model ?? "unknown model"}
+                    {orphan.port != null && ` · port ${orphan.port}`} · pid{" "}
+                    {orphan.pid}
+                  </span>
+                  <button
+                    className="button"
+                    onClick={() =>
+                      orphanStop(orphan.pid)
+                        .then(setOrphans)
+                        .catch(() => {})
+                    }
+                  >
+                    Stop
+                  </button>
+                </li>
+              ))}
+            </ul>
           </div>
         )}
         {content()}

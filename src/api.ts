@@ -152,16 +152,12 @@ export function resetProfile(id: string): Promise<NamedProfile[]> {
   return invoke<NamedProfile[]>("reset_profile", { id });
 }
 
-export function orphanStatus(): Promise<Orphan | null> {
-  return invoke<Orphan | null>("orphan_status");
+export function orphanStatus(): Promise<Orphan[]> {
+  return invoke<Orphan[]>("orphan_status");
 }
 
-export function orphanStop(pid: number): Promise<void> {
-  return invoke<void>("orphan_stop", { pid });
-}
-
-export function orphanDismiss(): Promise<void> {
-  return invoke<void>("orphan_dismiss");
+export function orphanStop(pid: number): Promise<Orphan[]> {
+  return invoke<Orphan[]>("orphan_stop", { pid });
 }
 
 export function onRunnerState(handler: (snapshot: RunnerSnapshot) => void) {

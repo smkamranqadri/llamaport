@@ -935,3 +935,18 @@ input[type="range"] {
 .ctx-mark-risky {
   background: var(--danger);
 }
+
+.orphan-list {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.orphan-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 0;
+  font-size: 12px;
+}

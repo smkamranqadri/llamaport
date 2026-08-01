@@ -145,8 +145,8 @@ export interface PlanMemory {
 
 export interface Orphan {
   pid: number;
-  port: number;
-  modelId: string;
+  port: number | null;
+  model: string | null;
 }
 
 export interface Telemetry {

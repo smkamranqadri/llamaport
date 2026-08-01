@@ -301,25 +301,38 @@ fn crash_before_ready_is_not_restarted() {
     );
 }
 
+/// Falling forward to a free port produced a second server on a port no client was
+/// configured for, and twice left two copies of the same model resident.
 #[test]
-fn occupied_port_falls_forward_and_reports_it() {
+fn an_occupied_port_refuses_to_launch_rather_than_moving() {
     let hold = TcpListener::bind(("127.0.0.1", 0)).expect("hold port");
     let taken = hold.local_addr().expect("addr").port();
 
     let recorder = Arc::new(Recorder::default());
     let (runner, _samples) = runner_with(recorder);
 
+    let outcome = runner.start(spec("/bin/sh", vec!["-c".into(), "sleep 5".into()], taken));
+
+    let error = outcome.expect_err("a busy port must not silently move");
+    assert!(error.contains(&taken.to_string()), "{error}");
+    assert_eq!(
+        runner.snapshot().state,
+        RunState::Idle,
+        "nothing should have been started"
+    );
+}
+
+#[test]
+fn a_free_port_still_launches() {
+    let port = free_port();
+    let recorder = Arc::new(Recorder::default());
+    let (runner, _samples) = runner_with(recorder);
+
     runner
-        .start(spec("/bin/sh", vec!["-c".into(), "sleep 5".into()], taken))
+        .start(spec("/bin/sh", vec!["-c".into(), "sleep 5".into()], port))
         .expect("start");
 
     let snapshot = runner.snapshot();
-    assert_eq!(snapshot.requested_port, Some(taken));
-    assert_ne!(
-        snapshot.port,
-        Some(taken),
-        "should not claim the occupied port"
-    );
-
+    assert_eq!(snapshot.port, Some(port));
     runner.stop().expect("stop");
 }

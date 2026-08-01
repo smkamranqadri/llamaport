@@ -49,7 +49,7 @@ struct AppState {
     caps: Mutex<Option<Result<Capabilities, String>>>,
     runner: Runner,
     tray: Mutex<Option<TrayHandles>>,
-    orphan: Mutex<Option<Orphan>>,
+    orphan: Mutex<Vec<Orphan>>,
     benchmarks: Mutex<Benchmarks>,
 }
 
@@ -514,6 +514,24 @@ fn runner_start(
         return Err("this shard set is incomplete".into());
     }
 
+    // Refuse rather than start a second copy: this app runs one model at a time, and a
+    // duplicate silently consumes another 15-20 GB.
+    let already = runner::detect_orphans(state.runner.snapshot().pid)
+        .into_iter()
+        .find(|orphan| orphan.model.as_deref() == Some(model.file_name.as_str()));
+    if let Some(existing) = already {
+        return Err(match existing.port {
+            Some(port) => format!(
+                "{} is already running on port {port} (pid {}). Stop it before starting another copy.",
+                model.file_name, existing.pid
+            ),
+            None => format!(
+                "{} is already running (pid {}). Stop it before starting another copy.",
+                model.file_name, existing.pid
+            ),
+        });
+    }
+
     let plan = build_plan(&state, &model_id, draft)?;
     if let Some(error) = plan.capability_error {
         return Err(error);
@@ -844,22 +862,19 @@ fn runner_stop(state: State<'_, AppState>) -> Result<RunnerSnapshot, String> {
     Ok(state.runner.snapshot())
 }
 
+/// Rescans every time: servers appear and vanish outside this app's knowledge.
 #[tauri::command]
-fn orphan_status(state: State<'_, AppState>) -> Option<Orphan> {
-    state.orphan.lock().expect("orphan lock").clone()
+fn orphan_status(state: State<'_, AppState>) -> Vec<Orphan> {
+    let ours = state.runner.snapshot().pid;
+    let found = runner::detect_orphans(ours);
+    *state.orphan.lock().expect("orphan lock") = found.clone();
+    found
 }
 
 #[tauri::command]
-fn orphan_stop(pid: u32, state: State<'_, AppState>) -> Result<(), String> {
+fn orphan_stop(pid: u32, state: State<'_, AppState>) -> Result<Vec<Orphan>, String> {
     runner::stop_orphan(pid)?;
-    *state.orphan.lock().expect("orphan lock") = None;
-    Ok(())
-}
-
-#[tauri::command]
-fn orphan_dismiss(state: State<'_, AppState>) {
-    runner::dismiss_orphan();
-    *state.orphan.lock().expect("orphan lock") = None;
+    Ok(orphan_status(state))
 }
 
 fn update_tray(app: &AppHandle, snapshot: &RunnerSnapshot) {
@@ -919,7 +934,7 @@ pub fn run() {
                 caps: Mutex::new(None),
                 runner,
                 tray: Mutex::new(None),
-                orphan: Mutex::new(runner::detect_orphan()),
+                orphan: Mutex::new(runner::detect_orphans(None)),
                 benchmarks: Mutex::new(benchmarks::load_from(&benchmarks::path())),
             });
 
@@ -1000,7 +1015,6 @@ pub fn run() {
             benchmarks_export,
             orphan_status,
             orphan_stop,
-            orphan_dismiss,
             list_profiles,
             save_named_profile,
             duplicate_profile,

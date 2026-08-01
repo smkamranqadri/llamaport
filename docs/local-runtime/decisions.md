@@ -238,3 +238,46 @@ the conflict at launch would address the cause.
 
 **Reverses if:** the server is ever bound off-loopback, or the app is used by
 more than one person on a shared machine.
+
+---
+
+## D17 — A busy port refuses the launch; it never falls forward
+
+**Date:** after Phase 7. **Status:** settled. Supersedes the fallback behaviour in
+the original `DESIGN.md`.
+
+Falling forward to the next free port was my decision in the first design
+document, and it was wrong for an application whose stated rule is one model at a
+time. Observed twice in one evening: the requested port was busy, the app quietly
+started a second server on 8889 or 8890, and the result was two copies of the
+same 15.7 GB model resident simultaneously — on a 32 GB machine — reachable by no
+client, since Pi is pinned to 8888.
+
+A launch onto a busy port now fails with a message naming the occupant, and
+distinguishing another llama-server from an unrelated process because the remedy
+differs.
+
+Related: starting a model that is already running is refused outright, and
+orphan detection now scans for `llama-server` processes rather than trusting a
+pidfile that only ever knew the last pid written to it.
+
+---
+
+## D18 — The downloader is the outstanding half of the original goal
+
+**Date:** after Phase 7. **Status:** acknowledged, not yet built.
+
+The first design document set two goals: run local models, and download them with
+resume that survives an app restart. Seven phases went into the runtime — memory
+calibration, safety states, workload templates, health checks, benchmark history,
+agent configuration — while the downloader, fully designed in `DESIGN.md`
+§Downloader, was never started. The user's actual workflow for acquiring models is
+still `curl` plus an external download manager, which is what the app was meant to
+replace.
+
+The design stands and needs no revision: manual redirect following to capture the
+signed CDN URL, segmented ranged GETs, a `.part.json` sidecar so resume survives a
+process exit, re-resolution of the expiring URL on every resume, `Authorization`
+stripped on the cross-host redirect, and one shared rate-limit token bucket.
+
+**Next session should start here.**
