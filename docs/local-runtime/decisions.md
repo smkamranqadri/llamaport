@@ -210,3 +210,31 @@ measurement noise rather than fitted.
 **Reverses if:** a platform appears where the ratio is not stable across models,
 in which case residency likely needs to be per-architecture or per-quantisation
 rather than a single machine-wide constant.
+
+---
+
+## D16 — Phase 6 (security guardrails) skipped
+
+**Date:** Phase 5 → 7 transition. **Status:** settled by the user.
+
+Deliberately not implemented. What remains open as a result:
+
+- **`rawArgs` bypasses structured validation.** Typing `--host 0.0.0.0` into extra
+  arguments exposes an unauthenticated server to the LAN, because validation runs
+  on the form fields rather than the effective argv. The default stays
+  `127.0.0.1`, so this requires a deliberate act — which is why skipping is
+  defensible for a single-user tool.
+- **No API key storage.** The Connect screen reports authentication as "none",
+  accurately. `Redacted` and argv redaction exist and are tested, so adding keys
+  later is wiring rather than design.
+- **No port conflict detection before launch.** Port fallback already works and
+  reports the substitution, but nothing warns that the *reason* is another
+  server.
+
+The last item is the one that has actually caused harm: Pi is configured for
+8888, fallback puts the server on 8889 or 8890, and Pi then fails silently. The
+Connect screen's port-mismatch warning (Phase 5) covers the symptom; detecting
+the conflict at launch would address the cause.
+
+**Reverses if:** the server is ever bound off-loopback, or the app is used by
+more than one person on a shared machine.

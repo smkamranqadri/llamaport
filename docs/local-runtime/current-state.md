@@ -242,7 +242,8 @@ bun run build                                                 # tsc + vite, clea
 
 1. Confirm in the app: run "Test model" on the Q3 and then the Q4 variant, open
    Benchmarks, select both and check the comparison reads sensibly.
-2. Then **Phase 6 — security guardrails**: validate the *effective* argv rather
+2. **Phase 6 skipped by decision (D16)** — see decisions.md for what stays open.
+   Superseded plan was: validate the *effective* argv rather
    than the form fields, since `rawArgs` can still reintroduce `--host 0.0.0.0`
    past every structured guard; add API key storage, which the Connect screen
    currently has to describe as "none"; port validation and conflict detection.
