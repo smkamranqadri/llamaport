@@ -12,7 +12,7 @@ use crate::profile::Profile;
 
 /// Bumped whenever the shape changes. Absence means the original shape, which had no
 /// version field at all.
-pub const CURRENT_SCHEMA: u32 = 2;
+pub const CURRENT_SCHEMA: u32 = 3;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
@@ -66,9 +66,14 @@ pub fn migrate(mut config: Config) -> Config {
         return config;
     }
 
-    // v1 had no named profiles and no version marker. Nothing needs rewriting — the
-    // built-in templates come from code, and an empty list is the correct starting
-    // point — so the migration is purely the version stamp.
+    // v3 drops the profile system's storage. These keys reach `extra` now that no
+    // field claims them, and would otherwise be carried forward forever as the
+    // unknown-key rule intends — correct for a key from a *newer* build, wrong for one
+    // this build deliberately removed.
+    for retired in ["defaultProfile", "overrides", "lastRun", "profiles"] {
+        config.extra.remove(retired);
+    }
+
     config.schema_version = CURRENT_SCHEMA;
     config
 }
@@ -267,6 +272,34 @@ mod tests {
             "the rest fall back"
         );
         assert_eq!(loaded.models_dir.as_deref(), Some("/models"));
+    }
+
+    #[test]
+    fn retired_keys_are_dropped_while_unknown_ones_are_kept() {
+        let path = scratch("retired");
+        fs::write(
+            &path,
+            r#"{
+              "defaultProfile": { "port": 8888 },
+              "overrides": { "abc": {} },
+              "lastRun": { "abc": 1 },
+              "profiles": [],
+              "somethingFromANewerBuild": true
+            }"#,
+        )
+        .expect("seed");
+
+        let loaded = load_from(&path);
+        for retired in ["defaultProfile", "overrides", "lastRun", "profiles"] {
+            assert!(
+                !loaded.extra.contains_key(retired),
+                "{retired} should be gone"
+            );
+        }
+        assert!(
+            loaded.extra.contains_key("somethingFromANewerBuild"),
+            "a key this build simply does not know must still survive"
+        );
     }
 
     #[test]

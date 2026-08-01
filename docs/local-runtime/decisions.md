@@ -340,3 +340,35 @@ Result: 5,061 → 4,742 lines of Rust, 108 → 87 tests, 17 → 13 commands.
 **Reverses if:** the same model needs to be run several ways routinely, at which
 point named configurations become worth their weight again — but per-model memory
 covers the common case, which is running each model the same way every time.
+
+---
+
+## D21 — Retired keys are pruned at migration, not preserved forever
+
+**Date:** consolidation. **Status:** settled.
+
+The unknown-key rule (D-era Phase 1) exists so that running an older build cannot
+delete settings a newer one wrote. It is the wrong rule for keys this build
+*deliberately removed*: `defaultProfile`, `overrides`, `lastRun` and `profiles`
+would otherwise be carried forward indefinitely as unrecognised data.
+
+Schema v3 drops exactly those four, and keeps preserving everything else it does
+not recognise. Removing a feature should clean up after itself; it should not
+license discarding data that belongs to someone else.
+
+---
+
+## D22 — Dead code deleted rather than kept "for later"
+
+**Date:** consolidation. **Status:** settled.
+
+`redact.rs` (182 lines, 8 tests) protected API keys, but nothing in the app could
+store one — every call site passed `None`. It was kept once on the argument that
+it was the right primitive for a future feature; on review that is how dead code
+accumulates. Deleted along with `Runner::is_busy`, which had no callers.
+
+If keys arrive, the primitive is three commits back in the history and took an
+hour to write. That is cheaper than carrying it untested-in-anger indefinitely.
+
+**Consequence:** the model test no longer accepts an API key. A server behind
+authentication cannot be tested until keys exist as a real feature.

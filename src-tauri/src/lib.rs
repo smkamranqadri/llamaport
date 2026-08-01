@@ -4,7 +4,6 @@ pub mod gguf;
 pub mod health;
 pub mod probe;
 pub mod profile;
-pub mod redact;
 pub mod runner;
 pub mod safety;
 pub mod store;
@@ -434,7 +433,6 @@ async fn health_test(state: State<'_, AppState>) -> Result<health::HealthReport,
         port: snapshot.port.ok_or("no port recorded")?,
         alias: snapshot.alias.unwrap_or_default(),
         pid: snapshot.pid,
-        api_key: None,
     };
 
     tauri::async_runtime::spawn_blocking(move || health::run(&target))

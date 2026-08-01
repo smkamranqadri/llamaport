@@ -210,11 +210,6 @@ impl Runner {
         inner.logs.iter().cloned().collect()
     }
 
-    pub fn is_busy(&self) -> bool {
-        let state = self.inner.lock().expect("runner lock").state;
-        matches!(state, RunState::Starting | RunState::Ready)
-    }
-
     /// Peak values seen across the current run, for the benchmark record. `None` when
     /// telemetry has not sampled yet.
     pub fn peaks(&self) -> (Option<u64>, Option<u64>) {

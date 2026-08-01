@@ -1,313 +1,80 @@
 # Current state
 
-## Current phase
+## Where things stand
 
-**Scope cleanup complete. The downloader is next and is the only remaining work
-from the original goal.**
+The runtime half of the app is built and cleaned up. **The downloader is not
+built**, and is the next session's work.
 
-The app was starting duplicate servers. Fixed, and the outstanding half of the
-original goal — the resumable downloader — is now recorded as the next work
-(D18).
+Read before starting: [docs/downloader-spec.md](../downloader-spec.md), then
+[decisions.md](decisions.md) — D17 and D20 changed how launching works, and D18
+records why the downloader stayed outstanding for so long.
 
-Phase 4 complete, then reworked after first real use exposed three defects (see
-below).
+## What the app does
 
-Phase 1 complete and confirmed in the running app (process footprint read 1.3 GB
-against Activity Monitor's 1.28 GB).
+List GGUF models with real header metadata → launch one under `llama-server`
+with the exact command visible → watch memory, throughput and logs → stop it.
+Plus a model test that says whether a running server actually works.
 
-## Scope cleanup (D19, D20)
+Settings are not configured or named: the form opens with whatever that model was
+last launched with, and a successful launch updates it.
 
-The profile system is gone entirely (D20). Settings are no longer configured,
-merged or named — the form opens with whatever that model was last launched with,
-and a successful launch updates it. 4,742 lines of Rust, 87 tests, 13 commands.
+## What it deliberately does not do
 
-### Earlier stage (D19)
+- Download models. Designed, unbuilt. The Downloads screen says so.
+- Profiles, templates or saved presets (D19, D20).
+- Benchmark history, agent configuration generation (D19).
+- API keys or non-loopback binding (D16 — Phase 6 was skipped).
 
-Removed benchmarks, agent integration and profile CRUD — a third of the Rust and
-half the command surface, none of it part of the original goal. Kept the four
-workload templates as apply-only, the model test as a working/not-working check,
-and the memory estimator. 6,707 lines → 5,061; 143 tests → 108; 29 commands → 17.
-
-## Runtime correction
-
-- **A busy port refuses the launch** instead of falling forward (D17). The old
-  behaviour produced two copies of the same 15.7 GB model on a 32 GB machine,
-  reachable by nothing, because Pi is pinned to 8888.
-- **Starting an already-running model is refused**, naming the port and pid.
-- **Orphans are found by scanning** for `llama-server` processes rather than
-  trusting a pidfile that only knew the last pid written to it. The banner now
-  lists every one, each with its model and port, and a Stop button.
-
-## Completed work — Phase 7
-
-- **Three context figures, worded as three different kinds of claim**: "Model
-  maximum" (file metadata), "Current profile" (the runtime value this launch will
-  request), "Estimated practical range" (a hardware estimate for the machine as
-  it is right now, explicitly not a guarantee). Markers on the context slider
-  show where the prediction turns amber and where it turns red.
-- **Port conflict detection before launch** (carried from the skipped Phase 6).
-  Distinguishes another llama-server from an unrelated process, because the
-  remedy differs, and says plainly that falling forward will break clients
-  configured for the original port — the failure that hit Pi twice tonight.
-- **Logs survive a crash.** Output is mirrored to `last-run.log` as it arrives;
-  when the in-memory buffer is empty the previous run's file is served instead,
-  so the lines that explain a crash outlive the process that produced them.
-- **Health is shown separately from process state** — "responding now" versus
-  "process alive, endpoint not answering" — sampled each second rather than
-  inferred from the state machine.
-- Reveal in Finder (selects the file rather than opening a 20 GB GGUF with
-  whatever claims the extension), full filenames on hover in Library and detail.
-
-## Completed work — Phase 5
-
-- **`agents.rs`** — endpoint details, permission-gated Pi inspection, configuration
-  preview generation, application detection. **Never writes a Pi file.**
-- **Inspection returns structure, never contents.** `models.json` holds API keys
-  for cloud providers, so returning the file would leak unrelated secrets into
-  event payloads and logs. The app reports provider names, base URLs, model ids
-  and *whether* a key is set — with a test asserting a cloud key cannot appear in
-  the serialised result.
-- **The preview mirrors the installed Pi version** rather than a schema this app
-  invented: `api` and extra keys such as `compat` are copied from the existing
-  local provider when one is found, and omitted when it is not.
-- **The generated key is always a placeholder.** Echoing a real key into text the
-  user will copy and possibly paste elsewhere is the leak `Redacted` exists to
-  prevent.
-- **Port mismatch is surfaced.** The user's Pi points at 8888; the app frequently
-  ends up on 8889 or 8890 after a port fallback, which silently breaks Pi. The
-  Connect screen now says so explicitly.
-- **Applications are detected, not hard-coded** — Picot, VS Code, Cursor, iTerm
-  in /Applications and ~/Applications, with the Pi session folder if present.
-- Fixed a **flaky test**: four tests shared one scratch directory keyed by process
-  id and ran in parallel, so one could delete another's fixture mid-read.
-  Directories are now unique per call; verified over three consecutive runs.
-
-Known shape of the user's Pi setup, from the granted inspection: provider
-`local-llama`, `api: openai-completions`, `baseUrl: http://127.0.0.1:8888/v1`,
-`compat` block present, `contextWindow: 64512` (1024 below the served 65536).
-
-## Phase 4 rework — what the first real benchmark exposed
-
-Running it against the real Q3 and Q4 produced a screen the user correctly called
-unclear, and diagnosis found three separate faults:
-
-1. **The probe measured a workload nobody runs.** 16 generated tokens at a
-   context depth of 17 tokens, with 13 of 17 prompt tokens served from cache
-   (`prompt_n: 4`). It reported 33.5 tok/s where real use at ~20k context gives
-   12–15. The number was internally consistent and completely unrepresentative.
-   Benchmarks now prefill to a working depth (default 8K) with `cache_prompt`
-   disabled and a per-run nonce so the prefill cannot be cache-served, then
-   generate 256 tokens. Depth is recorded on the row; comparisons refuse to
-   treat different depths, or a legacy shallow probe, as comparable.
-2. **A healthy reasoning model was reported as FAILED.** The probe read only
-   `delta.content`, but the model emits `reasoning_content` first and spent its
-   whole 16-token budget thinking. Both the streaming reader and the completion
-   check now recognise reasoning fields; a reasoning-only answer warns rather
-   than fails, and the budget rose to 96 tokens.
-3. **The comparison had unlabelled columns** and headlined two misleading memory
-   figures. Columns are now labelled A and B with model, quantisation, context
-   and depth; peak process footprint is labelled as excluding GPU-resident
-   weights; and the swap delta is gone, because machine-wide swap is not
-   attributable to one model.
-
-The model test and the benchmark are now separate actions: the test stays
-instant and shallow and records nothing, the benchmark takes about a minute and
-is the only thing that writes a row.
-
-## Completed work — Phase 4
-
-- **`benchmarks.rs` with `benchmarks.json` beside the config**, never inside it
-  (D11): history grows without bound and every profile edit would otherwise
-  rewrite it, risking settings for the sake of a log. Atomic write shared with
-  the config store via `store::write_atomic`.
-- **A row records the settings, not just the result** — model file and size,
-  architecture, quantisation, context, both cache types, ngl, parallel slots and
-  the llama.cpp build — because the feature exists to compare quantisations
-  like-for-like and a number without its configuration proves nothing.
-- **Recorded automatically when a model test completes**, using the timings
-  `health.rs` already produces plus peak process footprint and peak swap now
-  tracked across the run by the telemetry loop.
-- **Query is a tested Rust function**, not frontend filtering: filter by model
-  and quantisation, sort by date, generation, prompt eval, first token or peak
-  memory. Rows missing the sort key sink to the bottom in *both* directions — a
-  missing measurement is neither fast nor slow.
-- **Export** to CSV or JSON, written into the app support directory and the path
-  returned, avoiding a file-dialog dependency. CSV escapes separators and quotes;
-  missing measurements are blank cells, never zeroes.
-- **History capped at 500 rows**, oldest first.
-- **UI** — Benchmarks screen with filters, sort, per-row note and delete, and a
-  two-run comparison showing percentage deltas with direction awareness (higher
-  generation is better, lower first-token latency is better). The comparison
-  warns when the two runs differ in more than quantisation, so a difference is
-  not silently attributed to the wrong cause.
-
-## Completed work — Phase 3
-
-- **`redact.rs`** — `Redacted` newtype with no `Display`, a placeholder `Debug`
-  and `Serialize`, and the value reachable only through `expose()`. Formatting a
-  struct containing a secret therefore cannot print it, and every deliberate use
-  is greppable. Plus argv redaction (`--api-key VALUE` and `--api-key=VALUE`)
-  and header redaction, both ready for phases 6 and 8.
-- **`health.rs`** — eight ordered, individually timed checks: process alive, port
-  reachable, `/health`, `/v1/models`, alias advertised, chat completion,
-  streaming, reasoning. Verdict is Passed / Passed with warnings / Failed.
-- **Failure handling is graded, not binary.** An unadvertised alias warns (the
-  request still works); a failed stream warns; an unreachable port stops the run
-  rather than reporting later checks it never performed.
-- **Reasoning is detected, not assumed** — `reasoning_content`, `reasoning`,
-  `thinking`, or inline `<think>` tags, in that order.
-- **Timings prefer the server's own figures** (`timings.prompt_per_second`,
-  `predicted_per_second`) and fall back to wall-clock only when absent.
-- **The probe is deterministic and small**: fixed prompt, `temperature: 0`,
-  `max_tokens: 16`, with a compile-time assertion that it stays ≤ 32.
-- **UI** — "Test model" button in the Running panel; per-check status, detail
-  and duration; results cleared when the run changes so a stale report cannot be
-  read as current.
-
-## Completed work — Phase 2
-
-- **Schema v2 with migration.** `schemaVersion` added; absence means v1. The
-  migration is a version stamp only — templates come from code, so nothing
-  needed rewriting. Idempotent, and unknown keys still survive.
-- **`Profile` gained `#[serde(default)]`.** Found by a migration test: a
-  `defaultProfile` missing any single field failed to deserialise, and
-  `unwrap_or_default()` then discarded the *entire* config — overrides,
-  calibration, history. Any future field addition would have done this to a
-  downgrade.
-- **Named profiles.** `profiles.rs` with four built-in workload templates
-  (Quality Coding 32K, Balanced 64K, Long Context 128K with q4_0 V cache,
-  Lightweight 8K). Built-ins live in code with stable ids; a stored entry
-  shadows one, which is what makes them editable, and reset drops the stored
-  entry. User profiles are never touched by a reset, and built-ins cannot be
-  deleted.
-- **Templates are sparse patches**, never full profiles — they set context,
-  cache types and slots, and deliberately never alias, host or port.
-- **Name collisions are suffixed, not rejected** (" copy", " copy 2"), so saving
-  cannot fail on a name the user cannot see.
-- **Calibration recording bug fixed.** `stop()` took the child out from under the
-  waiter thread, so the waiter returned before recording and *only an unexpected
-  exit* ever banked a sample. Normal use is always an explicit stop, so the
-  residency model from Phase 1 could never have calibrated. Samples are now
-  captured on both paths, and zero/implausible observations are filtered when
-  fitting rather than when capturing.
-
-## Completed work — Phase 1
-
-**Prerequisite fixes** (required before Phase 2 migration is possible)
-
-- `store::save()` writes to a temp file and renames — an interrupted write can no
-  longer truncate config.
-- `Config` gained `#[serde(flatten)] extra`, so keys written by a newer build
-  survive a load/save round-trip instead of being silently dropped.
-- `store` split into `load_from`/`save_to` so persistence is testable without
-  touching the real config directory.
-
-**Native memory readings** — new `src-tauri/src/sysmem.rs`, the only `unsafe` in
-the project:
-
-| Value | Source |
-| --- | --- |
-| Installed unified memory | `sysctl hw.memsize` |
-| macOS pressure | `sysctl kern.memorystatus_vm_pressure_level` (1/2/4) |
-| Swap in use | `sysctl vm.swapusage` → `xsw_usage` |
-| Process footprint | `proc_pid_rusage` → `ri_phys_footprint` (Activity Monitor's column) |
-
-A size mismatch on any sysctl returns `None` rather than trusting the bytes.
-
-**Safety state** — new `src-tauri/src/safety.rs`, pure functions. Kernel pressure
-is authoritative; headroom and swap are heuristics; the worst signal wins.
-Thresholds: headroom < 2 GB red, < 4 GB yellow; swap ≥ 6 GB red, ≥ 2 GB yellow.
-Memory attributable to a running model is subtracted before projecting a
-replacement launch, so swapping models is not double-counted.
-
-**D14 implemented** — `reap_orphan()` (auto-kill) replaced by `detect_orphan()`
-(report only), `stop_orphan()` (re-verifies the process first) and
-`dismiss_orphan()`. The app no longer kills anything the user did not ask it to.
-
-**Surfaced in the UI** — pre-launch panel shows predicted breakdown, safety
-badge, reasons, installed / in use / swap / pressure / projected headroom, and
-states plainly that prediction and actual will differ. Running panel adds
-pressure, swap, headroom, process footprint (labelled "excludes GPU-resident
-weights"). Missing readings render "Unavailable", never zero.
-
-**Tooling adopted** — clippy (`-D warnings`) and rustfmt now clean across the
-project; four pre-existing findings fixed.
-
-## Files changed
-
-New: `src-tauri/src/sysmem.rs`, `src-tauri/src/safety.rs`, `src/Memory.tsx`,
-`docs/local-runtime/*`.
-
-Modified: `store.rs`, `runner.rs`, `lib.rs`, `estimate.rs`, `gguf.rs`,
-`catalog.rs`, `probe.rs`, `Cargo.toml` (+libc), `types.ts`, `api.ts`,
-`App.tsx`, `ModelDetail.tsx`, `App.css`, `tests/runner_lifecycle.rs`.
-
-## Commands run
+## Shape
 
 ```
-cargo fmt --manifest-path src-tauri/Cargo.toml -- --check     # clean
-cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings   # clean
-cargo test --manifest-path src-tauri/Cargo.toml               # 140 passed, 1 ignored
-bun run build                                                 # tsc + vite, clean
+4,569 lines Rust · 99 tests · 13 commands · 7 frontend files
 ```
 
-## Verification results
+Modules: `catalog`, `gguf`, `probe`, `profile`, `estimate`, `sysmem`, `safety`,
+`runner`, `health`, `store`.
 
-- **143 tests pass**, 1 ignored, stable across repeated runs (`real_launch`, loads a real model). Up from 40.
-  New: 5 store persistence, 7 sysmem, 11 safety.
-- clippy clean at `-D warnings` for the first time; 4 findings fixed (2
-  pre-existing OR-patterns, 1 identity op, 1 of mine).
-- rustfmt applied across the codebase; check is clean.
-- One test failure found and fixed during the run: a safety truth-table case
-  asserted Red at exactly 2 GB headroom, but the rule is `< 2 GB`. The test was
-  wrong, not the rule; it now also asserts the boundary explicitly.
-- App rebuilt under `tauri dev` and relaunched without error.
+## Verification
+
+```bash
+bun run build                                     # tsc + vite
+cargo test --manifest-path src-tauri/Cargo.toml   # 99 passing, 1 ignored
+cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
+cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
+```
+
+All four pass. The ignored test (`real_launch`) loads a real model; run it
+deliberately with `-- --ignored --nocapture`.
 
 ## Known problems
 
-1. **Calibration has zero samples so far**, but recording now works on the
-   normal stop path. Three start-to-stop cycles will fit a residency.
-2. **Residency is fitted machine-wide, not per model.** If Q3 and Q4 turn out to
-   have materially different ratios, one constant will be wrong for both (D15).
-3. **Headroom thresholds are unvalidated against real use.** 2/4 GB were chosen
-   for a 32 GB machine also running an editor, browser and coding agent. They
-   will fire often on this hardware; whether that is signal or noise needs a few
-   days of use.
-4. **`profileName` on benchmark rows is always null.** Templates are applied to
-   the launch form rather than bound to a run, so the app does not know which
-   named profile produced it. Fixing it means recording the last applied
-   template per model at apply time.
-5. **Adopt is not implemented** for orphans — only Stop and Leave running. D14
-   mentioned Adopt; it needs a runner path for a process we did not spawn (no
-   stdout to attach), deferred rather than half-built.
-5. Downloads still a placeholder (D13, intentional).
-6. MLA (`deepseek2`) KV estimate still over-counts.
-7. `rawArgs` still bypasses structured validation — Phase 6.
-8. No API key support — Phase 3/6.
+1. **Calibration has no samples yet.** Estimates use the nominal figure, which
+   over-predicts on Apple Silicon. Three clean start-to-stop cycles fit a ratio.
+2. **MLA (`deepseek2`) KV is over-counted** — GLM-4.7-Flash's compressed latent
+   is not per-head.
+3. **Headroom thresholds are unvalidated** against daily use (2 GB red, 4 GB
+   amber on a 32 GB machine).
+4. **`tauri dev` orphans servers** on every Rust rebuild: it SIGKILLs the app, so
+   the exit handler never stops the child. Orphan scanning finds them now, but
+   the cause is development-mode only.
+5. **`rawArgs` bypasses structured validation** — typing `--host 0.0.0.0` there
+   would expose an unauthenticated server. Default is loopback (D16).
 
 ## Exact next step
 
-1. Confirm in the app: run "Test model" on the Q3 and then the Q4 variant, open
-   Benchmarks, select both and check the comparison reads sensibly.
-2. Next: **the downloader** (D18) — the outstanding half of the original goal,
-   already designed in `DESIGN.md` §Downloader and never built. Phase 8
-   documentation after that.
-   Phase 6 skipped by decision (D16) — see decisions.md for what stays open.
-   Superseded plan was: validate the *effective* argv rather
-   than the form fields, since `rawArgs` can still reintroduce `--host 0.0.0.0`
-   past every structured guard; add API key storage, which the Connect screen
-   currently has to describe as "none"; port validation and conflict detection.
+Build the downloader, per [docs/downloader-spec.md](../downloader-spec.md).
+Suggested order, each independently verifiable:
 
-Superseded — Phase 5 was **Pi and Picot integration**: read-only, permission-gated
-   inspection of `~/.pi/agent/settings.json`, preview and copy only, never a
-   write, with configurable application paths. Note the app still has no API key
-   storage, so the "connect" surface can only describe an unauthenticated
-   localhost endpoint until Phase 6.
+1. **Resolve** — follow redirects manually, capture the final CDN URL,
+   `x-linked-size` and `x-linked-etag`, confirm `accept-ranges`. Strip
+   `Authorization` on the cross-host redirect.
+2. **Single-segment download with resume** — `.part` file plus `.part.json`
+   sidecar, re-resolving the expiring URL on every resume. Test by killing the
+   process mid-transfer.
+3. **Segmented transfer** — 4–8 ranged GETs, positioned writes, one shared rate
+   limit, stall detection.
+4. **Queue and UI** — the Downloads screen that currently says "not built yet".
 
-Superseded plan for reference — Phase 4 was **benchmark history**: `benchmarks.json` beside config (never
-   inside it), append-only with atomic rewrite, recording the fields listed in
-   the brief plus llama.cpp version from `Capabilities` and peak swap from the
-   Phase 1 sampling. Table, sort, filter, compare two runs, delete, export
-   JSON/CSV. No charts. The goal is an objective Q3 vs Q4 comparison; note that
-   `health.rs` already produces most of the per-run numbers a benchmark row
-   needs.
+Copy the runner's `EventSink` pattern for progress reporting: it is what makes
+the process lifecycle testable without a window, and the downloader needs the
+same property.

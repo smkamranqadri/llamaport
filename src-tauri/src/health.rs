@@ -12,8 +12,6 @@ use std::time::{Duration, Instant};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
-use crate::redact::Redacted;
-
 /// Short, deterministic, and cheap: a long prompt would distort the timings it is
 /// meant to measure and would eat context the user wanted for real work.
 const TEST_PROMPT: &str = "Reply with exactly one word: ready";
@@ -88,7 +86,6 @@ pub struct Target {
     pub port: u16,
     pub alias: String,
     pub pid: Option<u32>,
-    pub api_key: Option<Redacted>,
 }
 
 impl Target {
@@ -116,24 +113,15 @@ fn check(name: &str, status: CheckStatus, detail: impl Into<String>, started: In
     }
 }
 
-fn authorised(request: ureq::Request, key: Option<&Redacted>) -> ureq::Request {
-    match key {
-        Some(key) if !key.is_empty() => {
-            request.set("Authorization", &format!("Bearer {}", key.expose()))
-        }
-        _ => request,
-    }
-}
-
-fn get(url: &str, key: Option<&Redacted>) -> Result<String, String> {
-    authorised(ureq::get(url).timeout(REQUEST_TIMEOUT), key)
+fn get(url: &str) -> Result<String, String> {
+    ureq::get(url)
+        .timeout(REQUEST_TIMEOUT)
         .call()
         .map_err(|e| describe(&e))?
         .into_string()
         .map_err(|e| e.to_string())
 }
 
-/// Error text must never echo the request, which would carry the Authorization header.
 fn describe(error: &ureq::Error) -> String {
     match error {
         ureq::Error::Status(code, _) => format!("HTTP {code}"),
@@ -178,15 +166,13 @@ struct StreamOutcome {
     chunks: u64,
 }
 
-fn stream_chat(base: &str, alias: &str, key: Option<&Redacted>) -> Result<StreamOutcome, String> {
+fn stream_chat(base: &str, alias: &str) -> Result<StreamOutcome, String> {
     let started = Instant::now();
-    let response = authorised(
-        ureq::post(&format!("{base}/v1/chat/completions")).timeout(REQUEST_TIMEOUT),
-        key,
-    )
-    .set("Content-Type", "application/json")
-    .send_string(&chat_body(alias, true).to_string())
-    .map_err(|e| describe(&e))?;
+    let response = ureq::post(&format!("{base}/v1/chat/completions"))
+        .timeout(REQUEST_TIMEOUT)
+        .set("Content-Type", "application/json")
+        .send_string(&chat_body(alias, true).to_string())
+        .map_err(|e| describe(&e))?;
 
     let reader = BufReader::new(response.into_reader());
     let mut first_token_ms = None;
@@ -235,7 +221,6 @@ fn stream_chat(base: &str, alias: &str, key: Option<&Redacted>) -> Result<Stream
 
 pub fn run(target: &Target) -> HealthReport {
     let base = target.base();
-    let key = target.api_key.as_ref();
     let mut checks = Vec::new();
     let mut timings = Timings::default();
     let mut reasoning = Reasoning::NotReturned;
@@ -299,7 +284,7 @@ pub fn run(target: &Target) -> HealthReport {
 
     // 3. Health endpoint
     let started = Instant::now();
-    match get(&format!("{base}/health"), key) {
+    match get(&format!("{base}/health")) {
         Ok(_) => checks.push(check("Health endpoint", CheckStatus::Passed, "ok", started)),
         Err(e) => {
             checks.push(check("Health endpoint", CheckStatus::Failed, e, started));
@@ -309,7 +294,7 @@ pub fn run(target: &Target) -> HealthReport {
 
     // 4 and 5. Model list, and whether our alias is in it
     let started = Instant::now();
-    match get(&format!("{base}/v1/models"), key) {
+    match get(&format!("{base}/v1/models")) {
         Ok(body) => {
             let ids: Vec<String> = serde_json::from_str::<Value>(&body)
                 .ok()
@@ -351,12 +336,10 @@ pub fn run(target: &Target) -> HealthReport {
 
     // 6. Chat completion
     let started = Instant::now();
-    let completion = authorised(
-        ureq::post(&format!("{base}/v1/chat/completions")).timeout(REQUEST_TIMEOUT),
-        key,
-    )
-    .set("Content-Type", "application/json")
-    .send_string(&chat_body(&target.alias, false).to_string());
+    let completion = ureq::post(&format!("{base}/v1/chat/completions"))
+        .timeout(REQUEST_TIMEOUT)
+        .set("Content-Type", "application/json")
+        .send_string(&chat_body(&target.alias, false).to_string());
 
     match completion {
         Ok(response) => {
@@ -424,7 +407,7 @@ pub fn run(target: &Target) -> HealthReport {
 
     // 7. Streaming
     let started = Instant::now();
-    match stream_chat(&base, &target.alias, key) {
+    match stream_chat(&base, &target.alias) {
         Ok(outcome) => {
             timings.time_to_first_token_ms = Some(outcome.first_token_ms);
             if timings.total_response_ms.is_none() {
