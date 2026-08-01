@@ -1,17 +1,12 @@
 import { useEffect, useState } from "react";
 import {
-  deleteProfile,
-  duplicateProfile,
   getSettings,
-  listProfiles,
-  resetProfile,
   saveDefaultProfile,
   setLlamaServerPath,
   setModelsDir,
 } from "./api";
-import { ProfileBadge, summarise } from "./Profiles";
 import ProfileForm from "./ProfileForm";
-import type { NamedProfile, Profile, Settings } from "./types";
+import type { Profile, Settings } from "./types";
 
 export default function SettingsScreen({
   onModelsDirChanged,
@@ -24,7 +19,6 @@ export default function SettingsScreen({
   const [profile, setProfile] = useState<Profile | null>(null);
   const [saved, setSaved] = useState<string | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
-  const [profiles, setProfiles] = useState<NamedProfile[]>([]);
 
   useEffect(() => {
     getSettings()
@@ -35,7 +29,6 @@ export default function SettingsScreen({
         setProfile(next.defaultProfile);
       })
       .catch((e) => setFailure(String(e)));
-    listProfiles().then(setProfiles).catch((e) => setFailure(String(e)));
   }, []);
 
   const flash = (message: string) => {
@@ -142,65 +135,6 @@ export default function SettingsScreen({
             </div>
           </dl>
         )}
-      </section>
-
-      <section className="panel">
-        <h2>Workload profiles</h2>
-        <p className="field-hint">
-          Built-in templates are starting points sized for a 32 GB machine also
-          running an editor and browser. Edit them freely — reset restores the
-          original without touching your own profiles.
-        </p>
-        <ul className="profile-list">
-          {profiles.map((entry) => (
-            <li key={entry.id} className="profile-row">
-              <span className="profile-identity">
-                <span className="profile-name">
-                  {entry.name} <ProfileBadge profile={entry} />
-                </span>
-                <span className="field-hint">{summarise(entry.settings)}</span>
-                {entry.description && (
-                  <span className="field-hint">{entry.description}</span>
-                )}
-              </span>
-              <span className="actions">
-                <button
-                  className="button"
-                  onClick={() =>
-                    duplicateProfile(entry.id)
-                      .then(setProfiles)
-                      .catch((e) => setFailure(String(e)))
-                  }
-                >
-                  Duplicate
-                </button>
-                {entry.builtIn ? (
-                  <button
-                    className="button"
-                    onClick={() =>
-                      resetProfile(entry.id)
-                        .then(setProfiles)
-                        .catch((e) => setFailure(String(e)))
-                    }
-                  >
-                    Reset
-                  </button>
-                ) : (
-                  <button
-                    className="button button-danger"
-                    onClick={() =>
-                      deleteProfile(entry.id)
-                        .then(setProfiles)
-                        .catch((e) => setFailure(String(e)))
-                    }
-                  >
-                    Delete
-                  </button>
-                )}
-              </span>
-            </li>
-          ))}
-        </ul>
       </section>
 
       <section className="panel">

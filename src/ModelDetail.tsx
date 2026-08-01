@@ -1,13 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  benchmarkRun,
   getLaunchPlan,
   healthTest,
   listProfiles,
   revealPath,
   runnerStart,
   runnerStop,
-  saveNamedProfile,
   saveProfile,
 } from "./api";
 import { formatBytes, formatContext } from "./format";
@@ -21,7 +19,7 @@ import {
 } from "./Memory";
 import ProfileForm, { diffProfile } from "./ProfileForm";
 import HealthPanel from "./HealthPanel";
-import { applyPatch, workloadPatch } from "./Profiles";
+import { applyPatch } from "./Profiles";
 import type {
   HealthReport,
   LaunchPlan,
@@ -291,10 +289,8 @@ export default function ModelDetail({
   const [busy, setBusy] = useState(false);
   const [showLogs, setShowLogs] = useState(false);
   const [profiles, setProfiles] = useState<NamedProfile[]>([]);
-  const [newProfileName, setNewProfileName] = useState("");
   const [health, setHealth] = useState<HealthReport | null>(null);
   const [testing, setTesting] = useState(false);
-  const [benchmarking, setBenchmarking] = useState(false);
   const history = useRef<number[]>([]);
 
   const isCurrent = runner.modelId === model.id;
@@ -461,7 +457,7 @@ export default function ModelDetail({
             <span className="actions">
               <button
                 className="button"
-                disabled={testing || benchmarking}
+                disabled={testing}
                 onClick={() => {
                   setTesting(true);
                   setFailure(null);
@@ -472,23 +468,6 @@ export default function ModelDetail({
                 }}
               >
                 {testing ? "Testing…" : "Test model"}
-              </button>
-              <button
-                className="button"
-                disabled={testing || benchmarking}
-                title="Prefills 16K tokens then generates 256, matching the context depth of a real coding session"
-                onClick={() => {
-                  setBenchmarking(true);
-                  setFailure(null);
-                  benchmarkRun(16384, 256)
-                    .then(() =>
-                      setFailure(null),
-                    )
-                    .catch((e) => setFailure(String(e)))
-                    .finally(() => setBenchmarking(false));
-                }}
-              >
-                {benchmarking ? "Benchmarking… (~1 min)" : "Run benchmark"}
               </button>
             </span>
           </div>
@@ -590,36 +569,6 @@ export default function ModelDetail({
           )}
         </div>
 
-        <div className="panel-actions">
-          <input
-            value={newProfileName}
-            placeholder="name these settings as a reusable profile"
-            onChange={(e) => setNewProfileName(e.currentTarget.value)}
-          />
-          <button
-            className="button"
-            disabled={newProfileName.trim() === ""}
-            onClick={() =>
-              saveNamedProfile({
-                id: "",
-                name: newProfileName.trim(),
-                description: "",
-                builtIn: false,
-                workload: "custom",
-                modelId: null,
-                apiKeyRef: null,
-                settings: workloadPatch(form),
-              })
-                .then((next) => {
-                  setProfiles(next);
-                  setNewProfileName("");
-                })
-                .catch((e) => setFailure(String(e)))
-            }
-          >
-            Save as profile
-          </button>
-        </div>
       </section>
 
       <section className="panel">

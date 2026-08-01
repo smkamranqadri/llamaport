@@ -9,26 +9,16 @@ import {
   runnerStatus,
   runnerStop,
 } from "./api";
-import Benchmarks from "./Benchmarks";
-import Connect from "./Connect";
 import Library from "./Library";
 import ModelDetail from "./ModelDetail";
 import SettingsScreen from "./SettingsScreen";
 import type { ModelEntry, Orphan, RunnerSnapshot, Telemetry } from "./types";
 import "./App.css";
 
-type Screen =
-  | "library"
-  | "benchmarks"
-  | "connect"
-  | "discover"
-  | "downloads"
-  | "settings";
+type Screen = "library" | "discover" | "downloads" | "settings";
 
 const NAV: { id: Screen; label: string; phase?: string }[] = [
   { id: "library", label: "Library" },
-  { id: "benchmarks", label: "Benchmarks" },
-  { id: "connect", label: "Connect" },
   { id: "discover", label: "Discover", phase: "4" },
   { id: "downloads", label: "Downloads", phase: "3" },
   { id: "settings", label: "Settings" },
@@ -162,12 +152,6 @@ export default function App() {
           onSelect={setSelected}
         />
       );
-    }
-    if (screen === "benchmarks") {
-      return <Benchmarks />;
-    }
-    if (screen === "connect") {
-      return <Connect />;
     }
     if (screen === "settings") {
       return (

@@ -281,3 +281,38 @@ process exit, re-resolution of the expiring URL on every resume, `Authorization`
 stripped on the cross-host redirect, and one shared rate-limit token bucket.
 
 **Next session should start here.**
+
+---
+
+## D19 — Benchmarks, agent integration and profile CRUD removed
+
+**Date:** after the runtime correction. **Status:** settled by the user.
+
+An inventory found 29 commands and 6,707 lines of Rust, of which roughly a third
+and half the command surface served features that were never part of the original
+goal — while the resumable downloader, which was half of it, remained unbuilt.
+
+Deleted: `benchmarks.rs`, `agents.rs`, the Benchmarks and Connect screens, the
+benchmark half of `health.rs`, and the create/rename/duplicate/delete/reset
+surface around named profiles.
+
+Kept, deliberately:
+
+- **The four workload templates**, as apply-only buttons. Per-model overrides
+  already persist what a user changes; a second profile system on top of that was
+  the part that had no reason to exist.
+- **The model test**, reduced to "is this server working" — its diagnostic value
+  was proven when it caught a reasoning model being reported as broken.
+- **The memory estimator and safety verdict.** These solve the user's real
+  problem on a 32 GB machine and found a real one: an orphaned server costing
+  measurable inference speed.
+- **`redact.rs`**, though nothing currently stores a secret. It is small, tested,
+  and is the correct primitive if an API key ever lands.
+
+Result: 5,061 lines, 108 tests, 17 commands, 9 frontend files. Existing
+`benchmarks.json` is left on disk untouched — deleting a feature should not
+delete the user's data. A stored `profiles` key in config now survives via the
+`extra` catch-all rather than being dropped.
+
+**Reverses if:** benchmarking becomes a recurring need rather than a
+one-off question that has now been answered.

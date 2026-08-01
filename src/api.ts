@@ -1,16 +1,11 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import type {
-  AgentConnectionInfo,
-  BenchmarkQuery,
-  BenchmarkRecord,
+  NamedProfile,
   DirInfo,
   HealthReport,
   LaunchPlan,
-  PiInspection,
-  PiPreview,
   ModelEntry,
-  NamedProfile,
   Profile,
   ProfilePatch,
   RunnerSnapshot,
@@ -87,69 +82,8 @@ export function healthTest(): Promise<HealthReport> {
   return invoke<HealthReport>("health_test");
 }
 
-export function benchmarkRun(
-  depthTokens: number,
-  generateTokens: number,
-): Promise<BenchmarkRecord> {
-  return invoke<BenchmarkRecord>("benchmark_run", {
-    depthTokens,
-    generateTokens,
-  });
-}
-
-export function agentConnection(): Promise<AgentConnectionInfo> {
-  return invoke<AgentConnectionInfo>("agent_connection");
-}
-
-export function piInspect(): Promise<PiInspection> {
-  return invoke<PiInspection>("pi_inspect");
-}
-
-export function piPreview(providerName?: string): Promise<PiPreview> {
-  return invoke<PiPreview>("pi_preview", {
-    providerName: providerName ?? null,
-  });
-}
-
-export function benchmarksList(
-  query?: BenchmarkQuery,
-): Promise<BenchmarkRecord[]> {
-  return invoke<BenchmarkRecord[]>("benchmarks_list", { query: query ?? null });
-}
-
-export function benchmarkDelete(id: string): Promise<BenchmarkRecord[]> {
-  return invoke<BenchmarkRecord[]>("benchmark_delete", { id });
-}
-
-export function benchmarkNote(
-  id: string,
-  note: string | null,
-): Promise<BenchmarkRecord[]> {
-  return invoke<BenchmarkRecord[]>("benchmark_note", { id, note });
-}
-
-export function benchmarksExport(format: "csv" | "json"): Promise<string> {
-  return invoke<string>("benchmarks_export", { format });
-}
-
 export function listProfiles(): Promise<NamedProfile[]> {
   return invoke<NamedProfile[]>("list_profiles");
-}
-
-export function saveNamedProfile(profile: NamedProfile): Promise<NamedProfile[]> {
-  return invoke<NamedProfile[]>("save_named_profile", { profile });
-}
-
-export function duplicateProfile(id: string): Promise<NamedProfile[]> {
-  return invoke<NamedProfile[]>("duplicate_profile", { id });
-}
-
-export function deleteProfile(id: string): Promise<NamedProfile[]> {
-  return invoke<NamedProfile[]>("delete_profile", { id });
-}
-
-export function resetProfile(id: string): Promise<NamedProfile[]> {
-  return invoke<NamedProfile[]>("reset_profile", { id });
 }
 
 export function orphanStatus(): Promise<Orphan[]> {

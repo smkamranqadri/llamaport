@@ -2,7 +2,8 @@
 
 ## Current phase
 
-**Runtime correction after Phase 7. Complete.**
+**Scope cleanup complete. The downloader is next and is the only remaining work
+from the original goal.**
 
 The app was starting duplicate servers. Fixed, and the outstanding half of the
 original goal — the resumable downloader — is now recorded as the next work
@@ -13,6 +14,13 @@ below).
 
 Phase 1 complete and confirmed in the running app (process footprint read 1.3 GB
 against Activity Monitor's 1.28 GB).
+
+## Scope cleanup (D19)
+
+Removed benchmarks, agent integration and profile CRUD — a third of the Rust and
+half the command surface, none of it part of the original goal. Kept the four
+workload templates as apply-only, the model test as a working/not-working check,
+and the memory estimator. 6,707 lines → 5,061; 143 tests → 108; 29 commands → 17.
 
 ## Runtime correction
 

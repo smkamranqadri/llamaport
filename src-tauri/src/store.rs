@@ -8,7 +8,6 @@ use serde_json::{Map, Value};
 
 use crate::estimate::{CalibrationSample, MAX_SAMPLES};
 use crate::profile::{Profile, ProfilePatch};
-use crate::profiles::NamedProfile;
 
 /// Bumped whenever the shape changes. Absence means the original shape, which had no
 /// version field at all.
@@ -24,9 +23,6 @@ pub struct Config {
     pub overrides: BTreeMap<String, ProfilePatch>,
     pub calibration: Vec<CalibrationSample>,
     pub last_run: BTreeMap<String, u64>,
-    /// User profiles, plus any built-in template the user has edited. Templates that
-    /// have never been edited are not stored — they come from code.
-    pub profiles: Vec<NamedProfile>,
     /// Keys written by a different version of the app. Captured and written back
     /// untouched so that running an older build cannot silently delete newer settings.
     #[serde(flatten)]
@@ -228,8 +224,8 @@ mod tests {
         );
         assert_eq!(loaded.last_run.len(), 1);
         assert!(
-            loaded.profiles.is_empty(),
-            "templates come from code, not config"
+            loaded.extra.is_empty(),
+            "a v1 config has nothing this build does not understand"
         );
     }
 
