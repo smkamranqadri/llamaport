@@ -32,8 +32,8 @@ cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
 
 | File | What it is |
 | --- | --- |
-| [docs/runner-spec.md](docs/runner-spec.md) | Listing and running models. Built, and the constraints that shaped it |
-| [docs/downloader-spec.md](docs/downloader-spec.md) | Downloading with resume. Designed, unbuilt — the next piece of work |
+| [docs/runner-spec.md](docs/runner-spec.md) | Listing and running models |
+| [docs/downloader-spec.md](docs/downloader-spec.md) | Downloading with resume — not yet implemented |
 
 ## Notes
 
