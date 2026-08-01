@@ -1,0 +1,175 @@
+# Decisions
+
+Append-only. Each entry records what was decided, why, and what would reverse it.
+
+---
+
+## D1 — Tauri v2 + React/TS, not Electron or SwiftUI
+
+**Date:** before this plan. **Status:** settled.
+
+~10 MB binary, no bundled Chromium, and Rust suits the two hard parts: child
+process supervision and (later) a segmented downloader. Cost was a one-time
+`rustup` install.
+
+**Reverses if:** the app needs to ship on Windows/Linux with heavy native
+integration that Tauri makes awkward. No current pressure.
+
+---
+
+## D2 — Model identity is `(file_size, sha256 of first 4 KB)`
+
+Free during the scan that already reads the header. Profiles survive renames and
+directory moves. Full-file hashing would mean reading 21 GB on first sight.
+
+**Reverses if:** collisions appear in practice. None expected in a personal
+library.
+
+---
+
+## D3 — Runner reports through an `EventSink` trait, not `AppHandle`
+
+Decouples process supervision from Tauri so the lifecycle is testable headlessly.
+`runner_lifecycle.rs` drives spawn → Ready → telemetry → stop against a stand-in
+HTTP server with no window.
+
+**Consequence:** phases 3 and 4 can be tested the same way. Do not reintroduce a
+direct `AppHandle` dependency in the runner.
+
+---
+
+## D4 — Architecture is shown on the model detail page, never in list rows
+
+`general.architecture` is the llama.cpp architecture id, not the model's release
+identity: `Qwen3.6-35B-A3B` reports `qwen35moe`, `GLM-4.7-Flash` reports
+`deepseek2`. Beside the model name it reads as a contradictory version claim.
+
+Renaming it to something friendlier was rejected: the raw id is what llama.cpp
+accepts and reports, which is exactly what matters when a build refuses to load
+a model.
+
+---
+
+## D5 — KV occupancy is derived, not read
+
+llama.cpp build 10090 exposes no `kv_cache_*` metric series. Occupancy is
+computed as `n_tokens_max / n_ctx`, falling back to `kv_cache_usage_ratio` when
+an older build provides it. Validated against `/slots`, which reported
+`n_prompt_tokens` 20768 against `n_tokens_max` 20768.
+
+**Consequence:** any metric added in later phases must assume names can vanish
+between builds. Probe, do not assume.
+
+---
+
+## D6 — Memory is measured machine-wide, not per process
+
+Three sources disagreed on one running model on this 32 GB M2:
+
+| Source | Reported |
+| --- | --- |
+| `sysinfo` process memory (RSS) | 16.2 GB |
+| Activity Monitor process column (physical footprint) | 1.28 GB |
+| System wired memory | 20.0 GB |
+
+With `-ngl all`, weights and KV cache live in Metal buffers attributed to the
+kernel, not the process. Calibration therefore records peak system-wide growth
+against a pre-launch baseline, and the running panel shows system used/total and
+swap so it agrees with Activity Monitor rather than contradicting it.
+
+**Phase 1 nuance:** the brief asks for "memory used by the running llama-server
+process". That will be shown using `proc_pid_rusage` `ri_phys_footprint` — the
+Activity Monitor number — but labelled as the process footprint and presented
+*alongside* system pressure, never as the model's true cost.
+
+---
+
+## D7 — Negative calibration residuals are dropped, not clamped
+
+A run whose observed growth is below the predicted weights+KV base says nothing
+about compute overhead — the machine may have evicted as fast as the model
+loaded, or the weights may never have become fully resident. Clamping to zero
+would bias the fitted overhead downward, which is the dangerous direction.
+
+---
+
+## D8 — K and V cache dimensions are summed separately
+
+`kv = layers × ctx × kv_heads × (k_dim × bpe_k + v_dim × bpe_v)`, not
+`2 × head_dim`. Latent-attention architectures size K and V differently:
+`GLM-4.7-Flash` reports a 576-wide key with one KV head.
+
+**Open:** MLA stores a compressed latent rather than per-head K/V, so this still
+over-counts `deepseek2`. Treat that family's estimate as provisional.
+
+---
+
+## D9 — Command injection is prevented structurally, not by escaping
+
+`Command::spawn` receives an argument vector and no shell is involved.
+`render_command()` shell-quotes for *display only*. Phase 6 should document this
+rather than add escaping that implies a shell exists.
+
+**But:** `rawArgs` remains a genuine risk because it can reintroduce `--host` or
+`--api-key` past the structured fields. Validation must run on effective argv.
+
+---
+
+## D10 — Native sysctl over shell parsing *(proposed, Phase 1)*
+
+`hw.memsize`, `kern.memorystatus_vm_pressure_level`, `vm.swapusage` and
+`proc_pid_rusage` via `libc`, rather than parsing `memory_pressure`, `vm_stat`
+or `sysctl` output. Isolated in `sysmem.rs`; the parsing of raw structs is what
+gets fixture tests, not the syscalls.
+
+---
+
+## D11 — Benchmarks live in `benchmarks.json`, not `config.json` *(proposed, Phase 4)*
+
+Same technology, no new dependency, but isolated: history grows unboundedly and
+must never put profile data at risk during a rewrite.
+
+---
+
+## D12 — Git, with one commit per phase
+
+**Date:** Phase 0. **Status:** settled by the user.
+
+The directory was untracked. Initialised with a root `.gitignore` covering
+`node_modules/`, `dist/`, `src-tauri/target/` and `.DS_Store`. Each phase ends
+with a commit, giving a rollback point per phase and a readable history
+alongside `current-state.md`.
+
+---
+
+## D13 — Downloads keeps its visible placeholder
+
+**Date:** Phase 0. **Status:** settled by the user.
+
+The Downloads screen is not implemented and is not covered by phases 1–8,
+despite the brief assuming it exists. The nav entry stays and continues to say
+the feature is unbuilt: honest about the gap, and Phase 7's navigation work must
+leave it alone rather than quietly hiding it.
+
+The downloader design (segmented ranges, signed-URL re-resolution on resume,
+shared rate-limit token bucket) is preserved in the root `DESIGN.md` for
+whenever it is scheduled.
+
+---
+
+## D14 — Orphaned servers are surfaced, never auto-killed
+
+**Date:** Phase 0. **Status:** settled by the user. Supersedes the current
+behaviour of `runner::reap_orphan()`.
+
+A live pidfile on startup will be reported — "an orphaned llama-server is
+running on port X" — with Stop and Adopt offered to the user. The app will not
+kill a process the user did not ask it to kill.
+
+The existing auto-kill relies on a pid plus a name check, which is weak
+evidence: pids are recycled, and the check cannot distinguish our orphan from a
+server started by hand. This session demonstrated the cost directly by killing a
+user's manually-started server with an over-broad `pkill`.
+
+**Implementation:** scheduled for Phase 1 alongside the other lifecycle-adjacent
+fixes, or Phase 6 if it proves larger than expected.

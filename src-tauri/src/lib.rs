@@ -1,0 +1,487 @@
+pub mod catalog;
+pub mod estimate;
+pub mod gguf;
+pub mod probe;
+pub mod profile;
+pub mod runner;
+pub mod store;
+
+use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
+
+use serde::Serialize;
+use tauri::menu::{Menu, MenuItem};
+use tauri::tray::TrayIconBuilder;
+use tauri::{AppHandle, Emitter, Listener, Manager, State, WindowEvent, Wry};
+
+use catalog::{DirInfo, ModelEntry};
+use estimate::Estimate;
+use probe::Capabilities;
+use profile::{Profile, ProfilePatch};
+use runner::{EventSink, LaunchSpec, RunState, Runner, RunnerSnapshot};
+use store::Config;
+
+struct TauriEvents(AppHandle);
+
+impl EventSink for TauriEvents {
+    fn emit(&self, event: &str, payload: serde_json::Value) {
+        let _ = self.0.emit(event, payload);
+    }
+}
+
+struct TrayHandles {
+    status: MenuItem<Wry>,
+    stop: MenuItem<Wry>,
+}
+
+struct AppState {
+    config: Mutex<Config>,
+    models: Mutex<Vec<ModelEntry>>,
+    caps: Mutex<Option<Result<Capabilities, String>>>,
+    runner: Runner,
+    tray: Mutex<Option<TrayHandles>>,
+    startup_notice: Mutex<Option<String>>,
+}
+
+impl AppState {
+    fn models_dir(&self) -> PathBuf {
+        let config = self.config.lock().expect("config lock");
+        store::models_dir(&config)
+    }
+
+    fn save_config(&self) -> Result<(), String> {
+        let config = self.config.lock().expect("config lock");
+        store::save(&config).map_err(|e| e.to_string())
+    }
+
+    fn model(&self, model_id: &str) -> Result<ModelEntry, String> {
+        let models = self.models.lock().expect("models lock");
+        models
+            .iter()
+            .find(|m| m.id == model_id)
+            .cloned()
+            .ok_or_else(|| format!("model {model_id} is not in the catalog"))
+    }
+
+    fn capabilities(&self) -> Result<Capabilities, String> {
+        let mut cached = self.caps.lock().expect("caps lock");
+        if let Some(result) = cached.as_ref() {
+            return result.clone();
+        }
+
+        let configured = {
+            let config = self.config.lock().expect("config lock");
+            config.llama_server_path.clone()
+        };
+
+        let result = match probe::discover(configured.as_deref()) {
+            Some(binary) => probe::probe(&binary),
+            None => Err("llama-server was not found on PATH or in the usual locations".into()),
+        };
+        *cached = Some(result.clone());
+        result
+    }
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct LaunchPlan {
+    profile: Profile,
+    /// What this model would launch with if it had no overrides — alias derived and
+    /// context clamped, so the UI can diff against it directly.
+    effective_defaults: Profile,
+    overridden: Vec<String>,
+    args: Vec<String>,
+    command: String,
+    estimate: Option<Estimate>,
+    total_memory: u64,
+    max_ctx: Option<u64>,
+    capability_error: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct Settings {
+    models_dir: String,
+    llama_server_path: Option<String>,
+    default_profile: Profile,
+    capabilities: Option<Capabilities>,
+    capability_error: Option<String>,
+    calibration_samples: usize,
+    fitted_overhead: Option<u64>,
+}
+
+fn resolve(defaults: &Profile, model: &ModelEntry, patch: &ProfilePatch) -> Profile {
+    let mut resolved = defaults.merged(patch);
+    if resolved.alias.trim().is_empty() {
+        resolved.alias = profile::default_alias(&model.display_name);
+    }
+    if let Some(max) = model.metadata.as_ref().and_then(|m| m.context_length) {
+        resolved.ctx = resolved.ctx.min(max);
+    }
+    resolved
+}
+
+fn build_plan(state: &AppState, model_id: &str, draft: Option<ProfilePatch>) -> Result<LaunchPlan, String> {
+    let model = state.model(model_id)?;
+
+    let (defaults, patch, fitted) = {
+        let config = state.config.lock().expect("config lock");
+        (
+            config.default_profile.clone(),
+            draft.unwrap_or_else(|| config.patch_for(&model.id)),
+            estimate::fit_overhead(&config.calibration),
+        )
+    };
+
+    let profile = resolve(&defaults, &model, &patch);
+    let effective_defaults = resolve(&defaults, &model, &ProfilePatch::default());
+    let overridden = patch
+        .overridden_fields()
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
+
+    let estimate = model.metadata.as_ref().and_then(|md| {
+        estimate::estimate(
+            md,
+            model.size_bytes,
+            profile.ctx,
+            &profile.cache_type_k,
+            &profile.cache_type_v,
+            fitted,
+        )
+    });
+
+    let caps = state.capabilities();
+    let (args, command, capability_error) = match &caps {
+        Ok(caps) => {
+            let args = profile.args(&model.path, caps);
+            let command = profile::render_command(&caps.binary, &args);
+            (args, command, None)
+        }
+        Err(e) => (Vec::new(), String::new(), Some(e.clone())),
+    };
+
+    let mut system = sysinfo::System::new();
+    system.refresh_memory();
+
+    Ok(LaunchPlan {
+        total_memory: system.total_memory(),
+        max_ctx: model.metadata.as_ref().and_then(|m| m.context_length),
+        profile,
+        effective_defaults,
+        overridden,
+        args,
+        command,
+        estimate,
+        capability_error,
+    })
+}
+
+#[tauri::command]
+async fn catalog_list(state: State<'_, AppState>) -> Result<Vec<ModelEntry>, String> {
+    let dir = state.models_dir();
+    let entries = tauri::async_runtime::spawn_blocking(move || catalog::scan(&dir))
+        .await
+        .map_err(|e| e.to_string())?;
+    *state.models.lock().expect("models lock") = entries.clone();
+    Ok(entries)
+}
+
+#[tauri::command]
+async fn catalog_dir_info(state: State<'_, AppState>) -> Result<DirInfo, String> {
+    let dir = state.models_dir();
+    tauri::async_runtime::spawn_blocking(move || catalog::dir_info(&dir))
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn set_models_dir(path: String, state: State<'_, AppState>) -> Result<DirInfo, String> {
+    {
+        let mut config = state.config.lock().expect("config lock");
+        config.models_dir = Some(path);
+    }
+    state.save_config()?;
+
+    let dir = state.models_dir();
+    tauri::async_runtime::spawn_blocking(move || catalog::dir_info(&dir))
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn launch_plan(
+    model_id: String,
+    draft: Option<ProfilePatch>,
+    state: State<'_, AppState>,
+) -> Result<LaunchPlan, String> {
+    build_plan(&state, &model_id, draft)
+}
+
+#[tauri::command]
+fn save_profile(
+    model_id: String,
+    patch: ProfilePatch,
+    state: State<'_, AppState>,
+) -> Result<LaunchPlan, String> {
+    {
+        let mut config = state.config.lock().expect("config lock");
+        if patch.overridden_fields().is_empty() {
+            config.overrides.remove(&model_id);
+        } else {
+            config.overrides.insert(model_id.clone(), patch);
+        }
+    }
+    state.save_config()?;
+    build_plan(&state, &model_id, None)
+}
+
+#[tauri::command]
+fn save_default_profile(profile: Profile, state: State<'_, AppState>) -> Result<(), String> {
+    {
+        let mut config = state.config.lock().expect("config lock");
+        config.default_profile = profile;
+    }
+    state.save_config()
+}
+
+#[tauri::command]
+fn set_llama_server_path(path: Option<String>, state: State<'_, AppState>) -> Result<Settings, String> {
+    {
+        let mut config = state.config.lock().expect("config lock");
+        config.llama_server_path = path;
+    }
+    *state.caps.lock().expect("caps lock") = None;
+    state.save_config()?;
+    Ok(settings_view(&state))
+}
+
+fn settings_view(state: &AppState) -> Settings {
+    let caps = state.capabilities();
+    let config = state.config.lock().expect("config lock");
+
+    Settings {
+        models_dir: store::models_dir(&config).to_string_lossy().into_owned(),
+        llama_server_path: config.llama_server_path.clone(),
+        default_profile: config.default_profile.clone(),
+        calibration_samples: config.calibration.len(),
+        fitted_overhead: estimate::fit_overhead(&config.calibration),
+        capabilities: caps.as_ref().ok().cloned(),
+        capability_error: caps.err(),
+    }
+}
+
+#[tauri::command]
+fn get_settings(state: State<'_, AppState>) -> Settings {
+    settings_view(&state)
+}
+
+#[tauri::command]
+fn runner_status(state: State<'_, AppState>) -> RunnerSnapshot {
+    state.runner.snapshot()
+}
+
+#[tauri::command]
+fn runner_logs(state: State<'_, AppState>) -> Vec<String> {
+    state.runner.logs()
+}
+
+#[tauri::command]
+fn runner_start(
+    model_id: String,
+    draft: Option<ProfilePatch>,
+    state: State<'_, AppState>,
+) -> Result<RunnerSnapshot, String> {
+    let model = state.model(&model_id)?;
+    if model.error.is_some() {
+        return Err("this file could not be parsed as GGUF".into());
+    }
+    if model.shards.as_ref().is_some_and(|s| !s.missing.is_empty()) {
+        return Err("this shard set is incomplete".into());
+    }
+
+    let plan = build_plan(&state, &model_id, draft)?;
+    if let Some(error) = plan.capability_error {
+        return Err(error);
+    }
+
+    let caps = state.capabilities()?;
+    let predicted_base = plan
+        .estimate
+        .as_ref()
+        .map(|e| e.weights_bytes + e.kv_bytes)
+        .unwrap_or(0);
+
+    let spec = LaunchSpec {
+        model_id: model_id.clone(),
+        model_name: model.display_name.clone(),
+        binary: caps.binary.clone(),
+        args: plan.args,
+        alias: plan.profile.alias.clone(),
+        host: plan.profile.host.clone(),
+        port: plan.profile.port,
+        ctx: plan.profile.ctx,
+        cache_type_k: plan.profile.cache_type_k.clone(),
+        cache_type_v: plan.profile.cache_type_v.clone(),
+        predicted_base,
+    };
+
+    state.runner.start(spec)?;
+
+    {
+        let mut config = state.config.lock().expect("config lock");
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+        config.last_run.insert(model_id, now);
+    }
+    let _ = state.save_config();
+
+    Ok(state.runner.snapshot())
+}
+
+#[tauri::command]
+fn runner_stop(state: State<'_, AppState>) -> Result<RunnerSnapshot, String> {
+    state.runner.stop()?;
+    Ok(state.runner.snapshot())
+}
+
+#[tauri::command]
+fn startup_notice(state: State<'_, AppState>) -> Option<String> {
+    state.startup_notice.lock().expect("notice lock").take()
+}
+
+fn update_tray(app: &AppHandle, snapshot: &RunnerSnapshot) {
+    let state = app.state::<AppState>();
+    let tray = state.tray.lock().expect("tray lock");
+    let Some(handles) = tray.as_ref() else { return };
+
+    let label = match snapshot.state {
+        RunState::Idle => "No model running".to_string(),
+        RunState::Starting => format!("Starting {}…", snapshot.model_name.as_deref().unwrap_or("")),
+        RunState::Ready => format!(
+            "{} · :{}",
+            snapshot.alias.as_deref().unwrap_or(""),
+            snapshot.port.unwrap_or(0)
+        ),
+        RunState::Stopping => "Stopping…".to_string(),
+        RunState::Crashed => "Stopped after a crash".to_string(),
+    };
+
+    let _ = handles.status.set_text(label);
+    let _ = handles
+        .stop
+        .set_enabled(matches!(snapshot.state, RunState::Starting | RunState::Ready));
+}
+
+fn show_main_window(app: &AppHandle) {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.show();
+        let _ = window.set_focus();
+    }
+}
+
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
+pub fn run() {
+    tauri::Builder::default()
+        .plugin(tauri_plugin_opener::init())
+        .setup(|app| {
+            let handle = app.handle().clone();
+            let sink_handle = handle.clone();
+
+            let runner = Runner::new(
+                Arc::new(TauriEvents(handle.clone())),
+                Arc::new(move |sample| {
+                    let state = sink_handle.state::<AppState>();
+                    {
+                        let mut config = state.config.lock().expect("config lock");
+                        config.record_sample(sample);
+                    }
+                    let _ = state.save_config();
+                }),
+            );
+
+            app.manage(AppState {
+                config: Mutex::new(store::load()),
+                models: Mutex::new(Vec::new()),
+                caps: Mutex::new(None),
+                runner,
+                tray: Mutex::new(None),
+                startup_notice: Mutex::new(runner::reap_orphan()),
+            });
+
+            let status = MenuItem::with_id(app, "status", "No model running", false, None::<&str>)?;
+            let stop = MenuItem::with_id(app, "stop", "Stop model", false, None::<&str>)?;
+            let show = MenuItem::with_id(app, "show", "Show window", true, None::<&str>)?;
+            let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
+            let menu = Menu::with_items(app, &[&status, &stop, &show, &quit])?;
+
+            TrayIconBuilder::with_id("main")
+                .icon(app.default_window_icon().unwrap().clone())
+                .menu(&menu)
+                .show_menu_on_left_click(true)
+                .on_menu_event(|app, event| match event.id().as_ref() {
+                    "stop" => {
+                        let state = app.state::<AppState>();
+                        let _ = state.runner.stop();
+                        let snapshot = state.runner.snapshot();
+                        let _ = app.emit("runner:state", snapshot);
+                    }
+                    "show" => show_main_window(app),
+                    "quit" => {
+                        let state = app.state::<AppState>();
+                        let _ = state.runner.stop();
+                        app.exit(0);
+                    }
+                    _ => {}
+                })
+                .build(app)?;
+
+            {
+                let state = app.state::<AppState>();
+                *state.tray.lock().expect("tray lock") = Some(TrayHandles { status, stop });
+            }
+
+            let listener_handle = handle.clone();
+            handle.listen("runner:state", move |event| {
+                if let Ok(snapshot) = serde_json::from_str::<RunnerSnapshot>(event.payload()) {
+                    update_tray(&listener_handle, &snapshot);
+                }
+            });
+
+            Ok(())
+        })
+        .on_window_event(|window, event| {
+            // Closing hides; the app stays in the menu bar so the server survives.
+            if let WindowEvent::CloseRequested { api, .. } = event {
+                let _ = window.hide();
+                api.prevent_close();
+            }
+        })
+        .invoke_handler(tauri::generate_handler![
+            catalog_list,
+            catalog_dir_info,
+            set_models_dir,
+            launch_plan,
+            save_profile,
+            save_default_profile,
+            set_llama_server_path,
+            get_settings,
+            runner_status,
+            runner_logs,
+            runner_start,
+            runner_stop,
+            startup_notice
+        ])
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app, event| {
+            if let tauri::RunEvent::ExitRequested { .. } | tauri::RunEvent::Exit = event {
+                let state = app.state::<AppState>();
+                let _ = state.runner.stop();
+            }
+        });
+}
