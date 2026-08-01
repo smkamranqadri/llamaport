@@ -1,13 +1,11 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import type {
-  NamedProfile,
   DirInfo,
   HealthReport,
   LaunchPlan,
   ModelEntry,
   Profile,
-  ProfilePatch,
   RunnerSnapshot,
   Orphan,
   Settings,
@@ -28,20 +26,9 @@ export function setModelsDir(path: string): Promise<DirInfo> {
 
 export function getLaunchPlan(
   modelId: string,
-  draft?: ProfilePatch,
+  draft?: Profile,
 ): Promise<LaunchPlan> {
   return invoke<LaunchPlan>("launch_plan", { modelId, draft: draft ?? null });
-}
-
-export function saveProfile(
-  modelId: string,
-  patch: ProfilePatch,
-): Promise<LaunchPlan> {
-  return invoke<LaunchPlan>("save_profile", { modelId, patch });
-}
-
-export function saveDefaultProfile(profile: Profile): Promise<void> {
-  return invoke<void>("save_default_profile", { profile });
 }
 
 export function setLlamaServerPath(path: string | null): Promise<Settings> {
@@ -62,7 +49,7 @@ export function runnerLogs(): Promise<string[]> {
 
 export function runnerStart(
   modelId: string,
-  draft?: ProfilePatch,
+  draft?: Profile,
 ): Promise<RunnerSnapshot> {
   return invoke<RunnerSnapshot>("runner_start", {
     modelId,
@@ -80,10 +67,6 @@ export function revealPath(path: string): Promise<void> {
 
 export function healthTest(): Promise<HealthReport> {
   return invoke<HealthReport>("health_test");
-}
-
-export function listProfiles(): Promise<NamedProfile[]> {
-  return invoke<NamedProfile[]>("list_profiles");
 }
 
 export function orphanStatus(): Promise<Orphan[]> {

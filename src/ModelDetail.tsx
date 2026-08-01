@@ -2,11 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   getLaunchPlan,
   healthTest,
-  listProfiles,
   revealPath,
   runnerStart,
   runnerStop,
-  saveProfile,
 } from "./api";
 import { formatBytes, formatContext } from "./format";
 import {
@@ -17,14 +15,12 @@ import {
   SafetyBadge,
   Stat,
 } from "./Memory";
-import ProfileForm, { diffProfile } from "./ProfileForm";
+import ProfileForm from "./ProfileForm";
 import HealthPanel from "./HealthPanel";
-import { applyPatch } from "./Profiles";
 import type {
   HealthReport,
   LaunchPlan,
   ModelEntry,
-  NamedProfile,
   Profile,
   RunnerSnapshot,
   Telemetry,
@@ -288,17 +284,12 @@ export default function ModelDetail({
   const [failure, setFailure] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [showLogs, setShowLogs] = useState(false);
-  const [profiles, setProfiles] = useState<NamedProfile[]>([]);
   const [health, setHealth] = useState<HealthReport | null>(null);
   const [testing, setTesting] = useState(false);
   const history = useRef<number[]>([]);
 
   const isCurrent = runner.modelId === model.id;
   const running = isCurrent && (runner.state === "starting" || runner.state === "ready");
-
-  useEffect(() => {
-    listProfiles().then(setProfiles).catch(() => {});
-  }, []);
 
   useEffect(() => {
     getLaunchPlan(model.id)
@@ -325,18 +316,16 @@ export default function ModelDetail({
     history.current = [...history.current, telemetry.genTps].slice(-SPARK_POINTS);
   }, [telemetry]);
 
-  const patch = useMemo(() => {
-    if (!form || !plan) return {};
-    return diffProfile(form, plan.effectiveDefaults);
-  }, [form, plan]);
+  // The form is the launch: there is no saved profile to diff against.
+  const draft = form ?? undefined;
 
   useEffect(() => {
     if (!form || !plan) return;
     const timer = setTimeout(() => {
-      getLaunchPlan(model.id, patch).then(setPreview).catch(() => {});
+      getLaunchPlan(model.id, draft).then(setPreview).catch(() => {});
     }, 200);
     return () => clearTimeout(timer);
-  }, [patch, form, plan, model.id]);
+  }, [draft, form, plan, model.id]);
 
   const guard = useCallback(async (action: () => Promise<RunnerSnapshot>) => {
     setBusy(true);
@@ -395,7 +384,7 @@ export default function ModelDetail({
               <button
                 className="button"
                 disabled={busy}
-                onClick={() => guard(() => runnerStart(model.id, patch))}
+                onClick={() => guard(() => runnerStart(model.id, draft))}
               >
                 Reload
               </button>
@@ -411,7 +400,7 @@ export default function ModelDetail({
             <button
               className="button button-primary"
               disabled={busy || blocked !== null}
-              onClick={() => guard(() => runnerStart(model.id, patch))}
+              onClick={() => guard(() => runnerStart(model.id, draft))}
             >
               Run
             </button>
@@ -515,59 +504,13 @@ export default function ModelDetail({
       <section className="panel">
         <h2>Launch settings</h2>
 
-        {profiles.length > 0 && (
-          <div className="templates">
-            <span className="field-hint">Apply a workload template:</span>
-            <span className="template-buttons">
-              {profiles.map((entry) => (
-                <button
-                  key={entry.id}
-                  className="button"
-                  title={entry.description || undefined}
-                  onClick={() => setForm(applyPatch(form, entry.settings))}
-                >
-                  {entry.name}
-                </button>
-              ))}
-            </span>
-            <span className="field-hint">
-              Templates are starting points sized for this machine, not fixed
-              answers. They change context, cache types and slots — never alias,
-              host or port.
-            </span>
-          </div>
-        )}
-
         <ProfileForm
           value={form}
-          defaults={plan.effectiveDefaults}
           maxCtx={plan.maxCtx}
           practicalCtx={(preview ?? plan).practicalCtx}
           riskyCtx={(preview ?? plan).riskyCtx}
           onChange={setForm}
         />
-        <div className="panel-actions">
-          <button
-            className="button"
-            disabled={Object.keys(patch).length === 0}
-            onClick={() =>
-              saveProfile(model.id, patch)
-                .then((next) => {
-                  setPlan(next);
-                  setForm(next.profile);
-                  setPreview(next);
-                })
-                .catch((e) => setFailure(String(e)))
-            }
-          >
-            Save as this model's profile
-          </button>
-          {plan.overridden.length > 0 && (
-            <span className="field-hint">
-              saved overrides: {plan.overridden.join(", ")}
-            </span>
-          )}
-        </div>
 
       </section>
 

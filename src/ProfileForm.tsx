@@ -4,42 +4,18 @@ import type { Profile } from "./types";
 const CACHE_TYPES = ["f16", "bf16", "q8_0", "q5_1", "q5_0", "q4_1", "q4_0"];
 const CTX_STEP = 4096;
 
-export function diffProfile(form: Profile, defaults: Profile): Partial<Profile> {
-  const patch: Record<string, unknown> = {};
-  for (const key of Object.keys(form) as (keyof Profile)[]) {
-    const mine = form[key];
-    const theirs = defaults[key];
-    const same = Array.isArray(mine)
-      ? JSON.stringify(mine) === JSON.stringify(theirs)
-      : mine === theirs;
-    if (!same) patch[key] = mine;
-  }
-  return patch as Partial<Profile>;
-}
-
 function Field({
   label,
   hint,
-  overridden,
-  onReset,
   children,
 }: {
   label: string;
   hint?: string;
-  overridden?: boolean;
-  onReset?: () => void;
   children: ReactNode;
 }) {
   return (
     <label className="field">
-      <span className="field-label">
-        {label}
-        {overridden && (
-          <button className="field-reset" onClick={onReset} type="button">
-            reset
-          </button>
-        )}
-      </span>
+      <span className="field-label">{label}</span>
       {children}
       {hint && <span className="field-hint">{hint}</span>}
     </label>
@@ -48,7 +24,6 @@ function Field({
 
 export default function ProfileForm({
   value,
-  defaults,
   maxCtx,
   practicalCtx,
   riskyCtx,
@@ -56,7 +31,6 @@ export default function ProfileForm({
   onChange,
 }: {
   value: Profile;
-  defaults: Profile;
   maxCtx: number | null;
   practicalCtx?: number | null;
   riskyCtx?: number | null;
@@ -66,10 +40,6 @@ export default function ProfileForm({
   const set = <K extends keyof Profile>(key: K, next: Profile[K]) =>
     onChange({ ...value, [key]: next });
 
-  const reset = <K extends keyof Profile>(key: K) => set(key, defaults[key]);
-  const isOverridden = <K extends keyof Profile>(key: K) =>
-    JSON.stringify(value[key]) !== JSON.stringify(defaults[key]);
-
   const ctxCeiling = maxCtx ?? 131072;
 
   return (
@@ -77,8 +47,6 @@ export default function ProfileForm({
       {showAlias && (
         <Field
           label="Alias"
-          overridden={isOverridden("alias")}
-          onReset={() => reset("alias")}
         >
           <input
             value={value.alias}
@@ -89,8 +57,6 @@ export default function ProfileForm({
 
       <Field
         label="Port"
-        overridden={isOverridden("port")}
-        onReset={() => reset("port")}
       >
         <input
           type="number"
@@ -102,8 +68,6 @@ export default function ProfileForm({
       <Field
         label={`Context — ${value.ctx.toLocaleString()} tokens`}
         hint={maxCtx ? `model maximum ${maxCtx.toLocaleString()}` : undefined}
-        overridden={isOverridden("ctx")}
-        onReset={() => reset("ctx")}
       >
         <>
           <input
@@ -138,8 +102,6 @@ export default function ProfileForm({
       <Field
         label="GPU layers"
         hint="all, auto, or a number"
-        overridden={isOverridden("ngl")}
-        onReset={() => reset("ngl")}
       >
         <input
           value={value.ngl}
@@ -149,8 +111,6 @@ export default function ProfileForm({
 
       <Field
         label="Parallel slots"
-        overridden={isOverridden("parallel")}
-        onReset={() => reset("parallel")}
       >
         <input
           type="number"
@@ -162,8 +122,6 @@ export default function ProfileForm({
 
       <Field
         label="Cache type K"
-        overridden={isOverridden("cacheTypeK")}
-        onReset={() => reset("cacheTypeK")}
       >
         <select
           value={value.cacheTypeK}
@@ -177,8 +135,6 @@ export default function ProfileForm({
 
       <Field
         label="Cache type V"
-        overridden={isOverridden("cacheTypeV")}
-        onReset={() => reset("cacheTypeV")}
       >
         <select
           value={value.cacheTypeV}
@@ -214,8 +170,6 @@ export default function ProfileForm({
       <Field
         label="Extra arguments"
         hint="space separated, passed through verbatim"
-        overridden={isOverridden("rawArgs")}
-        onReset={() => reset("rawArgs")}
       >
         <input
           value={value.rawArgs.join(" ")}

@@ -56,26 +56,6 @@ export interface Profile {
   rawArgs: string[];
 }
 
-export type ProfilePatch = Partial<Profile>;
-
-export type Workload =
-  | "qualityCoding"
-  | "balanced"
-  | "longContext"
-  | "lightweight"
-  | "custom";
-
-export interface NamedProfile {
-  id: string;
-  name: string;
-  description: string;
-  builtIn: boolean;
-  workload: Workload;
-  modelId: string | null;
-  apiKeyRef: string | null;
-  settings: ProfilePatch;
-}
-
 export interface Estimate {
   weightsBytes: number;
   kvBytes: number;
@@ -88,8 +68,6 @@ export interface Estimate {
 
 export interface LaunchPlan {
   profile: Profile;
-  effectiveDefaults: Profile;
-  overridden: string[];
   args: string[];
   command: string;
   estimate: Estimate | null;
@@ -207,7 +185,6 @@ export interface Capabilities {
 export interface Settings {
   modelsDir: string;
   llamaServerPath: string | null;
-  defaultProfile: Profile;
   capabilities: Capabilities | null;
   capabilityError: string | null;
   calibrationSamples: number;

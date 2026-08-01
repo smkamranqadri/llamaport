@@ -4,7 +4,6 @@ pub mod gguf;
 pub mod health;
 pub mod probe;
 pub mod profile;
-pub mod profiles;
 pub mod redact;
 pub mod runner;
 pub mod safety;
@@ -22,8 +21,7 @@ use tauri::{AppHandle, Emitter, Listener, Manager, State, WindowEvent, Wry};
 use catalog::{DirInfo, ModelEntry};
 use estimate::Estimate;
 use probe::Capabilities;
-use profile::{Profile, ProfilePatch};
-use profiles::NamedProfile;
+use profile::Profile;
 use runner::{EventSink, LaunchSpec, Orphan, RunState, Runner, RunnerSnapshot};
 use store::Config;
 
@@ -93,10 +91,6 @@ impl AppState {
 #[serde(rename_all = "camelCase")]
 struct LaunchPlan {
     profile: Profile,
-    /// What this model would launch with if it had no overrides — alias derived and
-    /// context clamped, so the UI can diff against it directly.
-    effective_defaults: Profile,
-    overridden: Vec<String>,
     args: Vec<String>,
     command: String,
     estimate: Option<Estimate>,
@@ -131,15 +125,16 @@ struct PlanMemory {
 struct Settings {
     models_dir: String,
     llama_server_path: Option<String>,
-    default_profile: Profile,
     capabilities: Option<Capabilities>,
     capability_error: Option<String>,
     calibration_samples: usize,
     fitted_residency: Option<f64>,
 }
 
-fn resolve(defaults: &Profile, model: &ModelEntry, patch: &ProfilePatch) -> Profile {
-    let mut resolved = defaults.merged(patch);
+/// Fills in what the user has not chosen: an alias derived from the model's name, and a
+/// context clamped to what the file actually supports.
+fn resolve(model: &ModelEntry, draft: Option<Profile>) -> Profile {
+    let mut resolved = draft.unwrap_or_default();
     if resolved.alias.trim().is_empty() {
         resolved.alias = profile::default_alias(&model.display_name);
     }
@@ -152,26 +147,19 @@ fn resolve(defaults: &Profile, model: &ModelEntry, patch: &ProfilePatch) -> Prof
 fn build_plan(
     state: &AppState,
     model_id: &str,
-    draft: Option<ProfilePatch>,
+    draft: Option<Profile>,
 ) -> Result<LaunchPlan, String> {
     let model = state.model(model_id)?;
 
-    let (defaults, patch, residency) = {
+    let (residency, remembered) = {
         let config = state.config.lock().expect("config lock");
         (
-            config.default_profile.clone(),
-            draft.unwrap_or_else(|| config.patch_for(&model.id)),
             estimate::fit_residency(&config.calibration),
+            config.last_used.get(&model.id).cloned(),
         )
     };
 
-    let profile = resolve(&defaults, &model, &patch);
-    let effective_defaults = resolve(&defaults, &model, &ProfilePatch::default());
-    let overridden = patch
-        .overridden_fields()
-        .iter()
-        .map(|s| s.to_string())
-        .collect();
+    let profile = resolve(&model, draft.or(remembered));
 
     let estimate = model.metadata.as_ref().and_then(|md| {
         estimate::estimate(
@@ -249,8 +237,6 @@ fn build_plan(
         port_conflict: runner::inspect_port(&profile.host, profile.port),
         max_ctx: model.metadata.as_ref().and_then(|m| m.context_length),
         profile,
-        effective_defaults,
-        overridden,
         args,
         command,
         estimate,
@@ -293,37 +279,10 @@ async fn set_models_dir(path: String, state: State<'_, AppState>) -> Result<DirI
 #[tauri::command]
 fn launch_plan(
     model_id: String,
-    draft: Option<ProfilePatch>,
+    draft: Option<Profile>,
     state: State<'_, AppState>,
 ) -> Result<LaunchPlan, String> {
     build_plan(&state, &model_id, draft)
-}
-
-#[tauri::command]
-fn save_profile(
-    model_id: String,
-    patch: ProfilePatch,
-    state: State<'_, AppState>,
-) -> Result<LaunchPlan, String> {
-    {
-        let mut config = state.config.lock().expect("config lock");
-        if patch.overridden_fields().is_empty() {
-            config.overrides.remove(&model_id);
-        } else {
-            config.overrides.insert(model_id.clone(), patch);
-        }
-    }
-    state.save_config()?;
-    build_plan(&state, &model_id, None)
-}
-
-#[tauri::command]
-fn save_default_profile(profile: Profile, state: State<'_, AppState>) -> Result<(), String> {
-    {
-        let mut config = state.config.lock().expect("config lock");
-        config.default_profile = profile;
-    }
-    state.save_config()
 }
 
 #[tauri::command]
@@ -347,17 +306,11 @@ fn settings_view(state: &AppState) -> Settings {
     Settings {
         models_dir: store::models_dir(&config).to_string_lossy().into_owned(),
         llama_server_path: config.llama_server_path.clone(),
-        default_profile: config.default_profile.clone(),
         calibration_samples: config.calibration.len(),
         fitted_residency: estimate::fit_residency(&config.calibration),
         capabilities: caps.as_ref().ok().cloned(),
         capability_error: caps.err(),
     }
-}
-
-#[tauri::command]
-fn list_profiles() -> Vec<NamedProfile> {
-    profiles::built_ins()
 }
 
 #[tauri::command]
@@ -397,7 +350,7 @@ fn reveal_path(path: String) -> Result<(), String> {
 #[tauri::command]
 fn runner_start(
     model_id: String,
-    draft: Option<ProfilePatch>,
+    draft: Option<Profile>,
     state: State<'_, AppState>,
 ) -> Result<RunnerSnapshot, String> {
     let model = state.model(&model_id)?;
@@ -454,13 +407,13 @@ fn runner_start(
 
     state.runner.start(spec)?;
 
+    // Remembered only once a launch actually succeeded: settings that failed to start
+    // are not what the user wants to come back to.
     {
         let mut config = state.config.lock().expect("config lock");
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_secs())
-            .unwrap_or(0);
-        config.last_run.insert(model_id, now);
+        config
+            .last_used
+            .insert(model_id.clone(), plan.profile.clone());
     }
     let _ = state.save_config();
 
@@ -627,8 +580,6 @@ pub fn run() {
             catalog_dir_info,
             set_models_dir,
             launch_plan,
-            save_profile,
-            save_default_profile,
             set_llama_server_path,
             get_settings,
             runner_status,
@@ -639,7 +590,6 @@ pub fn run() {
             health_test,
             orphan_status,
             orphan_stop,
-            list_profiles,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

@@ -1,12 +1,6 @@
 import { useEffect, useState } from "react";
-import {
-  getSettings,
-  saveDefaultProfile,
-  setLlamaServerPath,
-  setModelsDir,
-} from "./api";
-import ProfileForm from "./ProfileForm";
-import type { Profile, Settings } from "./types";
+import { getSettings, setLlamaServerPath, setModelsDir } from "./api";
+import type { Settings } from "./types";
 
 export default function SettingsScreen({
   onModelsDirChanged,
@@ -16,7 +10,6 @@ export default function SettingsScreen({
   const [settings, setSettings] = useState<Settings | null>(null);
   const [dir, setDir] = useState("");
   const [binary, setBinary] = useState("");
-  const [profile, setProfile] = useState<Profile | null>(null);
   const [saved, setSaved] = useState<string | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
 
@@ -26,7 +19,6 @@ export default function SettingsScreen({
         setSettings(next);
         setDir(next.modelsDir);
         setBinary(next.llamaServerPath ?? "");
-        setProfile(next.defaultProfile);
       })
       .catch((e) => setFailure(String(e)));
   }, []);
@@ -36,7 +28,7 @@ export default function SettingsScreen({
     setTimeout(() => setSaved(null), 2000);
   };
 
-  if (!settings || !profile) {
+  if (!settings) {
     return (
       <>
         <header className="screen-header">
@@ -148,34 +140,6 @@ export default function SettingsScreen({
         </p>
       </section>
 
-      <section className="panel">
-        <h2>Default launch profile</h2>
-        <p className="field-hint">
-          Applies to every model that has not overridden the field.
-        </p>
-        <ProfileForm
-          value={profile}
-          defaults={settings.defaultProfile}
-          maxCtx={null}
-          showAlias={false}
-          onChange={setProfile}
-        />
-        <div className="panel-actions">
-          <button
-            className="button"
-            onClick={() =>
-              saveDefaultProfile(profile)
-                .then(() => {
-                  setSettings({ ...settings, defaultProfile: profile });
-                  flash("saved");
-                })
-                .catch((e) => setFailure(String(e)))
-            }
-          >
-            Save defaults
-          </button>
-        </div>
-      </section>
     </>
   );
 }

@@ -5,9 +5,8 @@ use crate::probe::Capabilities;
 pub const DEFAULT_PORT: u16 = 8888;
 pub const DEFAULT_CTX: u64 = 65536;
 
-/// `default` matters as much as the fields: without it, a `defaultProfile` missing any
-/// single key fails to deserialise, which takes the whole config down with it and resets
-/// overrides, calibration and history. Missing keys must degrade to defaults.
+/// The values one launch uses. Nothing persists these — the form starts from
+/// `Profile::default()` each time and edits last as long as the page is open.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct Profile {
@@ -42,64 +41,6 @@ impl Default for Profile {
     }
 }
 
-/// Per-model overrides are stored sparsely, so changing a global default reaches every
-/// model that never overrode that field.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", default)]
-pub struct ProfilePatch {
-    pub alias: Option<String>,
-    pub host: Option<String>,
-    pub port: Option<u16>,
-    pub ctx: Option<u64>,
-    pub ngl: Option<String>,
-    pub parallel: Option<u32>,
-    pub flash_attn: Option<bool>,
-    pub cache_type_k: Option<String>,
-    pub cache_type_v: Option<String>,
-    pub jinja: Option<bool>,
-    pub raw_args: Option<Vec<String>>,
-}
-
-impl ProfilePatch {
-    pub fn overridden_fields(&self) -> Vec<&'static str> {
-        let mut out = Vec::new();
-        if self.alias.is_some() {
-            out.push("alias");
-        }
-        if self.host.is_some() {
-            out.push("host");
-        }
-        if self.port.is_some() {
-            out.push("port");
-        }
-        if self.ctx.is_some() {
-            out.push("ctx");
-        }
-        if self.ngl.is_some() {
-            out.push("ngl");
-        }
-        if self.parallel.is_some() {
-            out.push("parallel");
-        }
-        if self.flash_attn.is_some() {
-            out.push("flashAttn");
-        }
-        if self.cache_type_k.is_some() {
-            out.push("cacheTypeK");
-        }
-        if self.cache_type_v.is_some() {
-            out.push("cacheTypeV");
-        }
-        if self.jinja.is_some() {
-            out.push("jinja");
-        }
-        if self.raw_args.is_some() {
-            out.push("rawArgs");
-        }
-        out
-    }
-}
-
 pub fn default_alias(display_name: &str) -> String {
     display_name
         .trim()
@@ -110,31 +51,6 @@ pub fn default_alias(display_name: &str) -> String {
 }
 
 impl Profile {
-    pub fn merged(&self, patch: &ProfilePatch) -> Profile {
-        Profile {
-            alias: patch.alias.clone().unwrap_or_else(|| self.alias.clone()),
-            host: patch.host.clone().unwrap_or_else(|| self.host.clone()),
-            port: patch.port.unwrap_or(self.port),
-            ctx: patch.ctx.unwrap_or(self.ctx),
-            ngl: patch.ngl.clone().unwrap_or_else(|| self.ngl.clone()),
-            parallel: patch.parallel.unwrap_or(self.parallel),
-            flash_attn: patch.flash_attn.unwrap_or(self.flash_attn),
-            cache_type_k: patch
-                .cache_type_k
-                .clone()
-                .unwrap_or_else(|| self.cache_type_k.clone()),
-            cache_type_v: patch
-                .cache_type_v
-                .clone()
-                .unwrap_or_else(|| self.cache_type_v.clone()),
-            jinja: patch.jinja.unwrap_or(self.jinja),
-            raw_args: patch
-                .raw_args
-                .clone()
-                .unwrap_or_else(|| self.raw_args.clone()),
-        }
-    }
-
     /// Renders argv gated on what the installed build actually accepts. `--metrics` is
     /// added silently because the telemetry view depends on it and it costs nothing.
     pub fn args(&self, model_path: &str, caps: &Capabilities) -> Vec<String> {
@@ -233,21 +149,6 @@ mod tests {
             ],
             true,
         )
-    }
-
-    #[test]
-    fn patches_apply_only_where_set() {
-        let base = Profile::default();
-        let patch = ProfilePatch {
-            ctx: Some(32768),
-            ..Default::default()
-        };
-        let merged = base.merged(&patch);
-
-        assert_eq!(merged.ctx, 32768);
-        assert_eq!(merged.port, DEFAULT_PORT);
-        assert_eq!(merged.cache_type_k, "q8_0");
-        assert_eq!(patch.overridden_fields(), vec!["ctx"]);
     }
 
     #[test]

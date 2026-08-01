@@ -15,7 +15,13 @@ below).
 Phase 1 complete and confirmed in the running app (process footprint read 1.3 GB
 against Activity Monitor's 1.28 GB).
 
-## Scope cleanup (D19)
+## Scope cleanup (D19, D20)
+
+The profile system is gone entirely (D20). Settings are no longer configured,
+merged or named — the form opens with whatever that model was last launched with,
+and a successful launch updates it. 4,742 lines of Rust, 87 tests, 13 commands.
+
+### Earlier stage (D19)
 
 Removed benchmarks, agent integration and profile CRUD — a third of the Rust and
 half the command surface, none of it part of the original goal. Kept the four

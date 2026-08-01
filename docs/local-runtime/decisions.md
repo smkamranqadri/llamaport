@@ -316,3 +316,27 @@ delete the user's data. A stored `profiles` key in config now survives via the
 
 **Reverses if:** benchmarking becomes a recurring need rather than a
 one-off question that has now been answered.
+
+---
+
+## D20 — No profile system; the last successful launch is remembered instead
+
+**Date:** after D19. **Status:** settled by the user.
+
+The remaining profile machinery is gone: the four workload templates, per-model
+override patches, the saved global default, and the merge layering between them.
+`ProfilePatch`, `profiles.rs` and the Settings profile editor are deleted.
+
+In its place, one behaviour: **the settings a model was last launched with are
+remembered, per model, and the form opens there.** Written only after a launch
+succeeds, because settings that failed to start are not what anyone wants to
+return to. There is no merging, no defaults layer and no second profile concept —
+one entry per model, replaced wholesale each time.
+
+A `Profile` is now simply the values one launch uses. The form is the launch.
+
+Result: 5,061 → 4,742 lines of Rust, 108 → 87 tests, 17 → 13 commands.
+
+**Reverses if:** the same model needs to be run several ways routinely, at which
+point named configurations become worth their weight again — but per-model memory
+covers the common case, which is running each model the same way every time.

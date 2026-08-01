@@ -1,4 +1,3 @@
-use std::collections::BTreeMap;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -6,8 +5,10 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
+use std::collections::BTreeMap;
+
 use crate::estimate::{CalibrationSample, MAX_SAMPLES};
-use crate::profile::{Profile, ProfilePatch};
+use crate::profile::Profile;
 
 /// Bumped whenever the shape changes. Absence means the original shape, which had no
 /// version field at all.
@@ -19,10 +20,11 @@ pub struct Config {
     pub schema_version: u32,
     pub models_dir: Option<String>,
     pub llama_server_path: Option<String>,
-    pub default_profile: Profile,
-    pub overrides: BTreeMap<String, ProfilePatch>,
     pub calibration: Vec<CalibrationSample>,
-    pub last_run: BTreeMap<String, u64>,
+    /// The settings each model was last launched with, so the form opens where it was
+    /// left rather than at a generic default. Not a profile system: there is one entry
+    /// per model, it is written by launching, and nothing merges.
+    pub last_used: BTreeMap<String, Profile>,
     /// Keys written by a different version of the app. Captured and written back
     /// untouched so that running an older build cannot silently delete newer settings.
     #[serde(flatten)]
@@ -30,10 +32,6 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn patch_for(&self, model_id: &str) -> ProfilePatch {
-        self.overrides.get(model_id).cloned().unwrap_or_default()
-    }
-
     pub fn record_sample(&mut self, sample: CalibrationSample) {
         self.calibration.push(sample);
         if self.calibration.len() > MAX_SAMPLES {
@@ -135,15 +133,19 @@ mod tests {
             models_dir: Some("/models".into()),
             ..Default::default()
         };
-        config.default_profile.ctx = 32768;
-        config.last_run.insert("abc".into(), 42);
+        config.last_used.insert(
+            "abc".into(),
+            Profile {
+                ctx: 32768,
+                ..Default::default()
+            },
+        );
 
         save_to(&path, &config).expect("save");
         let loaded = load_from(&path);
 
         assert_eq!(loaded.models_dir.as_deref(), Some("/models"));
-        assert_eq!(loaded.default_profile.ctx, 32768);
-        assert_eq!(loaded.last_run.get("abc"), Some(&42));
+        assert_eq!(loaded.last_used.get("abc").map(|p| p.ctx), Some(32768));
     }
 
     #[test]
@@ -198,11 +200,6 @@ mod tests {
     const V1_CONFIG: &str = r#"{
       "modelsDir": null,
       "llamaServerPath": null,
-      "defaultProfile": {
-        "alias": "", "host": "127.0.0.1", "port": 8888, "ctx": 65536,
-        "ngl": "all", "parallel": 1, "flashAttn": true,
-        "cacheTypeK": "q8_0", "cacheTypeV": "q8_0", "jinja": true, "rawArgs": []
-      },
       "overrides": { "abc-123": { "ctx": 32768 } },
       "calibration": [],
       "lastRun": { "3ec121be0-2395d7127ff460da": 1785592595 }
@@ -216,17 +213,33 @@ mod tests {
         let loaded = load_from(&path);
 
         assert_eq!(loaded.schema_version, CURRENT_SCHEMA);
-        assert_eq!(loaded.default_profile.port, 8888);
-        assert_eq!(loaded.default_profile.ctx, 65536);
-        assert_eq!(
-            loaded.overrides.get("abc-123").and_then(|p| p.ctx),
-            Some(32768)
-        );
-        assert_eq!(loaded.last_run.len(), 1);
+        assert!(loaded.last_used.is_empty());
         assert!(
             loaded.extra.is_empty(),
             "a v1 config has nothing this build does not understand"
         );
+    }
+
+    #[test]
+    fn the_settings_a_model_last_launched_with_round_trip() {
+        let path = scratch("last-used");
+        let mut config = Config::default();
+        config.last_used.insert(
+            "model-1".into(),
+            Profile {
+                ctx: 32768,
+                cache_type_v: "q4_0".into(),
+                ..Default::default()
+            },
+        );
+
+        save_to(&path, &config).expect("save");
+        let loaded = load_from(&path);
+        let remembered = loaded.last_used.get("model-1").expect("remembered");
+
+        assert_eq!(remembered.ctx, 32768);
+        assert_eq!(remembered.cache_type_v, "q4_0");
+        assert_eq!(remembered.port, 8888, "unset fields still fall back");
     }
 
     #[test]
@@ -235,19 +248,25 @@ mod tests {
         fs::write(
             &path,
             r#"{
-              "defaultProfile": { "port": 9000 },
-              "overrides": { "abc": { "ctx": 4096 } },
-              "lastRun": { "abc": 123 }
+              "modelsDir": "/models",
+              "lastUsed": { "abc": { "port": 9000 } }
             }"#,
         )
         .expect("seed");
 
         let loaded = load_from(&path);
 
-        assert_eq!(loaded.default_profile.port, 9000, "the stated field wins");
-        assert_eq!(loaded.default_profile.ctx, 65536, "the rest fall back");
-        assert_eq!(loaded.overrides.len(), 1, "unrelated data must survive");
-        assert_eq!(loaded.last_run.get("abc"), Some(&123));
+        assert_eq!(
+            loaded.last_used.get("abc").map(|p| p.port),
+            Some(9000),
+            "the stated field wins"
+        );
+        assert_eq!(
+            loaded.last_used.get("abc").map(|p| p.ctx),
+            Some(65536),
+            "the rest fall back"
+        );
+        assert_eq!(loaded.models_dir.as_deref(), Some("/models"));
     }
 
     #[test]
@@ -260,9 +279,7 @@ mod tests {
         let twice = load_from(&path);
 
         assert_eq!(twice.schema_version, CURRENT_SCHEMA);
-        assert_eq!(twice.overrides.len(), once.overrides.len());
-        assert_eq!(twice.last_run, once.last_run);
-        assert_eq!(twice.default_profile.ctx, once.default_profile.ctx);
+        assert_eq!(twice.models_dir, once.models_dir);
     }
 
     #[test]
@@ -271,7 +288,6 @@ mod tests {
         fs::write(
             &path,
             r#"{
-              "defaultProfile": { "port": 9000 },
               "somethingFromTheFuture": { "keep": "me" }
             }"#,
         )
@@ -279,7 +295,6 @@ mod tests {
 
         let loaded = load_from(&path);
         assert_eq!(loaded.schema_version, CURRENT_SCHEMA);
-        assert_eq!(loaded.default_profile.port, 9000);
 
         save_to(&path, &loaded).expect("save");
         let raw: Value =
@@ -300,17 +315,13 @@ mod tests {
                 "ngl": "all", "parallel": 1, "flashAttn": true,
                 "cacheTypeK": "q8_0", "cacheTypeV": "q8_0", "jinja": true, "rawArgs": []
               },
-              "overrides": {},
-              "calibration": [],
-              "lastRun": { "3ec121be0-2395d7127ff460da": 1785592595 }
+              "calibration": []
             }"#,
         )
         .expect("seed");
 
         let loaded = load_from(&path);
-        assert_eq!(loaded.default_profile.port, 8888);
-        assert_eq!(loaded.default_profile.ctx, 65536);
-        assert_eq!(loaded.last_run.len(), 1);
+        assert_eq!(loaded.models_dir, None);
         assert!(loaded.extra.is_empty());
     }
 }
