@@ -1,6 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getLaunchPlan, runnerStart, runnerStop, saveProfile } from "./api";
 import { formatBytes, formatContext } from "./format";
+import {
+  bytesOr,
+  headroomText,
+  pressureText,
+  Reasons,
+  SafetyBadge,
+  Stat,
+} from "./Memory";
 import ProfileForm, { diffProfile } from "./ProfileForm";
 import type {
   LaunchPlan,
@@ -40,11 +48,37 @@ function Facts({ model }: { model: ModelEntry }) {
 }
 
 function MemoryBar({ plan }: { plan: LaunchPlan }) {
+  const { memory } = plan;
+  const { assessment } = memory;
+
+  const machine = (
+    <>
+      <div className="telemetry-stats">
+        <Stat label="Installed" value={bytesOr(memory.installedBytes)} />
+        <Stat label="In use now" value={bytesOr(memory.usedBytes)} />
+        <Stat label="Swap in use" value={bytesOr(memory.swapUsedBytes)} />
+        <Stat label="macOS pressure" value={pressureText(memory.pressure)} />
+        <Stat
+          label="Headroom after launch"
+          value={headroomText(assessment.headroomBytes)}
+          hint="estimate, not a guarantee"
+        />
+      </div>
+      <p className="field-hint">
+        Predicted before launch. Actual usage is measured once the server is
+        running, and the two will differ.
+      </p>
+    </>
+  );
+
   if (!plan.estimate) {
     return (
-      <p className="empty-detail">
-        Not enough header metadata to estimate memory for this model.
-      </p>
+      <div className="memory">
+        <p className="empty-detail">
+          Not enough header metadata to estimate this model's memory.
+        </p>
+        {machine}
+      </div>
     );
   }
 
@@ -52,7 +86,6 @@ function MemoryBar({ plan }: { plan: LaunchPlan }) {
     plan.estimate;
   const scale = Math.max(plan.totalMemory, totalBytes);
   const width = (n: number) => `${(n / scale) * 100}%`;
-  const tight = totalBytes > plan.totalMemory * 0.85;
 
   return (
     <div className="memory">
@@ -65,13 +98,17 @@ function MemoryBar({ plan }: { plan: LaunchPlan }) {
           style={{ left: `${(plan.totalMemory / scale) * 100}%` }}
         />
       </div>
-      <p className={`memory-summary${tight ? " is-tight" : ""}`}>
-        <strong>{formatBytes(totalBytes)}</strong> of{" "}
-        {formatBytes(plan.totalMemory)} installed — weights{" "}
+
+      <p className="memory-summary">
+        <SafetyBadge state={assessment.state} />
+        <strong>{formatBytes(totalBytes)}</strong> predicted — weights{" "}
         {formatBytes(weightsBytes)}, KV cache {formatBytes(kvBytes)}, overhead{" "}
         {formatBytes(overheadBytes)}
         {!calibrated && " (uncalibrated)"}
       </p>
+      <Reasons assessment={assessment} />
+
+      {machine}
     </div>
   );
 }
@@ -161,20 +198,37 @@ function TelemetryPanel({
             {deferred > 0 && `, ${deferred} waiting`}
           </span>
         </div>
-        <div>
-          <span className="telemetry-label">System memory</span>
-          <span className="telemetry-value">
-            {telemetry?.systemUsedBytes && telemetry?.systemTotalBytes
+        <Stat
+          label="System memory"
+          value={
+            telemetry?.systemUsedBytes != null &&
+            telemetry?.systemTotalBytes != null
               ? `${formatBytes(telemetry.systemUsedBytes)} of ${formatBytes(telemetry.systemTotalBytes)}`
-              : "—"}
-          </span>
-          {telemetry?.swapUsedBytes ? (
-            <span className="field-hint">
-              swap {formatBytes(telemetry.swapUsedBytes)}
-            </span>
-          ) : null}
-        </div>
+              : "Unavailable"
+          }
+        />
+        <Stat
+          label="macOS pressure"
+          value={pressureText(telemetry?.pressure)}
+        />
+        <Stat label="Swap in use" value={bytesOr(telemetry?.swapUsedBytes)} />
+        <Stat
+          label="Headroom"
+          value={headroomText(telemetry?.safety?.headroomBytes)}
+        />
+        <Stat
+          label="Process footprint"
+          value={bytesOr(telemetry?.processFootprintBytes)}
+          hint="excludes GPU-resident weights"
+        />
       </div>
+
+      {telemetry?.safety && (
+        <div className="telemetry-verdict">
+          <SafetyBadge state={telemetry.safety.state} />
+          <Reasons assessment={telemetry.safety} />
+        </div>
+      )}
 
       {runner.serverCtx != null && (
         <p className="field-hint">

@@ -2,97 +2,106 @@
 
 ## Current phase
 
-**Phase 0 — Audit and design. Complete.** Awaiting go-ahead for Phase 1.
+**Phase 1 — Real system memory and safety status. Code complete, awaiting manual
+UI confirmation.**
 
 ## Completed work
 
-- Repository audited: framework, runtime, UI, persistence, process manager,
-  command builder, metrics, logs, tests, release path.
-- Data flow documented end to end in `design.md` §2.
-- Risks catalogued in `design.md` §4 (18 items).
-- Target design and phase boundaries written.
+**Prerequisite fixes** (required before Phase 2 migration is possible)
 
-Pre-existing application (built before this plan): model catalog with GGUF
-header parsing, launch profiles, RAM estimator with calibration hooks, supervised
-`llama-server` runner with health gate and telemetry, tray, Settings.
+- `store::save()` writes to a temp file and renames — an interrupted write can no
+  longer truncate config.
+- `Config` gained `#[serde(flatten)] extra`, so keys written by a newer build
+  survive a load/save round-trip instead of being silently dropped.
+- `store` split into `load_from`/`save_to` so persistence is testable without
+  touching the real config directory.
+
+**Native memory readings** — new `src-tauri/src/sysmem.rs`, the only `unsafe` in
+the project:
+
+| Value | Source |
+| --- | --- |
+| Installed unified memory | `sysctl hw.memsize` |
+| macOS pressure | `sysctl kern.memorystatus_vm_pressure_level` (1/2/4) |
+| Swap in use | `sysctl vm.swapusage` → `xsw_usage` |
+| Process footprint | `proc_pid_rusage` → `ri_phys_footprint` (Activity Monitor's column) |
+
+A size mismatch on any sysctl returns `None` rather than trusting the bytes.
+
+**Safety state** — new `src-tauri/src/safety.rs`, pure functions. Kernel pressure
+is authoritative; headroom and swap are heuristics; the worst signal wins.
+Thresholds: headroom < 2 GB red, < 4 GB yellow; swap ≥ 6 GB red, ≥ 2 GB yellow.
+Memory attributable to a running model is subtracted before projecting a
+replacement launch, so swapping models is not double-counted.
+
+**D14 implemented** — `reap_orphan()` (auto-kill) replaced by `detect_orphan()`
+(report only), `stop_orphan()` (re-verifies the process first) and
+`dismiss_orphan()`. The app no longer kills anything the user did not ask it to.
+
+**Surfaced in the UI** — pre-launch panel shows predicted breakdown, safety
+badge, reasons, installed / in use / swap / pressure / projected headroom, and
+states plainly that prediction and actual will differ. Running panel adds
+pressure, swap, headroom, process footprint (labelled "excludes GPU-resident
+weights"). Missing readings render "Unavailable", never zero.
+
+**Tooling adopted** — clippy (`-D warnings`) and rustfmt now clean across the
+project; four pre-existing findings fixed.
 
 ## Files changed
 
-Phase 0 added documentation only. No production code modified.
+New: `src-tauri/src/sysmem.rs`, `src-tauri/src/safety.rs`, `src/Memory.tsx`,
+`docs/local-runtime/*`.
 
-- `docs/local-runtime/design.md` (new)
-- `docs/local-runtime/implementation-plan.md` (new)
-- `docs/local-runtime/current-state.md` (new)
-- `docs/local-runtime/decisions.md` (new)
+Modified: `store.rs`, `runner.rs`, `lib.rs`, `estimate.rs`, `gguf.rs`,
+`catalog.rs`, `probe.rs`, `Cargo.toml` (+libc), `types.ts`, `api.ts`,
+`App.tsx`, `ModelDetail.tsx`, `App.css`, `tests/runner_lifecycle.rs`.
 
 ## Commands run
 
 ```
-find . -type f            # repository inventory
-wc -l src/* src-tauri/**  # 4651 lines total
-node -e ...package.json   # scripts: dev, build, preview, tauri (no lint)
-cargo clippy --version    # 0.1.97 available, not wired into the project
-cargo fmt --version       # 1.9.0 available, not wired
-git status                # fatal: not a git repository
-cat ~/Library/Application Support/llama-cpp-hub/config.json
+cargo fmt --manifest-path src-tauri/Cargo.toml -- --check     # clean
+cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings   # clean
+cargo test --manifest-path src-tauri/Cargo.toml               # 63 passed, 1 ignored
+bun run build                                                 # tsc + vite, clean
 ```
 
 ## Verification results
 
-- Test suite as of last full run: **40 passing, 1 ignored** (`real_launch`,
-  which loads a real model). An earlier session message said "44 tests" — that
-  was a miscount; 40 is correct.
-- `bun run build` passes (tsc + vite).
-- clippy and fmt have **never been run** against this project; unknown warning
-  count. Phase 1 adopts them.
-- Live config on this machine parses and contains: default profile
-  (127.0.0.1:8888, ctx 65536, ngl all, np 1, flash-attn on, q8_0/q8_0, jinja),
-  no overrides, **zero calibration samples**, two `lastRun` entries.
-
-## Decisions taken (Phase 0)
-
-- **D12** — git initialised, one commit per phase.
-- **D13** — Downloads keeps its visible placeholder; still unbuilt, still
-  unscheduled. Phase 7 nav work must not hide it.
-- **D14** — orphaned `llama-server` processes are surfaced with Stop/Adopt,
-  never auto-killed. Supersedes `runner::reap_orphan()`; implement in Phase 1.
+- **63 tests pass**, 1 ignored (`real_launch`, loads a real model). Up from 40.
+  New: 5 store persistence, 7 sysmem, 11 safety.
+- clippy clean at `-D warnings` for the first time; 4 findings fixed (2
+  pre-existing OR-patterns, 1 identity op, 1 of mine).
+- rustfmt applied across the codebase; check is clean.
+- One test failure found and fixed during the run: a safety truth-table case
+  asserted Red at exactly 2 GB headroom, but the rule is `< 2 GB`. The test was
+  wrong, not the rule; it now also asserts the boundary explicitly.
+- App rebuilt under `tauri dev` and relaunched without error.
 
 ## Known problems
 
-1. **Downloads is unbuilt** and unscheduled (D13). Placeholder is intentional.
-2. **`reap_orphan()` still auto-kills** until D14 is implemented.
-3. **Config drops unknown keys and writes non-atomically.** Must be fixed at the
-   start of Phase 1 or Phase 2 migration cannot satisfy "never lose unknown
-   fields".
-4. **`rawArgs` bypasses structured validation**, including host. Phase 6 must
-   validate effective argv, not just form fields.
-5. **No API key support** anywhere in the codebase.
-6. **Calibration has zero samples**, so the memory estimator still uses the
-   1.4 GB placeholder overhead. One observed run suggested ~120 MB.
-7. **Per-process memory is misleading on Apple Silicon** — three sources
-   disagreed by more than 10× on this machine. Phase 1 must present predicted,
-   actual, pressure and swap as four distinct things.
-8. **No frontend test runner.** Keep logic in Rust so rule 10 is satisfiable.
-9. **MLA (`deepseek2`) KV estimate is over-counted** for GLM-4.7-Flash.
-10. A `llama-server` may currently be running on port 8888 started through the
-    app; `runner.pid` exists in the config directory.
+1. **Manual UI confirmation outstanding.** The memory panel has not been seen
+   rendered. computer-use cannot drive an unbundled dev binary, so a human must
+   open a model and press Run.
+2. **Calibration still has zero samples**, so overhead remains the 1.4 GB
+   placeholder and every estimate reads "(uncalibrated)".
+3. **Headroom thresholds are unvalidated against real use.** 2/4 GB were chosen
+   for a 32 GB machine also running an editor, browser and coding agent. They
+   will fire often on this hardware; whether that is signal or noise needs a few
+   days of use.
+4. **Adopt is not implemented** for orphans — only Stop and Leave running. D14
+   mentioned Adopt; it needs a runner path for a process we did not spawn (no
+   stdout to attach), deferred rather than half-built.
+5. Downloads still a placeholder (D13, intentional).
+6. MLA (`deepseek2`) KV estimate still over-counts.
+7. `rawArgs` still bypasses structured validation — Phase 6.
+8. No API key support — Phase 3/6.
 
 ## Exact next step
 
-Begin **Phase 1**, in this order:
-
-1. Make `store::save()` atomic (temp file + rename) and add
-   `#[serde(flatten)] extra: Map<String, Value>` to `Config`; test unknown-key
-   round-trip.
-2. Add `src-tauri/src/sysmem.rs` with four `libc` readings — `hw.memsize`,
-   `kern.memorystatus_vm_pressure_level`, `vm.swapusage`,
-   `proc_pid_rusage`/`ri_phys_footprint` — each returning `Option`.
-3. Add safety-state computation (OS pressure authoritative, headroom and swap
-   heuristics secondary) with a truth-table test including
-   one-metric-unavailable cases.
-4. Replace `reap_orphan()` auto-kill with surface + Stop/Adopt (D14).
-5. Extend `Telemetry` and `LaunchPlan`; render the memory panel with per-field
-   "Unavailable" handling.
-6. Adopt clippy and rustfmt; fix any pre-existing warnings (one-off adoption
-   cost, in scope for Phase 1 only).
-7. Run all four verification commands; record output here; commit.
+1. Confirm the panel renders: open a model, check the pre-launch numbers, press
+   Run, check the running numbers, stop, confirm they reset.
+2. Then **Phase 2 — workload presets and improved profiles**: schema v2 with
+   migration from the current shape (absence of `schemaVersion` means v1), named
+   profiles with `builtIn`, four workload templates, duplicate/rename/reset.
+   `store.rs` is now ready for this: atomic writes and unknown-key preservation
+   are in place and tested.

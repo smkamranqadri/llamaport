@@ -202,7 +202,9 @@ pub fn scan(dir: &Path) -> Vec<ModelEntry> {
     for file in files {
         match parse_shard(&file.stem) {
             Some((base, index, total)) => {
-                let group = groups.entry(base.to_string()).or_insert((total, Vec::new()));
+                let group = groups
+                    .entry(base.to_string())
+                    .or_insert((total, Vec::new()));
                 group.0 = group.0.max(total);
                 group.1.push((index, file));
             }

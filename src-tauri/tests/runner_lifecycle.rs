@@ -225,7 +225,10 @@ fn crash_before_ready_is_not_restarted() {
         "a launch that never became ready must not be retried"
     );
     assert!(
-        snapshot.crash_tail.iter().any(|l| l.contains("failed to load model")),
+        snapshot
+            .crash_tail
+            .iter()
+            .any(|l| l.contains("failed to load model")),
         "stderr should be surfaced in the crash tail: {:?}",
         snapshot.crash_tail
     );

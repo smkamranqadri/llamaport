@@ -3,15 +3,17 @@ import {
   onRunnerLog,
   onRunnerState,
   onTelemetry,
+  orphanDismiss,
+  orphanStatus,
+  orphanStop,
   runnerLogs,
   runnerStatus,
   runnerStop,
-  startupNotice,
 } from "./api";
 import Library from "./Library";
 import ModelDetail from "./ModelDetail";
 import SettingsScreen from "./SettingsScreen";
-import type { ModelEntry, RunnerSnapshot, Telemetry } from "./types";
+import type { ModelEntry, Orphan, RunnerSnapshot, Telemetry } from "./types";
 import "./App.css";
 
 type Screen = "library" | "discover" | "downloads" | "settings";
@@ -96,13 +98,13 @@ export default function App() {
   const [runner, setRunner] = useState<RunnerSnapshot>(IDLE);
   const [telemetry, setTelemetry] = useState<Telemetry | null>(null);
   const [logs, setLogs] = useState<string[]>([]);
-  const [notice, setNotice] = useState<string | null>(null);
+  const [orphan, setOrphan] = useState<Orphan | null>(null);
   const [catalogVersion, setCatalogVersion] = useState(0);
 
   useEffect(() => {
     runnerStatus().then(setRunner).catch(() => {});
     runnerLogs().then(setLogs).catch(() => {});
-    startupNotice().then(setNotice).catch(() => {});
+    orphanStatus().then(setOrphan).catch(() => {});
 
     const unlisten = [
       onRunnerState((snapshot) => {
@@ -182,10 +184,29 @@ export default function App() {
       </nav>
 
       <main className="content">
-        {notice && (
-          <p className="notice" onClick={() => setNotice(null)}>
-            {notice}
-          </p>
+        {orphan && (
+          <div className="notice">
+            An llama-server from a previous session is still running on port{" "}
+            {orphan.port} (pid {orphan.pid}). It was not started by this window.
+            <span className="notice-actions">
+              <button
+                className="button"
+                onClick={() =>
+                  orphanStop(orphan.pid)
+                    .then(() => setOrphan(null))
+                    .catch(() => setOrphan(null))
+                }
+              >
+                Stop it
+              </button>
+              <button
+                className="button"
+                onClick={() => orphanDismiss().then(() => setOrphan(null))}
+              >
+                Leave it running
+              </button>
+            </span>
+          </div>
         )}
         {content()}
       </main>

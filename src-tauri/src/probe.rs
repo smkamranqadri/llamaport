@@ -92,7 +92,12 @@ fn read_version(binary: &Path) -> Option<String> {
     );
     text.lines()
         .find(|line| line.trim_start().starts_with("version:"))
-        .map(|line| line.trim_start().trim_start_matches("version:").trim().to_string())
+        .map(|line| {
+            line.trim_start()
+                .trim_start_matches("version:")
+                .trim()
+                .to_string()
+        })
 }
 
 pub fn probe(binary: &Path) -> Result<Capabilities, String> {
@@ -109,7 +114,10 @@ pub fn probe(binary: &Path) -> Result<Capabilities, String> {
 
     let flags = collect_flags(&help);
     if flags.is_empty() {
-        return Err(format!("{} produced no recognisable help", binary.display()));
+        return Err(format!(
+            "{} produced no recognisable help",
+            binary.display()
+        ));
     }
 
     Ok(Capabilities {

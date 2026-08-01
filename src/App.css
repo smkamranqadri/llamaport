@@ -636,3 +636,78 @@ input[type="range"] {
   margin-top: 8px;
   color: var(--text);
 }
+
+/* Memory safety */
+
+.safety-green,
+.safety-yellow,
+.safety-red,
+.safety-unknown {
+  margin-right: 8px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  font-size: 10px;
+}
+
+.safety-green {
+  color: #1f8a55;
+  background: color-mix(in srgb, #2eb872 18%, transparent);
+}
+
+.safety-yellow {
+  color: #a2701a;
+  background: color-mix(in srgb, #d99b28 22%, transparent);
+}
+
+.safety-red {
+  color: var(--danger);
+  background: color-mix(in srgb, #c0392b 18%, transparent);
+}
+
+.safety-unknown {
+  color: var(--text-muted);
+  background: var(--badge-bg);
+}
+
+@media (prefers-color-scheme: dark) {
+  .safety-green {
+    color: #4fd08c;
+  }
+
+  .safety-yellow {
+    color: #e0aa4a;
+  }
+}
+
+.memory-reasons {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.memory .telemetry-stats {
+  margin-top: 14px;
+}
+
+.telemetry-verdict {
+  display: flex;
+  align-items: baseline;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.telemetry-verdict .memory-reasons {
+  margin-top: 0;
+}
+
+.telemetry-value.is-missing {
+  color: var(--text-muted);
+}
+
+.notice-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}

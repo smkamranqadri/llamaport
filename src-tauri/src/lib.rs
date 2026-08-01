@@ -4,7 +4,9 @@ pub mod gguf;
 pub mod probe;
 pub mod profile;
 pub mod runner;
+pub mod safety;
 pub mod store;
+pub mod sysmem;
 
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
@@ -18,7 +20,7 @@ use catalog::{DirInfo, ModelEntry};
 use estimate::Estimate;
 use probe::Capabilities;
 use profile::{Profile, ProfilePatch};
-use runner::{EventSink, LaunchSpec, RunState, Runner, RunnerSnapshot};
+use runner::{EventSink, LaunchSpec, Orphan, RunState, Runner, RunnerSnapshot};
 use store::Config;
 
 struct TauriEvents(AppHandle);
@@ -40,7 +42,7 @@ struct AppState {
     caps: Mutex<Option<Result<Capabilities, String>>>,
     runner: Runner,
     tray: Mutex<Option<TrayHandles>>,
-    startup_notice: Mutex<Option<String>>,
+    orphan: Mutex<Option<Orphan>>,
 }
 
 impl AppState {
@@ -95,8 +97,22 @@ struct LaunchPlan {
     command: String,
     estimate: Option<Estimate>,
     total_memory: u64,
+    memory: PlanMemory,
     max_ctx: Option<u64>,
     capability_error: Option<String>,
+}
+
+/// Machine memory as it stands, plus the safety judgement for the launch being
+/// previewed. Every field is optional so one unreadable metric does not blank the panel.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PlanMemory {
+    installed_bytes: Option<u64>,
+    used_bytes: Option<u64>,
+    swap_used_bytes: Option<u64>,
+    pressure: sysmem::Pressure,
+    running_model_bytes: Option<u64>,
+    assessment: safety::Assessment,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -122,7 +138,11 @@ fn resolve(defaults: &Profile, model: &ModelEntry, patch: &ProfilePatch) -> Prof
     resolved
 }
 
-fn build_plan(state: &AppState, model_id: &str, draft: Option<ProfilePatch>) -> Result<LaunchPlan, String> {
+fn build_plan(
+    state: &AppState,
+    model_id: &str,
+    draft: Option<ProfilePatch>,
+) -> Result<LaunchPlan, String> {
     let model = state.model(model_id)?;
 
     let (defaults, patch, fitted) = {
@@ -166,8 +186,31 @@ fn build_plan(state: &AppState, model_id: &str, draft: Option<ProfilePatch>) -> 
     let mut system = sysinfo::System::new();
     system.refresh_memory();
 
+    let installed = sysmem::installed_bytes().or_else(|| Some(system.total_memory()));
+    let swap_used = sysmem::swap_used_bytes().or_else(|| Some(system.used_swap()));
+    let used = Some(system.used_memory());
+    let pressure = sysmem::pressure();
+    let running_model_bytes = state.runner.current_model_bytes();
+
+    let memory = PlanMemory {
+        installed_bytes: installed,
+        used_bytes: used,
+        swap_used_bytes: swap_used,
+        pressure,
+        running_model_bytes,
+        assessment: safety::assess(safety::Inputs {
+            installed,
+            used,
+            swap_used,
+            pressure,
+            running_model_bytes,
+            predicted_total: estimate.as_ref().map(|e| e.total_bytes),
+        }),
+    };
+
     Ok(LaunchPlan {
-        total_memory: system.total_memory(),
+        total_memory: installed.unwrap_or_else(|| system.total_memory()),
+        memory,
         max_ctx: model.metadata.as_ref().and_then(|m| m.context_length),
         profile,
         effective_defaults,
@@ -248,7 +291,10 @@ fn save_default_profile(profile: Profile, state: State<'_, AppState>) -> Result<
 }
 
 #[tauri::command]
-fn set_llama_server_path(path: Option<String>, state: State<'_, AppState>) -> Result<Settings, String> {
+fn set_llama_server_path(
+    path: Option<String>,
+    state: State<'_, AppState>,
+) -> Result<Settings, String> {
     {
         let mut config = state.config.lock().expect("config lock");
         config.llama_server_path = path;
@@ -350,8 +396,21 @@ fn runner_stop(state: State<'_, AppState>) -> Result<RunnerSnapshot, String> {
 }
 
 #[tauri::command]
-fn startup_notice(state: State<'_, AppState>) -> Option<String> {
-    state.startup_notice.lock().expect("notice lock").take()
+fn orphan_status(state: State<'_, AppState>) -> Option<Orphan> {
+    state.orphan.lock().expect("orphan lock").clone()
+}
+
+#[tauri::command]
+fn orphan_stop(pid: u32, state: State<'_, AppState>) -> Result<(), String> {
+    runner::stop_orphan(pid)?;
+    *state.orphan.lock().expect("orphan lock") = None;
+    Ok(())
+}
+
+#[tauri::command]
+fn orphan_dismiss(state: State<'_, AppState>) {
+    runner::dismiss_orphan();
+    *state.orphan.lock().expect("orphan lock") = None;
 }
 
 fn update_tray(app: &AppHandle, snapshot: &RunnerSnapshot) {
@@ -372,9 +431,10 @@ fn update_tray(app: &AppHandle, snapshot: &RunnerSnapshot) {
     };
 
     let _ = handles.status.set_text(label);
-    let _ = handles
-        .stop
-        .set_enabled(matches!(snapshot.state, RunState::Starting | RunState::Ready));
+    let _ = handles.stop.set_enabled(matches!(
+        snapshot.state,
+        RunState::Starting | RunState::Ready
+    ));
 }
 
 fn show_main_window(app: &AppHandle) {
@@ -410,7 +470,7 @@ pub fn run() {
                 caps: Mutex::new(None),
                 runner,
                 tray: Mutex::new(None),
-                startup_notice: Mutex::new(runner::reap_orphan()),
+                orphan: Mutex::new(runner::detect_orphan()),
             });
 
             let status = MenuItem::with_id(app, "status", "No model running", false, None::<&str>)?;
@@ -474,7 +534,9 @@ pub fn run() {
             runner_logs,
             runner_start,
             runner_stop,
-            startup_notice
+            orphan_status,
+            orphan_stop,
+            orphan_dismiss
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

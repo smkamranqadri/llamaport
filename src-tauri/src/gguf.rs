@@ -59,7 +59,12 @@ impl Value {
             Value::U64(v) => Some(*v),
             Value::I64(v) if *v >= 0 => Some(*v as u64),
             // Some architectures store per-layer values; the largest is what sizing must assume.
-            Value::Ints(v) => v.iter().copied().filter(|n| *n >= 0).max().map(|n| n as u64),
+            Value::Ints(v) => v
+                .iter()
+                .copied()
+                .filter(|n| *n >= 0)
+                .max()
+                .map(|n| n as u64),
             _ => None,
         }
     }
@@ -136,8 +141,8 @@ fn fixed_size(value_type: u32) -> Option<u64> {
     match value_type {
         0 | 1 | 7 => Some(1),
         2 | 3 => Some(2),
-        4 | 5 | 6 => Some(4),
-        10 | 11 | 12 => Some(8),
+        4..=6 => Some(4),
+        10..=12 => Some(8),
         _ => None,
     }
 }
@@ -367,7 +372,8 @@ mod tests {
         fn string_array(mut self, key: &str, values: &[&str]) -> Self {
             self.key(key, 9);
             self.pairs.extend_from_slice(&8u32.to_le_bytes());
-            self.pairs.extend_from_slice(&(values.len() as u64).to_le_bytes());
+            self.pairs
+                .extend_from_slice(&(values.len() as u64).to_le_bytes());
             for v in values {
                 encode_string(&mut self.pairs, v);
             }
@@ -377,7 +383,8 @@ mod tests {
         fn i32_array(mut self, key: &str, values: &[i32]) -> Self {
             self.key(key, 9);
             self.pairs.extend_from_slice(&5u32.to_le_bytes());
-            self.pairs.extend_from_slice(&(values.len() as u64).to_le_bytes());
+            self.pairs
+                .extend_from_slice(&(values.len() as u64).to_le_bytes());
             for v in values {
                 self.pairs.extend_from_slice(&v.to_le_bytes());
             }

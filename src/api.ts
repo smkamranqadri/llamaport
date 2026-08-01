@@ -7,6 +7,7 @@ import type {
   Profile,
   ProfilePatch,
   RunnerSnapshot,
+  Orphan,
   Settings,
   Telemetry,
 } from "./types";
@@ -71,8 +72,16 @@ export function runnerStop(): Promise<RunnerSnapshot> {
   return invoke<RunnerSnapshot>("runner_stop");
 }
 
-export function startupNotice(): Promise<string | null> {
-  return invoke<string | null>("startup_notice");
+export function orphanStatus(): Promise<Orphan | null> {
+  return invoke<Orphan | null>("orphan_status");
+}
+
+export function orphanStop(pid: number): Promise<void> {
+  return invoke<void>("orphan_stop", { pid });
+}
+
+export function orphanDismiss(): Promise<void> {
+  return invoke<void>("orphan_dismiss");
 }
 
 export function onRunnerState(handler: (snapshot: RunnerSnapshot) => void) {

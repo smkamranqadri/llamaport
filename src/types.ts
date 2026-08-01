@@ -74,6 +74,7 @@ export interface LaunchPlan {
   command: string;
   estimate: Estimate | null;
   totalMemory: number;
+  memory: PlanMemory;
   maxCtx: number | null;
   capabilityError: string | null;
 }
@@ -95,6 +96,32 @@ export interface RunnerSnapshot {
   serverCtx: number | null;
 }
 
+export type Pressure = "normal" | "warning" | "critical" | "unknown";
+
+export type SafetyState = "unknown" | "green" | "yellow" | "red";
+
+export interface Assessment {
+  state: SafetyState;
+  projectedUsedBytes: number | null;
+  headroomBytes: number | null;
+  reasons: string[];
+}
+
+export interface PlanMemory {
+  installedBytes: number | null;
+  usedBytes: number | null;
+  swapUsedBytes: number | null;
+  pressure: Pressure;
+  runningModelBytes: number | null;
+  assessment: Assessment;
+}
+
+export interface Orphan {
+  pid: number;
+  port: number;
+  modelId: string;
+}
+
 export interface Telemetry {
   kvCacheUsage: number | null;
   promptTps: number | null;
@@ -109,6 +136,9 @@ export interface Telemetry {
   systemTotalBytes: number | null;
   swapUsedBytes: number | null;
   modelDeltaBytes: number | null;
+  processFootprintBytes: number | null;
+  pressure: Pressure;
+  safety: Assessment | null;
   uptimeSecs: number;
 }
 

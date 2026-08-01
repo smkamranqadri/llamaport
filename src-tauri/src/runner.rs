@@ -10,6 +10,8 @@ use serde::{Deserialize, Serialize};
 use sysinfo::{Pid, ProcessesToUpdate, System};
 
 use crate::estimate::CalibrationSample;
+use crate::safety::{self, Assessment, Inputs};
+use crate::sysmem::{self, Pressure};
 
 /// The runner reports through this rather than talking to Tauri directly, so its
 /// lifecycle can be driven by tests without a running app.
@@ -75,6 +77,10 @@ pub struct Telemetry {
     pub system_total_bytes: Option<u64>,
     pub swap_used_bytes: Option<u64>,
     pub model_delta_bytes: Option<u64>,
+    /// Activity Monitor's Memory column for the child. Undercounts GPU-resident weights.
+    pub process_footprint_bytes: Option<u64>,
+    pub pressure: Pressure,
+    pub safety: Option<Assessment>,
     pub uptime_secs: u64,
 }
 
@@ -184,6 +190,16 @@ impl Runner {
     pub fn is_busy(&self) -> bool {
         let state = self.inner.lock().expect("runner lock").state;
         matches!(state, RunState::Starting | RunState::Ready)
+    }
+
+    /// Machine-wide memory growth attributable to the running model, for subtracting
+    /// before projecting a replacement launch. `None` when nothing is running.
+    pub fn current_model_bytes(&self) -> Option<u64> {
+        let guard = self.inner.lock().expect("runner lock");
+        if guard.state != RunState::Ready {
+            return None;
+        }
+        Some(guard.peak_used.saturating_sub(guard.baseline_used))
     }
 
     pub fn start(&self, spec: LaunchSpec) -> Result<(), String> {
@@ -300,7 +316,13 @@ fn spawn_run(
     }
 
     spawn_health_and_telemetry(inner.clone(), events.clone(), generation, spec.clone());
-    spawn_waiter(inner.clone(), sink.clone(), events.clone(), generation, spec);
+    spawn_waiter(
+        inner.clone(),
+        sink.clone(),
+        events.clone(),
+        generation,
+        spec,
+    );
 
     Ok(())
 }
@@ -419,7 +441,12 @@ fn read_counters(metrics: &HashMap<String, f64>) -> Counters {
 
 /// Counters are cumulative, so throughput is a delta. A counter that goes backwards means
 /// the process restarted and the baseline has to be dropped rather than differenced.
-fn rate(current_tokens: f64, previous_tokens: f64, current_secs: f64, previous_secs: f64) -> Option<f64> {
+fn rate(
+    current_tokens: f64,
+    previous_tokens: f64,
+    current_secs: f64,
+    previous_secs: f64,
+) -> Option<f64> {
     if current_tokens < previous_tokens || current_secs < previous_secs {
         return None;
     }
@@ -459,15 +486,30 @@ fn telemetry_loop(
 
         system.refresh_memory();
         let used = system.used_memory();
-        telemetry.system_used_bytes = Some(used);
-        telemetry.system_total_bytes = Some(system.total_memory());
-        telemetry.swap_used_bytes = Some(system.used_swap());
+        let installed = sysmem::installed_bytes().or_else(|| Some(system.total_memory()));
+        let swap = sysmem::swap_used_bytes().or_else(|| Some(system.used_swap()));
 
-        {
+        telemetry.system_used_bytes = Some(used);
+        telemetry.system_total_bytes = installed;
+        telemetry.swap_used_bytes = swap;
+        telemetry.pressure = sysmem::pressure();
+
+        let pid = {
             let mut guard = inner.lock().expect("runner lock");
             guard.peak_used = guard.peak_used.max(used);
             telemetry.model_delta_bytes = Some(used.saturating_sub(guard.baseline_used));
-        }
+            guard.child.as_ref().map(|c| c.id())
+        };
+
+        telemetry.process_footprint_bytes = pid.and_then(sysmem::process_footprint_bytes);
+        telemetry.safety = Some(safety::assess(Inputs {
+            installed,
+            used: Some(used),
+            swap_used: swap,
+            pressure: telemetry.pressure,
+            running_model_bytes: None,
+            predicted_total: None,
+        }));
 
         if let Ok(body) = http_get(&format!("{base}/metrics")) {
             let metrics = parse_metrics(&body);
@@ -648,29 +690,80 @@ fn clear_pidfile() {
     let _ = std::fs::remove_file(pidfile_path());
 }
 
-/// A live pidfile on startup means the app died without stopping its server. The process
-/// is verified by name before being killed so a recycled pid cannot be hit by mistake.
-pub fn reap_orphan() -> Option<String> {
-    let raw = std::fs::read_to_string(pidfile_path()).ok()?;
-    let record: PidFile = serde_json::from_str(&raw).ok()?;
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Orphan {
+    pub pid: u32,
+    pub port: u16,
+    pub model_id: String,
+}
 
-    let pid = Pid::from_u32(record.pid);
+/// True when the pid is alive and still looks like our server. A pid alone is weak
+/// evidence because pids are recycled, so the name is always rechecked.
+fn is_live_server(pid: u32) -> bool {
+    let pid = Pid::from_u32(pid);
     let mut system = System::new();
     system.refresh_processes(ProcessesToUpdate::Some(&[pid]), true);
 
-    let process = system.process(pid)?;
-    let name = process.name().to_string_lossy().to_string();
-    if !name.contains("llama-server") {
+    system
+        .process(pid)
+        .map(|process| process.name().to_string_lossy().contains("llama-server"))
+        .unwrap_or(false)
+}
+
+/// A live pidfile on startup means the app died without stopping its server.
+///
+/// This reports and never kills: the app must not terminate a process the user did not
+/// ask it to terminate, and a name check cannot distinguish our orphan from a server the
+/// user started by hand. A stale pidfile (process gone, or the pid now belongs to
+/// something else) is cleared silently.
+pub fn detect_orphan() -> Option<Orphan> {
+    let raw = std::fs::read_to_string(pidfile_path()).ok()?;
+    let record: PidFile = match serde_json::from_str::<PidFile>(&raw) {
+        Ok(record) => record,
+        Err(_) => {
+            clear_pidfile();
+            return None;
+        }
+    };
+
+    if !is_live_server(record.pid) {
         clear_pidfile();
         return None;
     }
 
-    process.kill();
+    Some(Orphan {
+        pid: record.pid,
+        port: record.port,
+        model_id: record.model_id,
+    })
+}
+
+/// Stops an orphan the user explicitly chose to stop, re-verifying the process first.
+pub fn stop_orphan(pid: u32) -> Result<(), String> {
+    if !is_live_server(pid) {
+        clear_pidfile();
+        return Err("that process is no longer running".to_string());
+    }
+
+    let target = Pid::from_u32(pid);
+    let mut system = System::new();
+    system.refresh_processes(ProcessesToUpdate::Some(&[target]), true);
+
+    let process = system
+        .process(target)
+        .ok_or_else(|| "process disappeared".to_string())?;
+
+    if !process.kill() {
+        return Err("could not stop the process".to_string());
+    }
     clear_pidfile();
-    Some(format!(
-        "stopped an orphaned llama-server (pid {}, port {}) left by a previous session",
-        record.pid, record.port
-    ))
+    Ok(())
+}
+
+/// Leaves the process running and forgets about it.
+pub fn dismiss_orphan() {
+    clear_pidfile();
 }
 
 #[cfg(test)]
@@ -689,7 +782,10 @@ garbage line
 ";
         let metrics = parse_metrics(body);
         assert_eq!(metrics.get("llamacpp:kv_cache_usage_ratio"), Some(&0.34));
-        assert_eq!(metrics.get("llamacpp:tokens_predicted_total"), Some(&1024.0));
+        assert_eq!(
+            metrics.get("llamacpp:tokens_predicted_total"),
+            Some(&1024.0)
+        );
         assert_eq!(metrics.get("llamacpp:requests_deferred"), Some(&2.0));
         assert!(!metrics.contains_key("garbage"));
     }

@@ -40,8 +40,8 @@ pub fn kv_bytes(md: &GgufMetadata, ctx: u64, cache_k: &str, cache_v: &str) -> Op
     let k_dim = md.head_dim()?;
     let v_dim = md.value_head_dim()?;
 
-    let per_token = (k_dim as f64 * bytes_per_element(cache_k))
-        + (v_dim as f64 * bytes_per_element(cache_v));
+    let per_token =
+        (k_dim as f64 * bytes_per_element(cache_k)) + (v_dim as f64 * bytes_per_element(cache_v));
     let total = layers as f64 * ctx as f64 * kv_heads as f64 * per_token;
     Some(total as u64)
 }
@@ -149,7 +149,10 @@ mod tests {
         let asymmetric = kv_bytes(&metadata(1, 576, Some(512)), 4096, "f16", "f16").unwrap();
         assert!(asymmetric < symmetric);
 
-        let expected = 40u64 * 4096 * 1 * (576 * 2 + 512 * 2);
+        let layers = 40u64;
+        let ctx = 4096u64;
+        let kv_heads = 1u64;
+        let expected = layers * ctx * kv_heads * (576 * 2 + 512 * 2);
         assert_eq!(asymmetric, expected);
     }
 
@@ -166,7 +169,10 @@ mod tests {
 
         assert_eq!(e.weights_bytes, 20_000_000_000);
         assert_eq!(e.overhead_bytes, DEFAULT_OVERHEAD_BYTES);
-        assert_eq!(e.total_bytes, e.weights_bytes + e.kv_bytes + e.overhead_bytes);
+        assert_eq!(
+            e.total_bytes,
+            e.weights_bytes + e.kv_bytes + e.overhead_bytes
+        );
         assert!(!e.calibrated);
     }
 
@@ -189,11 +195,7 @@ mod tests {
 
     #[test]
     fn calibration_takes_the_median_residual() {
-        let samples = [
-            sample(1000, 1100),
-            sample(1000, 1400),
-            sample(1000, 1200),
-        ];
+        let samples = [sample(1000, 1100), sample(1000, 1400), sample(1000, 1200)];
         assert_eq!(fit_overhead(&samples), Some(200));
     }
 
