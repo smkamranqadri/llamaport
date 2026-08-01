@@ -435,11 +435,30 @@ fn update_tray(app: &AppHandle, snapshot: &RunnerSnapshot) {
     ));
 }
 
+/// Brings the window back to a usable state.
+///
+/// An unbundled dev binary with a tray icon can start without activating, and macOS may
+/// restore a frame far smaller than the configured minimum — observed at 91x97, which is
+/// indistinguishable from the app having no window at all. Assert a sane size rather than
+/// trusting what was restored.
 fn show_main_window(app: &AppHandle) {
-    if let Some(window) = app.get_webview_window("main") {
-        let _ = window.show();
-        let _ = window.set_focus();
+    let Some(window) = app.get_webview_window("main") else {
+        return;
+    };
+
+    let too_small = window
+        .outer_size()
+        .map(|size| size.width < 600 || size.height < 400)
+        .unwrap_or(true);
+
+    if too_small {
+        let _ = window.set_size(tauri::LogicalSize::new(1060.0, 720.0));
+        let _ = window.center();
     }
+
+    let _ = window.unminimize();
+    let _ = window.show();
+    let _ = window.set_focus();
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
