@@ -572,6 +572,13 @@ pub fn benchmark(target: &Target, spec: &BenchmarkSpec) -> Result<BenchmarkOutco
     outcome.time_to_first_token_ms = first_token_ms;
     outcome.total_ms = started.elapsed().as_millis() as u64;
 
+    // Record the depth actually processed, not the depth asked for: a request for 8192
+    // lands near 7100 real tokens, and comparing rows by an aspiration rather than a
+    // measurement is how two runs at different depths look equivalent.
+    if let Some(measured) = outcome.prompt_tokens.filter(|n| *n > 0) {
+        outcome.depth_tokens = Some(measured);
+    }
+
     if outcome.generated_tokens.unwrap_or(0) == 0 && first_token_ms.is_none() {
         return Err("the server produced nothing".to_string());
     }
