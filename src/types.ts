@@ -189,9 +189,17 @@ export interface Capabilities {
   flashAttnTakesValue: boolean;
 }
 
+export interface DownloadOptions {
+  segments: number;
+  /// Bytes per second across the whole transfer. Null is unlimited.
+  rateLimit: number | null;
+  verify: boolean;
+}
+
 export interface Settings {
   modelsDir: string;
   llamaServerPath: string | null;
+  downloads: DownloadOptions;
   capabilities: Capabilities | null;
   capabilityError: string | null;
 }

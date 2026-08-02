@@ -3,6 +3,7 @@ import { listen } from "@tauri-apps/api/event";
 import type {
   DirInfo,
   DownloadJob,
+  DownloadOptions,
   DownloadProgress,
   HealthReport,
   LaunchPlan,
@@ -39,6 +40,12 @@ export function setLlamaServerPath(path: string | null): Promise<Settings> {
 
 export function getSettings(): Promise<Settings> {
   return invoke<Settings>("get_settings");
+}
+
+export function setDownloadOptions(
+  options: DownloadOptions,
+): Promise<Settings> {
+  return invoke<Settings>("set_download_options", { options });
 }
 
 export function runnerStatus(): Promise<RunnerSnapshot> {

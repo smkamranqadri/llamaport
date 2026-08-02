@@ -6,13 +6,26 @@ import {
   downloadStart,
   downloadStatus,
   getDirInfo,
+  getSettings,
   onDownloadProgress,
   onDownloadState,
+  setDownloadOptions,
 } from "./api";
 import { formatBytes, formatRate } from "./format";
-import type { DirInfo, DownloadJob, DownloadPhase } from "./types";
+import type {
+  DirInfo,
+  DownloadJob,
+  DownloadOptions,
+  DownloadPhase,
+} from "./types";
 
 type Recovery = "resume" | "restart" | "none";
+
+const MIB = 1024 ** 2;
+
+/// The engine charges a buffer at a time, so anything slower parks a segment for longer
+/// than a second and is raised to this on the way in.
+const FLOOR = 64 * 1024;
 
 const PHASE_LABEL: Record<DownloadPhase, string> = {
   resolving: "resolving",
@@ -182,6 +195,36 @@ function Row({
   );
 }
 
+/// The field holds MB/s because that is how a limit is thought about; the engine holds
+/// bytes per second. `formatRate` counts a megabyte as 1024², so this has to as well, or a
+/// limit typed as 10 reads back as 9.5.
+function toField(bytesPerSecond: number | null): string {
+  if (bytesPerSecond == null) return "";
+  return String(Math.round((bytesPerSecond / MIB) * 100) / 100);
+}
+
+/// `null` for no limit, `undefined` for something that is not a limit at all.
+function toRate(typed: string): number | null | undefined {
+  const trimmed = typed.trim();
+  if (trimmed === "") return null;
+
+  const megabytes = Number(trimmed);
+  if (!Number.isFinite(megabytes) || megabytes < 0) return undefined;
+  if (megabytes === 0) return null;
+  return Math.round(megabytes * MIB);
+}
+
+function limitHint(typed: string, applied: number | null): string {
+  const asked = toRate(typed);
+  if (asked !== undefined && asked !== null && asked < FLOOR) {
+    return `Below ${formatRate(FLOOR)}, which is the slowest the engine transfers at — it will use that instead.`;
+  }
+  if (applied == null) {
+    return "No limit. A change applies to the download running now, not only the next one.";
+  }
+  return `Limited to ${formatRate(applied)}. A change applies to the download running now, not only the next one.`;
+}
+
 /// One row per file: a resume starts a fresh job for a URL that already has one, and two
 /// rows for the same file read as a bug rather than as history.
 function newestPerUrl(jobs: DownloadJob[]): DownloadJob[] {
@@ -200,11 +243,19 @@ export default function Downloads({
   const [url, setUrl] = useState("");
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
+  const [options, setOptions] = useState<DownloadOptions | null>(null);
+  const [limit, setLimit] = useState("");
 
   useEffect(() => {
     const readDir = () => getDirInfo().then(setDir).catch(() => {});
     downloadStatus()
       .then(setJobs)
+      .catch((e) => setFailure(String(e)));
+    getSettings()
+      .then((settings) => {
+        setOptions(settings.downloads);
+        setLimit(toField(settings.downloads.rateLimit));
+      })
       .catch((e) => setFailure(String(e)));
     readDir();
 
@@ -264,6 +315,25 @@ export default function Downloads({
       .catch((e) => setFailure(String(e)));
   }, []);
 
+  const applyLimit = (event: FormEvent) => {
+    event.preventDefault();
+    if (!options) return;
+
+    const rateLimit = toRate(limit);
+    if (rateLimit === undefined) {
+      setFailure("a speed limit is a number of MB/s, or empty for no limit");
+      return;
+    }
+
+    setFailure(null);
+    setDownloadOptions({ ...options, rateLimit })
+      .then((settings) => {
+        setOptions(settings.downloads);
+        setLimit(toField(settings.downloads.rateLimit));
+      })
+      .catch((e) => setFailure(String(e)));
+  };
+
   const active = jobs.find((job) => job.state === "active");
   const rows = newestPerUrl(jobs);
   const settled = rows.some((job) => job.state !== "active");
@@ -314,6 +384,23 @@ export default function Downloads({
           </p>
         )}
       </section>
+
+      {options && (
+        <section className="panel">
+          <h2>Speed limit</h2>
+          <form className="row-input" onSubmit={applyLimit}>
+            <input
+              value={limit}
+              placeholder="MB/s — leave empty for no limit"
+              onChange={(e) => setLimit(e.currentTarget.value)}
+            />
+            <button className="button" type="submit">
+              Apply
+            </button>
+          </form>
+          <p className="field-hint">{limitHint(limit, options.rateLimit)}</p>
+        </section>
+      )}
 
       {failure && <p className="notice notice-error">{failure}</p>}
 
