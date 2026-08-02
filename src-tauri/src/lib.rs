@@ -16,7 +16,10 @@ use std::sync::{Arc, Mutex};
 use serde::Serialize;
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::TrayIconBuilder;
-use tauri::{AppHandle, Emitter, Listener, Manager, State, WindowEvent, Wry};
+use tauri::{
+    AppHandle, Emitter, Listener, Manager, State, WebviewUrl, WebviewWindowBuilder, WindowEvent,
+    Wry,
+};
 
 use catalog::{DirInfo, ModelEntry};
 use downloads::{DownloadJob, Downloads, Options};
@@ -314,6 +317,41 @@ fn runner_logs(state: State<'_, AppState>) -> Vec<String> {
     }
 }
 
+const WEBUI_WINDOW: &str = "webui";
+
+/// Opens `llama-server`'s own web UI in a second window.
+///
+/// A top-level navigation rather than a frame inside the main window: the app document is
+/// served from a custom scheme, and whether WKWebView would carry an http subresource
+/// inside it is unverified.
+#[tauri::command]
+fn open_webui_window(app: AppHandle, port: u16) -> Result<(), String> {
+    let url = tauri::Url::parse(&format!("http://127.0.0.1:{port}")).map_err(|e| e.to_string())?;
+
+    if let Some(window) = app.get_webview_window(WEBUI_WINDOW) {
+        window.navigate(url).map_err(|e| e.to_string())?;
+        window.show().map_err(|e| e.to_string())?;
+        return window.set_focus().map_err(|e| e.to_string());
+    }
+
+    WebviewWindowBuilder::new(&app, WEBUI_WINDOW, WebviewUrl::External(url))
+        .title("llama.cpp — Web UI")
+        .inner_size(920.0, 720.0)
+        .min_inner_size(480.0, 400.0)
+        .build()
+        .map(|_| ())
+        .map_err(|e| e.to_string())
+}
+
+/// Driven from the explicit stops rather than from the `runner:state` stream, because
+/// `start` stops before it spawns: a listener closing on Idle would tear the window down
+/// on every Reload, when the server is about to come back on the same port.
+fn close_webui_window(app: &AppHandle) {
+    if let Some(window) = app.get_webview_window(WEBUI_WINDOW) {
+        let _ = window.close();
+    }
+}
+
 /// Selects the file in Finder rather than opening it — a 20 GB GGUF should not be
 /// handed to whatever application claims the extension.
 #[tauri::command]
@@ -424,8 +462,9 @@ async fn health_test(state: State<'_, AppState>) -> Result<health::HealthReport,
 }
 
 #[tauri::command]
-fn runner_stop(state: State<'_, AppState>) -> Result<RunnerSnapshot, String> {
+fn runner_stop(app: AppHandle, state: State<'_, AppState>) -> Result<RunnerSnapshot, String> {
     state.runner.stop()?;
+    close_webui_window(&app);
     Ok(state.runner.snapshot())
 }
 
@@ -594,6 +633,7 @@ pub fn run() {
                 .on_menu_event(|app, event| match event.id().as_ref() {
                     "stop" => {
                         let _ = app.state::<AppState>().runner.stop();
+                        close_webui_window(app);
                     }
                     "show" => show_main_window(app),
                     "quit" => {
@@ -624,10 +664,14 @@ pub fn run() {
             Ok(())
         })
         .on_window_event(|window, event| {
-            // Closing hides; the app stays in the menu bar so the server survives.
+            // Closing hides; the app stays in the menu bar so the server survives. Only the
+            // main window: a chat window that hides instead of closing would sit invisible
+            // and stale, then reappear pointed at a port from a previous run.
             if let WindowEvent::CloseRequested { api, .. } = event {
-                let _ = window.hide();
-                api.prevent_close();
+                if window.label() == "main" {
+                    let _ = window.hide();
+                    api.prevent_close();
+                }
             }
         })
         .invoke_handler(tauri::generate_handler![
@@ -641,6 +685,7 @@ pub fn run() {
             runner_status,
             runner_logs,
             reveal_path,
+            open_webui_window,
             runner_start,
             runner_stop,
             health_test,

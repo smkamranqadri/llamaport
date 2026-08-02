@@ -1,15 +1,15 @@
 # Current
 
 ```text
-Branch:   main, 2 ahead of origin. `v0.1.0` is tagged at `05c3a21`, so anything
-          past it is unreleased.
-Task:     none in progress. v0.1.0 is out.
+Branch:   main, 7 ahead of origin, nothing uncommitted. `v0.1.0` is tagged at
+          `05c3a21`, so everything past it is unreleased and unpushed.
+Task:     none in progress. The Web UI window is done and committed.
 Mode:     Fast
 Blocker:  none. One thing is unproved rather than blocking: the README's
           "Open Anyway" steps have never met a real Gatekeeper prompt.
 Next:     download the `.dmg` from the release page in a browser and follow the
-          README's Install section as a stranger would. Then wait for the beta
-          to say something.
+          README's Install section as a stranger would. Decide separately
+          whether the seven unpushed commits want a `v0.1.1`.
 ```
 
 Run and verify commands: [knowledge/technical.md](../knowledge/technical.md).
@@ -26,8 +26,10 @@ screen, and a limit changed there reaches the transfer already running.
 The app is now Llamaport, identifier `com.mkamran.llamaport`, config under
 `Application Support/llamaport` ([intent/rename.md](../intent/rename.md)).
 
-A ready model offers "Chat in browser", which opens `llama-server`'s own web UI
-at the bound port. The app still has no chat of its own and is not getting one
+A ready model offers **Web UI**, which opens `llama-server`'s own interface in a
+second app window titled "llama.cpp — Web UI". An explicit stop closes it; a
+Reload does not, because the server returns on the same port. The app still has
+no chat of its own and is not getting one
 ([knowledge/project.md](../knowledge/project.md)).
 
 **v0.1.0 is published**, unsigned, as a GitHub pre-release with the `.dmg`
@@ -37,8 +39,7 @@ build and the tree are not the same thing.
 
 Discover was planned and then dropped ([intent/roadmap.md](../intent/roadmap.md)).
 
-Everything is committed. `main` is one ahead of `origin/main`; `git log` is the
-record.
+Everything is committed; `git log` is the record.
 
 ## Proof
 
@@ -59,22 +60,29 @@ Release, 2026-08-03:
   wall was never hit and the README's "Open Anyway" steps remain untested. That
   needs a browser download by a human.
 
-Chat button, 2026-08-03:
+Web UI window, 2026-08-03:
 
-- Works, confirmed by the author clicking it against a running model — the
-  browser opened llama.cpp's chat UI. A screenshot of the running app shows the
-  button in the Running panel head with qwen2.5-0.5b-instruct ready on :8888.
-  The agent could not check this itself; screen recording is denied here.
-- Not checked: the port fall-forward case, where the requested port is busy and
-  the server lands on another. The button reads `runner.port` rather than the
-  requested one, so it should follow, but nobody has made that happen.
-- The web UI being served was checked against the installed `llama-server --help`
-  rather than assumed: `--ui, --webui, --no-ui, --no-webui  whether to enable the
-  Web UI (default: enabled)`.
-- Known dead end, deliberately unguarded: `--no-webui` typed into `rawArgs` sends
-  the button to a 404. `check_raw_args` blocks only `--host` and `--port`, and
-  `Capabilities.flags` lists `--webui` whether or not the UI is compiled in, so a
-  probe would answer a different question than the one asked.
+- Works, confirmed by the author against a running model: the window opens and
+  the conversation persists across sessions. Both the browser version it replaced
+  and this one were checked the same way — by the author looking, since screen
+  recording is denied to the agent. Four commands green: build, fmt, clippy,
+  test, 145 tests, each status captured directly.
+- How llama.cpp's UI serves and stores was measured, not assumed, and the
+  findings are in [knowledge/project.md](../knowledge/project.md) because they
+  are stable facts rather than session history.
+- Two stale UI claims were found and removed while checking the port. The
+  pre-launch notice promised a fall-forward to the next free port; `spawn_run`
+  refuses a busy port outright ([runner.rs](../../src-tauri/src/runner.rs)),
+  which is what `knowledge/project.md` already recorded. A second notice, "was
+  busy — listening on", was unreachable: `requested_port` was only ever set
+  equal to `port`. That field is now deleted from Rust and TypeScript.
+- Not covered, decided rather than missed: a **crash** leaves the window open on
+  a dead server. Closing is driven from the two explicit stops, because `start`
+  stops before it spawns and a listener on Idle would tear the window down on
+  every Reload.
+- Untested: `--no-webui` in `rawArgs` would leave the window on a 404. Left
+  unguarded — `Capabilities.flags` lists the flag whether or not the UI is
+  compiled in, so a probe would answer a different question.
 
 Tray staleness, 2026-08-03:
 

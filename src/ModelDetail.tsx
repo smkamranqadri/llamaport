@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   getLaunchPlan,
   healthTest,
-  openChat,
+  openWebUi,
   revealPath,
   runnerStart,
   runnerStop,
@@ -383,8 +383,8 @@ export default function ModelDetail({
           {(preview ?? plan).portConflict!.isLlamaServer
             ? " by another llama-server — probably one this app lost track of."
             : " by another process."}{" "}
-          This launch will fall forward to the next free port, which will break any
-          client configured for {(preview ?? plan).portConflict!.port}.
+          This launch will be refused rather than moved to another port — free{" "}
+          {(preview ?? plan).portConflict!.port} and try again.
         </p>
       )}
       {failure && <p className="notice notice-error">{failure}</p>}
@@ -398,13 +398,6 @@ export default function ModelDetail({
         </div>
       )}
 
-      {isCurrent && runner.requestedPort != null &&
-        runner.port != null &&
-        runner.requestedPort !== runner.port && (
-          <p className="notice">
-            Port {runner.requestedPort} was busy — listening on {runner.port}.
-          </p>
-        )}
 
       {isCurrent && runner.state === "ready" && (
         <section className="panel">
@@ -416,10 +409,10 @@ export default function ModelDetail({
                   className="button"
                   onClick={() => {
                     setFailure(null);
-                    openChat(port).catch((e) => setFailure(String(e)));
+                    openWebUi(port).catch((e) => setFailure(String(e)));
                   }}
                 >
-                  Chat in browser ↗
+                  Web UI
                 </button>
               )}
               <button

@@ -18,10 +18,27 @@ so downloads currently go through an external download manager.
 costs, stop it, say whether it works; download with resume.
 
 **Out of scope:** a chat UI of our own — `llama-server` ships one, enabled by
-default, and a ready model offers a button that opens it in the browser. That
-button is the decision holding, not an exception to it. Also out: non-macOS platforms,
+default, and a ready model opens it in a second app window labelled Web UI. That
+window is the decision holding, not an exception to it. Also out: non-macOS platforms,
 managing the llama.cpp installation itself, saved profiles or presets, API keys,
 binding anywhere but loopback.
+
+## How llama.cpp's Web UI actually works
+
+Checked against the installed build, because the design depends on it and the
+obvious guess is wrong:
+
+- It is served by `llama-server` itself, not by any always-on service. With no
+  model running the port refuses connections outright. It exists only between
+  Ready and Stop, which is why a permanent Chat item in the sidebar cannot work.
+- Conversations and settings live in the **client**, not the server: IndexedDB
+  (`LlamacppWebui`, a `Conversations` store) plus `localStorage`. That is why
+  history survives a restart, and why it is keyed by origin — `http://127.0.0.1:<port>`.
+  A different port is a different, empty history. The fixed port is what makes
+  the persistence usable, so it is load-bearing, not incidental.
+- `--help` calls it the **Web UI**, flags `--ui`/`--webui`, enabled by default.
+  `--no-webui` in `rawArgs` would leave the window on a 404; deliberately
+  unguarded, since `Capabilities.flags` lists the flag either way.
 
 ## Durable decisions
 
@@ -49,6 +66,15 @@ Each is argued in the specs; this is the index, not a second copy.
   rule above.
 - A server that will not serve ranges is refused: no ranges means no resume, and
   an unresumable 20 GB transfer is a trap rather than a convenience.
+- llama.cpp's UI is reached by a second app window, not an iframe and not a
+  browser tab. An iframe would need an http subresource inside a custom-scheme
+  document, which nobody has verified WKWebView allows; a true embedded pane
+  needs Tauri's `unstable` feature. A second window needs neither and keeps the
+  webview's own persistent store. Only the main window hides on close — any
+  other window closes for real, or it would sit invisible and stale.
+- What is borrowed is labelled as borrowed: the button reads **Web UI** and the
+  window **llama.cpp — Web UI**. Never "Open Web UI" — Open WebUI is a different,
+  well-known project, and the phrasing would claim it.
 - The name does not lead with llama.cpp. A shipped `llama.cpp hub` claims a
   project it is not part of, and sits unfindable next to it in any search. The
   names ruled out on collision are in [rename.md](../intent/rename.md), so this

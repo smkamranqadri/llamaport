@@ -1,6 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { openUrl } from "@tauri-apps/plugin-opener";
 import type {
   DirInfo,
   DownloadJob,
@@ -79,11 +78,8 @@ export function revealPath(path: string): Promise<void> {
   return invoke<void>("reveal_path", { path });
 }
 
-// Loopback is not read from the snapshot because the app owns `--host` outright:
-// the profile's field is never exposed and the launch appends it last, so this
-// cannot drift from where the server actually bound.
-export function openChat(port: number): Promise<void> {
-  return openUrl(`http://127.0.0.1:${port}`);
+export function openWebUi(port: number): Promise<void> {
+  return invoke<void>("open_webui_window", { port });
 }
 
 export function healthTest(): Promise<HealthReport> {

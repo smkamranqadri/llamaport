@@ -43,7 +43,6 @@ pub struct RunnerSnapshot {
     pub model_name: Option<String>,
     pub alias: Option<String>,
     pub port: Option<u16>,
-    pub requested_port: Option<u16>,
     pub pid: Option<u32>,
     pub started_secs: Option<u64>,
     pub error: Option<String>,
@@ -106,7 +105,6 @@ struct Inner {
     stopping: bool,
     started_secs: Option<u64>,
     port: Option<u16>,
-    requested_port: Option<u16>,
     server_ctx: Option<u64>,
 }
 
@@ -118,7 +116,6 @@ impl Inner {
             model_name: self.spec.as_ref().map(|s| s.model_name.clone()),
             alias: self.spec.as_ref().map(|s| s.alias.clone()),
             port: self.port,
-            requested_port: self.requested_port,
             pid: self.child.as_ref().map(|c| c.id()),
             started_secs: self.started_secs,
             error: self.error.clone(),
@@ -161,7 +158,6 @@ impl Runner {
                 stopping: false,
                 started_secs: None,
                 port: None,
-                requested_port: None,
                 server_ctx: None,
             })),
         }
@@ -303,7 +299,6 @@ fn spawn_run(
         guard.crash_tail.clear();
         guard.stopping = false;
         guard.port = Some(port);
-        guard.requested_port = Some(port);
         guard.server_ctx = None;
         guard.restarted = is_restart;
         guard.started_secs = SystemTime::now()

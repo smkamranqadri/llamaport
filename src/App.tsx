@@ -33,7 +33,6 @@ const IDLE: RunnerSnapshot = {
   modelName: null,
   alias: null,
   port: null,
-  requestedPort: null,
   pid: null,
   startedSecs: null,
   error: null,

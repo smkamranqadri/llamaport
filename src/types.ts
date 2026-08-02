@@ -86,7 +86,6 @@ export interface RunnerSnapshot {
   modelName: string | null;
   alias: string | null;
   port: number | null;
-  requestedPort: number | null;
   pid: number | null;
   startedSecs: number | null;
   error: string | null;
