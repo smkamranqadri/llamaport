@@ -1,4 +1,4 @@
-# llama.cpp hub
+# Llamaport
 
 A macOS app for running local GGUF models. Lists what is in your models
 directory, launches one under `llama-server` with the exact command visible, and

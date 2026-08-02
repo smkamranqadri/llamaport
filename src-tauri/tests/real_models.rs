@@ -4,7 +4,7 @@
 use std::collections::HashSet;
 use std::path::PathBuf;
 
-use llama_cpp_hub_lib::catalog::{self, ModelEntry};
+use llamaport_lib::catalog::{self, ModelEntry};
 
 fn models_dir() -> PathBuf {
     let home = std::env::var("HOME").unwrap_or_default();

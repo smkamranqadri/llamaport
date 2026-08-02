@@ -13,7 +13,7 @@ use std::sync::{mpsc, Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
 
-use llama_cpp_hub_lib::download::{self, Phase, Progress, ProgressSink, Spec};
+use llamaport_lib::download::{self, Phase, Progress, ProgressSink, Spec};
 
 /// For the cases that are about bytes rather than about what was reported.
 struct Silent;

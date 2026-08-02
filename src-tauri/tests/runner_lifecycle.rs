@@ -12,7 +12,7 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
 
-use llama_cpp_hub_lib::runner::{EventSink, LaunchSpec, RunState, Runner};
+use llamaport_lib::runner::{EventSink, LaunchSpec, RunState, Runner};
 
 #[derive(Default)]
 struct Recorder {

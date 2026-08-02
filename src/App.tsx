@@ -159,7 +159,7 @@ export default function App() {
   return (
     <div className="app">
       <nav className="sidebar">
-        <div className="sidebar-title">llama.cpp hub</div>
+        <div className="sidebar-title">Llamaport</div>
         <ul className="nav">
           {NAV.map((item) => (
             <li key={item.id}>

@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "llama-cpp-hub",
+  "productName": "Llamaport",
   "version": "0.1.0",
-  "identifier": "com.mkamran.llama-cpp-hub",
+  "identifier": "com.mkamran.llamaport",
   "build": {
     "beforeDevCommand": "bun run dev",
     "devUrl": "http://localhost:1420",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "llama.cpp hub",
+        "title": "Llamaport",
         "width": 1060,
         "height": 720,
         "minWidth": 880,

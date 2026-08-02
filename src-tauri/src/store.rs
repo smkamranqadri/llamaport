@@ -37,15 +37,40 @@ fn home() -> PathBuf {
     std::env::var("HOME").map(PathBuf::from).unwrap_or_default()
 }
 
+/// The app was called llama-cpp-hub until it was renamed. Everything it keeps lives
+/// under one directory named after it: this config, the runner pidfile, the last run log.
+const LEGACY_DIR: &str = "llama-cpp-hub";
+
+fn support_dir() -> PathBuf {
+    home().join("Library").join("Application Support")
+}
+
 pub fn config_dir() -> PathBuf {
-    home()
-        .join("Library")
-        .join("Application Support")
-        .join("llama-cpp-hub")
+    support_dir().join("llamaport")
 }
 
 pub fn config_path() -> PathBuf {
     config_dir().join("config.json")
+}
+
+/// Takes over a directory left under an older name, once.
+///
+/// Declines when the current directory already exists: an older build run afterwards
+/// recreates the legacy name, and adopting it a second time would throw away everything
+/// written since. Must run before anything reads that directory.
+pub fn adopt_legacy_dir(legacy: &Path, current: &Path) -> io::Result<bool> {
+    if current.exists() || !legacy.is_dir() {
+        return Ok(false);
+    }
+    if let Some(parent) = current.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    fs::rename(legacy, current)?;
+    Ok(true)
+}
+
+pub fn adopt_legacy_config_dir() -> io::Result<bool> {
+    adopt_legacy_dir(&support_dir().join(LEGACY_DIR), &config_dir())
 }
 
 /// Brings a config forward to the current schema.
@@ -121,12 +146,16 @@ pub fn models_dir(config: &Config) -> PathBuf {
 mod tests {
     use super::*;
 
-    fn scratch(name: &str) -> PathBuf {
+    fn scratch_dir(name: &str) -> PathBuf {
         let dir =
             std::env::temp_dir().join(format!("llama-hub-store-{name}-{}", std::process::id()));
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).expect("scratch dir");
-        dir.join("config.json")
+        dir
+    }
+
+    fn scratch(name: &str) -> PathBuf {
+        scratch_dir(name).join("config.json")
     }
 
     #[test]
@@ -374,6 +403,69 @@ mod tests {
         let raw: Value =
             serde_json::from_str(&fs::read_to_string(&path).expect("read")).expect("json");
         assert_eq!(raw["somethingFromTheFuture"]["keep"], Value::from("me"));
+    }
+
+    #[test]
+    fn a_directory_left_under_the_old_name_is_adopted_whole() {
+        let root = scratch_dir("adopt");
+        let legacy = root.join("llama-cpp-hub");
+        let current = root.join("llamaport");
+        fs::create_dir_all(&legacy).expect("legacy dir");
+        save_to(
+            &legacy.join("config.json"),
+            &Config {
+                models_dir: Some("/models".into()),
+                ..Default::default()
+            },
+        )
+        .expect("seed config");
+        fs::write(legacy.join("runner.pid"), "4242").expect("seed pidfile");
+
+        assert!(adopt_legacy_dir(&legacy, &current).expect("adopt"));
+
+        assert_eq!(
+            load_from(&current.join("config.json"))
+                .models_dir
+                .as_deref(),
+            Some("/models")
+        );
+        assert_eq!(
+            fs::read_to_string(current.join("runner.pid")).expect("pidfile"),
+            "4242",
+            "the whole directory moves, not just the config"
+        );
+        assert!(!legacy.exists(), "nothing is left under the old name");
+    }
+
+    #[test]
+    fn adopting_never_clobbers_a_directory_that_already_exists() {
+        let root = scratch_dir("adopt-existing");
+        let legacy = root.join("llama-cpp-hub");
+        let current = root.join("llamaport");
+        fs::create_dir_all(&legacy).expect("legacy dir");
+        fs::create_dir_all(&current).expect("current dir");
+        fs::write(legacy.join("config.json"), r#"{ "modelsDir": "/stale" }"#).expect("seed legacy");
+        fs::write(current.join("config.json"), r#"{ "modelsDir": "/live" }"#)
+            .expect("seed current");
+
+        assert!(!adopt_legacy_dir(&legacy, &current).expect("adopt"));
+
+        assert_eq!(
+            load_from(&current.join("config.json"))
+                .models_dir
+                .as_deref(),
+            Some("/live"),
+            "an older build recreating the old name must not win"
+        );
+        assert!(legacy.exists(), "and the old directory is left alone");
+    }
+
+    #[test]
+    fn there_being_nothing_to_adopt_is_not_a_failure() {
+        let root = scratch_dir("adopt-absent");
+        let adopted = adopt_legacy_dir(&root.join("llama-cpp-hub"), &root.join("llamaport"))
+            .expect("adopt must not error");
+        assert!(!adopted);
     }
 
     #[test]

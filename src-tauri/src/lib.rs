@@ -522,6 +522,9 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
+            // Before the pidfile is read or the config is loaded, both of which live there.
+            let _ = store::adopt_legacy_config_dir();
+
             let handle = app.handle().clone();
 
             let runner = Runner::new(Arc::new(TauriEvents(handle.clone())));

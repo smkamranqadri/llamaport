@@ -9,7 +9,7 @@ use std::net::{TcpListener, TcpStream};
 use std::thread;
 use std::time::Duration;
 
-use llama_cpp_hub_lib::health::{self, CheckStatus, Reasoning, Target, Verdict};
+use llamaport_lib::health::{self, CheckStatus, Reasoning, Target, Verdict};
 
 #[derive(Clone, Copy, PartialEq)]
 enum Mode {

@@ -15,15 +15,15 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
 
-use llama_cpp_hub_lib::download::{
+use llamaport_lib::download::{
     Control, Phase, Progress, ProgressSink, Spec, CANCELLED, DEFAULT_FLUSH_EVERY,
     DEFAULT_PROGRESS_EVERY,
 };
-use llama_cpp_hub_lib::downloads::{
+use llamaport_lib::downloads::{
     admit, cancellable, file_name_for, normalized_rate, settle, spec_for, DownloadJob,
     DownloadState, Downloads, Engine, Options,
 };
-use llama_cpp_hub_lib::runner::EventSink;
+use llamaport_lib::runner::EventSink;
 
 fn scratch(name: &str) -> PathBuf {
     static NEXT: AtomicU32 = AtomicU32::new(0);

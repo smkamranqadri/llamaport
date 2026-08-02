@@ -11,7 +11,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
 use std::time::Duration;
 
-use llama_cpp_hub_lib::download::{
+use llamaport_lib::download::{
     self, Control, Phase, Progress, ProgressSink, Spec, DEFAULT_FLUSH_EVERY, DEFAULT_PROGRESS_EVERY,
 };
 

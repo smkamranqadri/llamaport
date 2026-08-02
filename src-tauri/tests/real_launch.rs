@@ -7,10 +7,10 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
 
-use llama_cpp_hub_lib::catalog;
-use llama_cpp_hub_lib::probe;
-use llama_cpp_hub_lib::profile::{self, Profile};
-use llama_cpp_hub_lib::runner::{EventSink, LaunchSpec, RunState, Runner};
+use llamaport_lib::catalog;
+use llamaport_lib::probe;
+use llamaport_lib::profile::{self, Profile};
+use llamaport_lib::runner::{EventSink, LaunchSpec, RunState, Runner};
 
 struct Printer {
     telemetry: Mutex<Vec<serde_json::Value>>,
