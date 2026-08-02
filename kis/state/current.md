@@ -37,6 +37,17 @@ The four commands were last run green after the rename, which is the whole tree:
 `bun run build` — all exit 0, statuses captured directly rather than through a
 pipe. 137 tests across 10 binaries.
 
+Tray staleness, 2026-08-03:
+
+- Found by the author using the app, not by the suite: stopping from the window
+  left the menu bar advertising a running model. `Runner::stop` changed state
+  without emitting, and the tray reads only the event stream.
+- 145 tests. The fix was checked by removal — strip the emit and
+  `reaches_ready_reports_telemetry_and_stops` fails — and confirmed in the built
+  `.app` by the author, who watched the menu return to "No model running".
+- The orphan path was checked for the same shape and does not have it: the tray
+  label reads the runner's own state, and orphans never reached it.
+
 Blockers, 2026-08-02:
 
 - 144 tests, up 7. The guard's tests fail against a gutted `check_raw_args`; the

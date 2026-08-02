@@ -31,6 +31,12 @@ That is what makes spawn -> Ready -> telemetry -> stop, and resolve -> transfer
 -> verify, testable against a stand-in with no window. Follow the pattern rather
 than adding a third idiom.
 
+Returning new state to a caller is not the same as announcing it. A command hands
+its snapshot to the window, but the tray has no caller and learns everything from
+the event stream, so a state change that only returns leaves the menu bar stale.
+Assert on what was emitted, not only on the snapshot: the snapshot is right in
+exactly the case this gets wrong.
+
 Config is one JSON file at schema 5, every field `#[serde(default)]`, with
 unknown keys preserved through a load/save round-trip.
 
