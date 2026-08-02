@@ -5,8 +5,7 @@ Branch:   main (clean, nothing pushed)
 Task:     none in progress
 Mode:     Standard
 Blocker:  none
-Next:     packaging and release. Fix README.md:6 before it
-          ([intent/roadmap.md](../intent/roadmap.md)).
+Next:     packaging and release ([intent/roadmap.md](../intent/roadmap.md)).
 ```
 
 Run and verify commands: [knowledge/technical.md](../knowledge/technical.md).

@@ -39,12 +39,8 @@ Its research was not wasted: what it established about the engine's limits is in
 - `rawArgs` is passed to `llama-server` verbatim, so `--host 0.0.0.0` typed there
   exposes an unauthenticated server to the network. Acceptable for a personal
   tool; a release blocker. Decide before step 2.
-- The runner spec has no "known gaps" section, but `README.md:48` sends readers
+- The runner spec has no "known gaps" section, but `README.md:50` sends readers
   to one. Fix the reference or write the section.
-- `README.md:6` still says downloading "is designed but **not built**". It has
-  been built and proved. Deliberately left out of the rename diff so a real
-  correction was not hidden inside a mechanical one. The README is what a reader
-  meets first, so this is a release blocker, not a tidy-up.
 - The app can start with an unusable window. Observed twice in one session: once
   with no window at all and the Window menu empty, once at 60x60.
   `show_main_window` asserts a usable frame and does not reliably achieve it.

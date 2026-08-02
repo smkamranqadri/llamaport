@@ -4,8 +4,10 @@ A macOS app for running local GGUF models. Lists what is in your models
 directory, launches one under `llama-server` with the exact command visible, and
 shows what it costs while it runs.
 
-Downloading models with resume is designed but **not built** — see
-[docs/downloader-spec.md](docs/downloader-spec.md).
+Fetches them too. Paste the URL of a `.gguf` on Hugging Face and it downloads
+over four ranged connections, resumes from where it stopped after a kill or a
+dropped connection, verifies sha256, and lands the file in your models
+directory — see [docs/downloader-spec.md](docs/downloader-spec.md).
 
 ## Requires
 
@@ -33,7 +35,7 @@ cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
 | File | What it is |
 | --- | --- |
 | [docs/runner-spec.md](docs/runner-spec.md) | Listing and running models |
-| [docs/downloader-spec.md](docs/downloader-spec.md) | Downloading with resume — not yet implemented |
+| [docs/downloader-spec.md](docs/downloader-spec.md) | Downloading with resume |
 
 ## Notes
 
