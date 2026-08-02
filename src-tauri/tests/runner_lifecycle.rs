@@ -73,9 +73,69 @@ fn fixture_dir(name: &str) -> PathBuf {
     dir
 }
 
-fn free_port() -> u16 {
-    let listener = TcpListener::bind(("127.0.0.1", 0)).expect("bind");
-    listener.local_addr().expect("addr").port()
+/// A port kept bound until the moment it is handed to the runner.
+///
+/// Choosing one by binding port 0 and closing immediately leaves a window in which a
+/// sibling test — these run in parallel — is handed the same port, and the launch is then
+/// refused as occupied, which is `inspect_port` working correctly on a port the test
+/// believed was free.
+struct Port {
+    listener: Option<TcpListener>,
+    number: u16,
+}
+
+impl Port {
+    fn reserve() -> Self {
+        let listener = TcpListener::bind(("127.0.0.1", 0)).expect("bind");
+        let number = listener.local_addr().expect("addr").port();
+        Self {
+            listener: Some(listener),
+            number,
+        }
+    }
+
+    /// Frees the port and returns it, to be called immediately before the launch.
+    fn release(&mut self) -> u16 {
+        self.listener = None;
+        self.number
+    }
+}
+
+/// Serialises reserve-release-launch, so the gap between releasing a port and the runner
+/// claiming it cannot be filled by another test.
+static HANDOVER: Mutex<()> = Mutex::new(());
+
+fn handover() -> std::sync::MutexGuard<'static, ()> {
+    HANDOVER
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
+/// Launches on a port this test proved free, and returns it.
+///
+/// `HANDOVER` only reaches threads in this binary. `cargo test` runs each integration
+/// target as its own process, and siblings such as `download_engine` bind ephemeral
+/// ports throughout, so the port can still be lost between `release` and the launch.
+/// Only the refusal naming this exact port is retried, so a genuine conflict still fails.
+fn start_on_free_port(runner: &Runner, spec_for: impl Fn(u16) -> LaunchSpec) -> u16 {
+    const ATTEMPTS: usize = 8;
+    let mut refusal = String::new();
+
+    for _ in 0..ATTEMPTS {
+        let guard = handover();
+        let mut reserved = Port::reserve();
+        let port = reserved.release();
+        let outcome = runner.start(spec_for(port));
+        drop(guard);
+
+        match outcome {
+            Ok(()) => return port,
+            Err(error) if error.starts_with(&format!("port {port} is already")) => refusal = error,
+            Err(error) => panic!("start: {error}"),
+        }
+    }
+
+    panic!("no reserved port survived the handover in {ATTEMPTS} attempts: {refusal}");
 }
 
 fn spec(binary: &str, args: Vec<String>, port: u16) -> LaunchSpec {
@@ -117,12 +177,11 @@ fn reaches_ready_reports_telemetry_and_stops() {
     }
 
     let dir = fixture_dir("lifecycle");
-    let port = free_port();
     let recorder = Arc::new(Recorder::default());
     let runner = runner_with(recorder.clone());
 
-    runner
-        .start(spec(
+    let port = start_on_free_port(&runner, |port| {
+        spec(
             "python3",
             vec![
                 "-m".into(),
@@ -132,8 +191,8 @@ fn reaches_ready_reports_telemetry_and_stops() {
                 dir.to_string_lossy().into_owned(),
             ],
             port,
-        ))
-        .expect("start");
+        )
+    });
 
     assert!(
         wait_for(|| runner.snapshot().state == RunState::Ready, 20),
@@ -185,16 +244,16 @@ fn crash_before_ready_is_not_restarted() {
     let recorder = Arc::new(Recorder::default());
     let runner = runner_with(recorder.clone());
 
-    runner
-        .start(spec(
+    start_on_free_port(&runner, |port| {
+        spec(
             "/bin/sh",
             vec![
                 "-c".into(),
                 "echo 'error: failed to load model' >&2; exit 3".into(),
             ],
-            free_port(),
-        ))
-        .expect("start");
+            port,
+        )
+    });
 
     assert!(
         wait_for(|| runner.snapshot().state == RunState::Crashed, 10),
@@ -229,6 +288,7 @@ fn crash_before_ready_is_not_restarted() {
 /// configured for, and twice left two copies of the same model resident.
 #[test]
 fn an_occupied_port_refuses_to_launch_rather_than_moving() {
+    let guard = handover();
     let hold = TcpListener::bind(("127.0.0.1", 0)).expect("hold port");
     let taken = hold.local_addr().expect("addr").port();
 
@@ -236,6 +296,7 @@ fn an_occupied_port_refuses_to_launch_rather_than_moving() {
     let runner = runner_with(recorder);
 
     let outcome = runner.start(spec("/bin/sh", vec!["-c".into(), "sleep 5".into()], taken));
+    drop(guard);
 
     let error = outcome.expect_err("a busy port must not silently move");
     assert!(error.contains(&taken.to_string()), "{error}");
@@ -248,13 +309,12 @@ fn an_occupied_port_refuses_to_launch_rather_than_moving() {
 
 #[test]
 fn a_free_port_still_launches() {
-    let port = free_port();
     let recorder = Arc::new(Recorder::default());
     let runner = runner_with(recorder);
 
-    runner
-        .start(spec("/bin/sh", vec!["-c".into(), "sleep 5".into()], port))
-        .expect("start");
+    let port = start_on_free_port(&runner, |port| {
+        spec("/bin/sh", vec!["-c".into(), "sleep 5".into()], port)
+    });
 
     let snapshot = runner.snapshot();
     assert_eq!(snapshot.port, Some(port));
