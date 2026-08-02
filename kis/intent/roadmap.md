@@ -15,9 +15,10 @@ Two, each with its own spec, module and screen:
 1. ~~**Rename to Llamaport**~~ — done 2026-08-02, before packaging, because the
    bundle identifier is free to change until something is signed and step 2 signs
    it. [rename.md](rename.md).
-2. **Packaging and release** — signing, notarization, a bundled `.app`, install
-   docs. Nothing beyond Tauri defaults exists today. Not planned yet, and the
-   three risks below are the reason to plan it rather than start it.
+2. **First beta release** — planned, not started. [release.md](release.md).
+   Public GitHub, unsigned, MIT, tagged `v0.1.0` as a pre-release, in four
+   phases. Signing and notarization are deliberately out: there is no Developer
+   ID, and one costs $99/yr before anything says the app is wanted.
 
 ## Decided against
 
@@ -36,12 +37,18 @@ Its research was not wasted: what it established about the engine's limits is in
 
 ## Risks
 
+All three are owned by [release.md](release.md) now — the first two by its phase
+1, the third by its phase 3 README rewrite. They stay listed here because the
+roadmap is where a reader looks for what is unresolved, not because they are
+unplanned.
+
 - `rawArgs` is passed to `llama-server` verbatim, so `--host 0.0.0.0` typed there
   exposes an unauthenticated server to the network. Acceptable for a personal
-  tool; a release blocker. Decide before step 2.
-- The runner spec has no "known gaps" section, but `README.md:50` sends readers
-  to one. Fix the reference or write the section.
+  tool; a release blocker. Decided: `rawArgs` may not set what the app owns.
 - The app can start with an unusable window. Observed twice in one session: once
   with no window at all and the Window menu empty, once at 60x60.
   `show_main_window` asserts a usable frame and does not reliably achieve it.
-  Predates the downloader, and is a release blocker of its own.
+  Predates the downloader, and is a release blocker of its own. Never reproduced
+  on demand, so the fix will be structural rather than a repair.
+- The runner spec has no "known gaps" section, but `README.md:50` sends readers
+  to one. Fix the reference or write the section.
