@@ -238,19 +238,26 @@ pub fn scan(dir: &Path) -> Vec<ModelEntry> {
     entries
 }
 
-pub fn dir_info(dir: &Path) -> DirInfo {
+/// Available and total bytes on the volume holding `dir`, picking the deepest matching
+/// mount point so a nested volume wins over `/`.
+pub fn disk_space(dir: &Path) -> Option<(u64, u64)> {
     let disks = Disks::new_with_refreshed_list();
-    let best = disks
+    disks
         .list()
         .iter()
         .filter(|d| dir.starts_with(d.mount_point()))
-        .max_by_key(|d| d.mount_point().as_os_str().len());
+        .max_by_key(|d| d.mount_point().as_os_str().len())
+        .map(|d| (d.available_space(), d.total_space()))
+}
+
+pub fn dir_info(dir: &Path) -> DirInfo {
+    let space = disk_space(dir);
 
     DirInfo {
         path: dir.to_string_lossy().into_owned(),
         exists: dir.is_dir(),
-        free_bytes: best.map(|d| d.available_space()),
-        total_bytes: best.map(|d| d.total_space()),
+        free_bytes: space.map(|(available, _)| available),
+        total_bytes: space.map(|(_, total)| total),
     }
 }
 
