@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import {
+  listModels,
+  onCatalogChanged,
   onRunnerLog,
   onRunnerState,
   onTelemetry,
@@ -9,6 +11,7 @@ import {
   runnerStatus,
   runnerStop,
 } from "./api";
+import Downloads from "./Downloads";
 import Library from "./Library";
 import ModelDetail from "./ModelDetail";
 import SettingsScreen from "./SettingsScreen";
@@ -20,7 +23,7 @@ type Screen = "library" | "discover" | "downloads" | "settings";
 const NAV: { id: Screen; label: string; phase?: string }[] = [
   { id: "library", label: "Library" },
   { id: "discover", label: "Discover", phase: "4" },
-  { id: "downloads", label: "Downloads", phase: "3" },
+  { id: "downloads", label: "Downloads" },
   { id: "settings", label: "Settings" },
 ];
 
@@ -117,6 +120,7 @@ export default function App() {
       }),
       onRunnerLog((line) => setLogs((prev) => [...prev.slice(-1999), line])),
       onTelemetry(setTelemetry),
+      onCatalogChanged(() => setCatalogVersion((v) => v + 1)),
     ];
 
     return () => {
@@ -127,6 +131,16 @@ export default function App() {
 
   const stop = useCallback(() => {
     runnerStop().then(setRunner).catch(() => {});
+  }, []);
+
+  const showInLibrary = useCallback((path: string) => {
+    setScreen("library");
+    listModels()
+      .then((models) => {
+        const landed = models.find((model) => model.path === path);
+        if (landed) setSelected(landed);
+      })
+      .catch(() => {});
   }, []);
 
   const active = NAV.find((item) => item.id === screen)!;
@@ -152,6 +166,9 @@ export default function App() {
           onSelect={setSelected}
         />
       );
+    }
+    if (screen === "downloads") {
+      return <Downloads onShowInLibrary={showInLibrary} />;
     }
     if (screen === "settings") {
       return (

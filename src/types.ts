@@ -129,6 +129,32 @@ export interface Telemetry {
   uptimeSecs: number;
 }
 
+export type DownloadPhase = "resolving" | "transferring" | "verifying";
+export type DownloadState = "active" | "complete" | "cancelled" | "failed";
+
+export interface DownloadJob {
+  id: string;
+  url: string;
+  fileName: string;
+  path: string;
+  state: DownloadState;
+  phase: DownloadPhase | null;
+  completed: number;
+  total: number | null;
+  bytesPerSecond: number | null;
+  error: string | null;
+  startedSecs: number | null;
+  finishedSecs: number | null;
+}
+
+export interface DownloadProgress {
+  id: string;
+  phase: DownloadPhase;
+  completed: number;
+  total: number | null;
+  bytesPerSecond: number | null;
+}
+
 export type CheckStatus = "passed" | "warning" | "failed" | "skipped";
 export type Verdict = "passed" | "passedWithWarnings" | "failed";
 export type Reasoning = "separateField" | "inline" | "notReturned";

@@ -7,6 +7,16 @@ export function formatBytes(bytes: number): string {
   return `${Math.round(bytes / 1024 ** 2)} MB`;
 }
 
+export function formatRate(bytesPerSecond: number): string {
+  if (bytesPerSecond >= GIB) {
+    return `${(bytesPerSecond / GIB).toFixed(1)} GB/s`;
+  }
+  if (bytesPerSecond >= 1024 ** 2) {
+    return `${(bytesPerSecond / 1024 ** 2).toFixed(1)} MB/s`;
+  }
+  return `${Math.round(bytesPerSecond / 1024)} KB/s`;
+}
+
 export function formatContext(tokens: number): string {
   if (tokens >= 1024) {
     return `${Math.round(tokens / 1024)}K`;

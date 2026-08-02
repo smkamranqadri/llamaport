@@ -2,6 +2,8 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import type {
   DirInfo,
+  DownloadJob,
+  DownloadProgress,
   HealthReport,
   LaunchPlan,
   ModelEntry,
@@ -77,6 +79,22 @@ export function orphanStop(pid: number): Promise<Orphan[]> {
   return invoke<Orphan[]>("orphan_stop", { pid });
 }
 
+export function downloadStart(url: string): Promise<DownloadJob[]> {
+  return invoke<DownloadJob[]>("download_start", { url });
+}
+
+export function downloadCancel(id: string): Promise<DownloadJob[]> {
+  return invoke<DownloadJob[]>("download_cancel", { id });
+}
+
+export function downloadStatus(): Promise<DownloadJob[]> {
+  return invoke<DownloadJob[]>("download_status");
+}
+
+export function downloadClear(): Promise<DownloadJob[]> {
+  return invoke<DownloadJob[]>("download_clear");
+}
+
 export function onRunnerState(handler: (snapshot: RunnerSnapshot) => void) {
   return listen<RunnerSnapshot>("runner:state", (event) =>
     handler(event.payload),
@@ -89,6 +107,26 @@ export function onRunnerLog(handler: (line: string) => void) {
 
 export function onTelemetry(handler: (telemetry: Telemetry) => void) {
   return listen<Telemetry>("runner:telemetry", (event) =>
+    handler(event.payload),
+  );
+}
+
+export function onDownloadState(handler: (jobs: DownloadJob[]) => void) {
+  return listen<DownloadJob[]>("download:state", (event) =>
+    handler(event.payload),
+  );
+}
+
+export function onDownloadProgress(
+  handler: (progress: DownloadProgress) => void,
+) {
+  return listen<DownloadProgress>("download:progress", (event) =>
+    handler(event.payload),
+  );
+}
+
+export function onCatalogChanged(handler: (models: ModelEntry[]) => void) {
+  return listen<ModelEntry[]>("catalog:changed", (event) =>
     handler(event.payload),
   );
 }

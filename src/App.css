@@ -961,3 +961,36 @@ input[type="range"] {
     color: #e0aa4a;
   }
 }
+
+/* Downloads */
+
+.download-row {
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.download-row:last-child {
+  border-bottom: none;
+}
+
+.download-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 16px;
+}
+
+.download-progress {
+  margin-top: 10px;
+}
+
+.download-row .model-error,
+.download-row .field-hint {
+  display: block;
+  margin: 6px 0 0;
+  white-space: normal;
+}
+
+.kv-bar.is-verifying span {
+  background: #7c5cff;
+}
