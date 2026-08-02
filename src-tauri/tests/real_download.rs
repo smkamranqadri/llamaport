@@ -81,7 +81,6 @@ fn spec(dest: std::path::PathBuf) -> Spec {
         segments: 4,
         stall_after: Duration::from_secs(30),
         retry_backoff: Duration::from_millis(500),
-        rate_limit: None,
         verify: true,
         progress_every: DEFAULT_PROGRESS_EVERY,
         flush_every: DEFAULT_FLUSH_EVERY,

@@ -182,14 +182,20 @@ pub fn spec_for(url: &str, dest: &Path, options: &Options) -> Spec {
         segments: options.segments,
         stall_after: STALL_AFTER,
         retry_backoff: RETRY_BACKOFF,
-        rate_limit: options
-            .rate_limit
-            .filter(|rate| *rate > 0)
-            .map(|rate| rate.max(MIN_RATE_LIMIT)),
         verify: options.verify,
         progress_every: DEFAULT_PROGRESS_EVERY,
         flush_every: DEFAULT_FLUSH_EVERY,
     }
+}
+
+/// What a stored limit means to the engine.
+///
+/// The floor is policy rather than mechanism, which is why it lives here: the engine
+/// honours whatever it is told, and the tests rely on being able to tell it a byte a
+/// second. What a user can ask for through the app is bounded here instead.
+pub fn normalized_rate(rate: Option<u64>) -> Option<u64> {
+    rate.filter(|rate| *rate > 0)
+        .map(|rate| rate.max(MIN_RATE_LIMIT))
 }
 
 fn now_secs() -> Option<u64> {
@@ -253,6 +259,7 @@ impl Downloads {
     ) -> Result<Vec<DownloadJob>, String> {
         let id = format!("dl-{}", self.next.fetch_add(1, Ordering::Relaxed));
         let control = Arc::new(Control::default());
+        control.set_rate_limit(normalized_rate(options.rate_limit));
 
         let (dest, snapshot) = {
             let mut jobs = self.jobs.lock().expect("downloads lock");
@@ -302,6 +309,20 @@ impl Downloads {
             }
         }
         Ok(snapshot)
+    }
+
+    /// Applies a limit to whatever is running now as well as remembering it for what runs
+    /// next. A limit only the next download honours is not the one the user was watching
+    /// when they set it.
+    pub fn set_rate_limit(&self, rate: Option<u64>) -> Vec<DownloadJob> {
+        let jobs = self.jobs.lock().expect("downloads lock");
+        for job in jobs
+            .iter()
+            .filter(|job| job.view.state == DownloadState::Active)
+        {
+            job.control.set_rate_limit(normalized_rate(rate));
+        }
+        views(&jobs)
     }
 
     /// Drops everything that has settled. The `.part` of a cancelled or failed transfer

@@ -270,11 +270,14 @@ fn settings_view(state: &AppState) -> Settings {
 
 #[tauri::command]
 fn set_download_options(options: Options, state: State<'_, AppState>) -> Result<Settings, String> {
+    let rate_limit = options.rate_limit;
     {
         let mut config = state.config.lock().expect("config lock");
         config.downloads = options;
     }
     state.save_config()?;
+    // A limit is changed while watching the transfer it is meant for, not before the next.
+    state.downloads.set_rate_limit(rate_limit);
     Ok(settings_view(&state))
 }
 

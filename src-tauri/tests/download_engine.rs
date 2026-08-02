@@ -434,7 +434,6 @@ fn spec(url: String, dest: PathBuf) -> Spec {
         segments: 4,
         stall_after: Duration::from_millis(400),
         retry_backoff: Duration::from_millis(10),
-        rate_limit: None,
         verify: false,
         progress_every: download::DEFAULT_PROGRESS_EVERY,
         flush_every: download::DEFAULT_FLUSH_EVERY,
@@ -935,11 +934,12 @@ fn the_rate_limit_is_shared_across_segments() {
     let dir = scratch("ratelimit");
     let dest = dir.join("model.gguf");
 
-    let mut limited = spec(server.url(), dest.clone());
-    limited.rate_limit = Some(100_000);
+    let limited = spec(server.url(), dest.clone());
+    let control = download::Control::default();
+    control.set_rate_limit(Some(100_000));
 
     let started = Instant::now();
-    download::download(&limited, &download::Control::default(), &Silent).expect("download");
+    download::download(&limited, &control, &Silent).expect("download");
     let elapsed = started.elapsed();
 
     // Each of the four segments is 50 KB — small enough to fit in an initial burst, so
@@ -967,12 +967,12 @@ fn a_cancel_reaches_a_transfer_waiting_on_its_rate_limit() {
     let dir = scratch("ratelimit-cancel");
 
     let mut crawling = spec(server.url(), dir.join("model.gguf"));
-    crawling.rate_limit = Some(1);
     crawling.progress_every = Duration::from_millis(10);
 
     let reports = Arc::new(Recorder::default());
     let watched = Arc::clone(&reports);
     let control = Arc::new(download::Control::default());
+    control.set_rate_limit(Some(1));
     let running = Arc::clone(&control);
     let (finished, waiting) = mpsc::channel();
     thread::spawn(move || {
@@ -1004,6 +1004,59 @@ fn a_cancel_reaches_a_transfer_waiting_on_its_rate_limit() {
         .expect_err("a cancelled transfer must not report success");
 
     assert_eq!(error, download::CANCELLED);
+}
+
+/// A limit is something the user changes while watching the transfer it applies to, so it
+/// has to reach one that is already running. The segments are parked inside a sleep when
+/// the change arrives, which is the case that would otherwise only take effect on the next
+/// download — or never, on a transfer with hours left.
+#[test]
+fn a_rate_limit_lifted_mid_transfer_reaches_the_transfer_it_is_lifted_on() {
+    let body = body_of(300_000);
+    let server = start(body.clone());
+    let dir = scratch("ratelimit-live");
+    let dest = dir.join("model.gguf");
+
+    let mut crawling = spec(server.url(), dest.clone());
+    crawling.progress_every = Duration::from_millis(10);
+
+    let reports = Arc::new(Recorder::default());
+    let watched = Arc::clone(&reports);
+    let control = Arc::new(download::Control::default());
+    control.set_rate_limit(Some(1));
+    let running = Arc::clone(&control);
+    let (finished, waiting) = mpsc::channel();
+    thread::spawn(move || {
+        let _ = finished.send(download::download(&crawling, &running, &*watched));
+    });
+
+    // The budget starts full at one buffer and is spent at a byte a second after that, so
+    // waiting for it to run out is what puts every segment inside a sleep before the lift.
+    let moved = || {
+        reports
+            .phase(Phase::Transferring)
+            .last()
+            .map_or(0, |report| report.completed)
+    };
+    let deadline = Instant::now() + Duration::from_secs(10);
+    while moved() < 64 * 1024 {
+        assert!(
+            Instant::now() < deadline,
+            "the transfer never spent its initial budget, reached {}",
+            moved()
+        );
+        thread::sleep(Duration::from_millis(5));
+    }
+
+    // The remaining 230 KB at a byte a second is three days of transfer. Finishing at all
+    // is the assertion; the timeout is what makes it one.
+    control.set_rate_limit(None);
+
+    waiting
+        .recv_timeout(Duration::from_secs(20))
+        .expect("the lifted limit never reached the running transfer")
+        .expect("download");
+    assert_eq!(std::fs::read(&dest).expect("read result"), body);
 }
 
 /// Without this a transfer sits at 97% indefinitely: the socket is open, nothing is

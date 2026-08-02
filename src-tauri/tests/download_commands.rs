@@ -20,8 +20,8 @@ use llama_cpp_hub_lib::download::{
     DEFAULT_PROGRESS_EVERY,
 };
 use llama_cpp_hub_lib::downloads::{
-    admit, cancellable, file_name_for, settle, spec_for, DownloadJob, DownloadState, Downloads,
-    Engine, Options,
+    admit, cancellable, file_name_for, normalized_rate, settle, spec_for, DownloadJob,
+    DownloadState, Downloads, Engine, Options,
 };
 use llama_cpp_hub_lib::runner::EventSink;
 
@@ -143,7 +143,6 @@ struct Handed {
     segments: usize,
     stall_after: Duration,
     retry_backoff: Duration,
-    rate_limit: Option<u64>,
     verify: bool,
     progress_every: Duration,
     flush_every: Duration,
@@ -156,7 +155,6 @@ fn handed(spec: &Spec) -> Handed {
         segments: spec.segments,
         stall_after: spec.stall_after,
         retry_backoff: spec.retry_backoff,
-        rate_limit: spec.rate_limit,
         verify: spec.verify,
         progress_every: spec.progress_every,
         flush_every: spec.flush_every,
@@ -316,21 +314,7 @@ fn spec_for_turns_the_stored_options_into_a_spec() {
     assert_eq!(spec.url, URL);
     assert_eq!(spec.dest, PathBuf::from("/models").join(FILE));
     assert_eq!(spec.segments, 8);
-    assert_eq!(spec.rate_limit, Some(10_000_000));
     assert!(!spec.verify);
-
-    let unlimited = spec_for(
-        URL,
-        &PathBuf::from(FILE),
-        &Options {
-            rate_limit: Some(0),
-            ..Options::default()
-        },
-    );
-    assert_eq!(
-        unlimited.rate_limit, None,
-        "a limit of zero is no limit, not a stalled transfer"
-    );
 }
 
 /// The engine charges a 64 KB buffer at a time and sleeps out whatever the budget does not
@@ -339,21 +323,85 @@ fn spec_for_turns_the_stored_options_into_a_spec() {
 #[test]
 fn a_rate_limit_too_low_to_transfer_at_is_raised_to_one_that_is() {
     for asked in [1, 100, 8_000] {
-        let spec = spec_for(
-            URL,
-            &PathBuf::from(FILE),
-            &Options {
-                rate_limit: Some(asked),
-                ..Options::default()
-            },
-        );
-        let rate = spec.rate_limit.expect("a limit was asked for");
+        let rate = normalized_rate(Some(asked)).expect("a limit was asked for");
         assert!(
             rate >= 64 * 1024,
             "{asked} bytes per second reached the engine as {rate}, which parks a buffer \
              for longer than a second"
         );
     }
+
+    assert_eq!(
+        normalized_rate(Some(0)),
+        None,
+        "a limit of zero is no limit, not a stalled transfer"
+    );
+    assert_eq!(normalized_rate(None), None);
+    assert_eq!(
+        normalized_rate(Some(10_000_000)),
+        Some(10_000_000),
+        "a limit above the floor is the user's to choose"
+    );
+}
+
+/// A limit is set while watching the transfer it applies to, so reaching the store is not
+/// enough: it has to reach the transfer that is already running.
+#[test]
+fn a_rate_limit_changed_mid_transfer_reaches_the_running_one() {
+    let dir = scratch("live-rate");
+    let observed = Arc::new(Mutex::new(None));
+    let watched = Arc::clone(&observed);
+
+    // Stands in for a transfer reading its budget as it goes, which is what the engine's
+    // token bucket does on every charge.
+    let engine: Engine = Arc::new(move |_: &Spec, control: &Control, _: &dyn ProgressSink| {
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while !control.cancelled() && Instant::now() < deadline {
+            *watched.lock().expect("rate lock") = control.rate_limit();
+            thread::sleep(Duration::from_millis(5));
+        }
+        Err(CANCELLED.to_string())
+    });
+    let manager = manager(engine);
+
+    let started = manager
+        .downloads
+        .start(
+            URL,
+            &dir,
+            &Options {
+                rate_limit: Some(10_000_000),
+                ..Options::default()
+            },
+        )
+        .expect("admitted");
+    let running = started[0].id.clone();
+
+    let seen = || *observed.lock().expect("rate lock");
+    eventually("the stored limit never reached the transfer", || {
+        seen() == Some(10_000_000)
+    });
+
+    manager.downloads.set_rate_limit(Some(2_000_000));
+    eventually("the lowered limit never reached the transfer", || {
+        seen() == Some(2_000_000)
+    });
+
+    manager.downloads.set_rate_limit(Some(1));
+    eventually("the floor was not applied to a live change", || {
+        seen() == Some(64 * 1024)
+    });
+
+    manager.downloads.set_rate_limit(None);
+    eventually("lifting the limit never reached the transfer", || {
+        seen().is_none()
+    });
+
+    manager.downloads.cancel(&running).expect("cancelled");
+    assert_eq!(
+        settled(&manager.downloads, &running).state,
+        DownloadState::Cancelled
+    );
 }
 
 #[test]
@@ -408,7 +456,6 @@ fn the_stored_options_reach_the_engine() {
     assert_eq!(spec.url, URL);
     assert_eq!(spec.dest, dir.join(FILE));
     assert_eq!(spec.segments, 8);
-    assert_eq!(spec.rate_limit, Some(10_000_000));
     assert!(!spec.verify);
 
     // The engine's bounds are the manager's to supply, and none of them is optional: a

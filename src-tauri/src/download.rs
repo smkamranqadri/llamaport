@@ -27,8 +27,6 @@ pub struct Spec {
     pub stall_after: Duration,
     /// First delay before retrying a transient failure; doubles with each attempt.
     pub retry_backoff: Duration,
-    /// Bytes per second across the whole transfer, not per segment.
-    pub rate_limit: Option<u64>,
     pub verify: bool,
     /// Smallest gap between progress reports — a floor, not a period.
     pub progress_every: Duration,
@@ -130,10 +128,13 @@ impl<'a> Meter<'a> {
     }
 }
 
-/// Shared with whoever started the transfer, so it can be stopped from elsewhere.
+/// Shared with whoever started the transfer, so it can be stopped or slowed from
+/// elsewhere. Everything here is read by the transfer as it runs rather than at the start,
+/// which is what lets a limit be changed on the download it applies to.
 #[derive(Debug, Default)]
 pub struct Control {
     cancelled: AtomicBool,
+    rate_limit: AtomicU64,
 }
 
 impl Control {
@@ -143,6 +144,19 @@ impl Control {
 
     pub fn cancelled(&self) -> bool {
         self.cancelled.load(Ordering::Relaxed)
+    }
+
+    /// Bytes per second across the whole transfer. A limit of zero is no limit rather than
+    /// a stalled transfer, which is also what `Default` leaves this at.
+    pub fn set_rate_limit(&self, rate: Option<u64>) {
+        self.rate_limit.store(rate.unwrap_or(0), Ordering::Relaxed);
+    }
+
+    pub fn rate_limit(&self) -> Option<u64> {
+        match self.rate_limit.load(Ordering::Relaxed) {
+            0 => None,
+            rate => Some(rate),
+        }
     }
 }
 
@@ -472,16 +486,14 @@ const CHARGE_SLICE: Duration = Duration::from_millis(250);
 /// A limit applied per segment is not a limit at all: it multiplies by the segment
 /// count, so a 10 MB/s cap becomes 40 MB/s across four connections.
 struct Bucket {
-    rate: u64,
     capacity: f64,
     tokens: Mutex<(f64, Instant)>,
 }
 
 impl Bucket {
-    fn new(rate: u64) -> Self {
+    fn new() -> Self {
         let capacity = BUFFER as f64;
         Self {
-            rate: rate.max(1),
             capacity,
             tokens: Mutex::new((capacity, Instant::now())),
         }
@@ -490,16 +502,23 @@ impl Bucket {
     /// Charges for bytes already read, blocking until the budget covers them. Charging
     /// after the fact keeps the accounting exact; charging a buffer's worth up front
     /// would over-charge on every short read.
+    ///
+    /// The rate is read on every pass rather than held, so a segment parked in here on an
+    /// old limit picks the new one up within a slice. An unlimited transfer leaves on the
+    /// atomic, before the lock: four segments contending over a budget nobody is spending
+    /// would be a cost paid by every download that has no limit at all.
     fn charge(&self, bytes: u64, control: &Control) {
         let mut owed = bytes as f64;
 
         while owed > 0.0 && !control.cancelled() {
+            let Some(rate) = control.rate_limit() else {
+                return;
+            };
             let wait = {
                 let mut tokens = self.tokens.lock().expect("bucket lock");
                 let now = Instant::now();
                 let (available, last) = *tokens;
-                let refilled = (available
-                    + now.duration_since(last).as_secs_f64() * self.rate as f64)
+                let refilled = (available + now.duration_since(last).as_secs_f64() * rate as f64)
                     .min(self.capacity);
 
                 let spend = refilled.min(owed);
@@ -509,7 +528,7 @@ impl Bucket {
                 if owed <= 0.0 {
                     return;
                 }
-                Duration::from_secs_f64(owed.min(self.capacity) / self.rate as f64)
+                Duration::from_secs_f64(owed.min(self.capacity) / rate as f64)
             };
             thread::sleep(wait.min(CHARGE_SLICE));
         }
@@ -577,7 +596,7 @@ struct Transfer<'a> {
     file: &'a File,
     control: &'a Control,
     abort: &'a Abort,
-    bucket: Option<&'a Bucket>,
+    bucket: &'a Bucket,
     backoff: Duration,
     stall_after: Duration,
 }
@@ -677,9 +696,7 @@ fn attempt_range(transfer: &Transfer, url: &str, index: usize) -> Result<(), Fet
         states.lock().expect("segment lock")[index].completed += read as u64;
         moved.fetch_add(read as u64, Ordering::Relaxed);
 
-        if let Some(bucket) = bucket {
-            bucket.charge(read as u64, control);
-        }
+        bucket.charge(read as u64, control);
     }
 
     // A clean end of stream short of the range asked for is a truncated response, not a
@@ -798,7 +815,7 @@ fn segmented(
         total,
         current: Mutex::new(resolved.url.clone()),
     };
-    let bucket = spec.rate_limit.map(Bucket::new);
+    let bucket = Bucket::new();
     let transfer = Transfer {
         source: &source,
         states: &states,
@@ -806,7 +823,7 @@ fn segmented(
         file: &file,
         control,
         abort: &abort,
-        bucket: bucket.as_ref(),
+        bucket: &bucket,
         backoff: spec.retry_backoff,
         stall_after: spec.stall_after,
     };
