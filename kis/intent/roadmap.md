@@ -15,10 +15,14 @@ Two, each with its own spec, module and screen:
 1. ~~**Rename to Llamaport**~~ — done 2026-08-02, before packaging, because the
    bundle identifier is free to change until something is signed and step 2 signs
    it. [rename.md](rename.md).
-2. **First beta release** — planned, not started. [release.md](release.md).
-   Public GitHub, unsigned, MIT, tagged `v0.1.0` as a pre-release, in four
-   phases. Signing and notarization are deliberately out: there is no Developer
-   ID, and one costs $99/yr before anything says the app is wanted.
+2. ~~**First beta release**~~ — shipped 2026-08-03, unsigned, MIT, `v0.1.0` as a
+   GitHub pre-release. [release.md](release.md). Signing and notarization were
+   deliberately out: no Developer ID, and one costs $99/yr before anything says
+   the app is wanted. Revisit if the beta lands — and note the bundle identifier
+   is now effectively fixed, since changing it strands existing installs.
+
+3. **Nothing planned.** The next move is whatever the beta says: install
+   friction, bug reports, or silence. Do not plan features against silence.
 
 ## Decided against
 

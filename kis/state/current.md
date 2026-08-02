@@ -1,15 +1,16 @@
 # Current
 
 ```text
-Branch:   main. `origin` now configured, nothing pushed — the repo is public and
-          empty, so the first push publishes. Held until phase 3.
-Task:     beta release phase 4, ship — in progress. `.dmg` built and verified;
-          push, tag and release remain.
-          [intent/release.md](../intent/release.md)
-Mode:     Phase
-Blocker:  none. The `.dmg` no longer needs Apple events: `CI=true` makes
-          create-dmg skip the Finder styling.
-Next:     phase 1 blockers, then 3 public face, then 4 ship.
+Branch:   main, one commit ahead of origin — the chat button is not pushed and
+          not in the release.
+Task:     none in progress. v0.1.0 is out.
+Mode:     Fast
+Blocker:  none. Two things are unproved rather than blocking: nobody has watched
+          the chat button open a browser, and the README's "Open Anyway" steps
+          have never met a real Gatekeeper prompt.
+Next:     watch the chat button work, then push it. Separately, download the
+          `.dmg` from the release page in a browser and follow the README's
+          Install section as a stranger would.
 ```
 
 Run and verify commands: [knowledge/technical.md](../knowledge/technical.md).
@@ -30,9 +31,14 @@ A ready model offers "Chat in browser", which opens `llama-server`'s own web UI
 at the bound port. The app still has no chat of its own and is not getting one
 ([knowledge/project.md](../knowledge/project.md)).
 
+**v0.1.0 is published**, unsigned, as a GitHub pre-release with the `.dmg`
+attached: https://github.com/smkamranqadri/llamaport/releases/tag/v0.1.0. The tag
+sits at `05c3a21`; `main` has since moved one commit past it.
+
 Discover was planned and then dropped ([intent/roadmap.md](../intent/roadmap.md)).
 
-Everything is committed; `git log` is the record.
+Everything is committed. `main` is one ahead of `origin/main`; `git log` is the
+record.
 
 ## Proof
 
@@ -40,6 +46,18 @@ The four commands were last run green after the rename, which is the whole tree:
 `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test`,
 `bun run build` — all exit 0, statuses captured directly rather than through a
 pipe. 137 tests across 10 binaries.
+
+Release, 2026-08-03:
+
+- The `.dmg` was built with `CI=true`, mounted, and checked: `Llamaport.app` at
+  0.1.0, the `/Applications` symlink present, and `icon.icns` byte-identical to
+  the source by sha256.
+- The published asset was downloaded back from GitHub and is byte-identical to
+  what was built, mounts, and holds the same app.
+- Not proved, and the plan asked for it: the download was `curl`, which sets no
+  quarantine attribute — checked, there is none on the file. So the Gatekeeper
+  wall was never hit and the README's "Open Anyway" steps remain untested. That
+  needs a browser download by a human.
 
 Chat button, 2026-08-03:
 

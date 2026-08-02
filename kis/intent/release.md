@@ -1,6 +1,12 @@
 # First beta release
 
-Planned 2026-08-02. Not started.
+Planned 2026-08-02, shipped 2026-08-03.
+https://github.com/smkamranqadri/llamaport/releases/tag/v0.1.0
+
+All four phases closed. What is left is not part of this plan: the README's
+"Open Anyway" steps have never met a real Gatekeeper prompt, because the
+verification download used `curl`, which sets no quarantine attribute. Proof and
+its limits are in [state/current.md](../state/current.md).
 
 A public, unsigned, MIT-licensed macOS beta on GitHub, tagged `v0.1.0` and
 marked pre-release.
@@ -104,30 +110,25 @@ falls back to hardcoded Homebrew paths, so short of hiding the author's binary
 it will always find one. Only the wording changed there, on a render path that
 already worked.
 
-**4 — Ship.** Build the `.dmg`, push, tag `v0.1.0`, GitHub release marked
-pre-release.
+**4 — Ship — DONE 2026-08-03.** `.dmg` built, 54 commits pushed, `v0.1.0` tagged,
+GitHub release marked pre-release with the `.dmg` attached and notes leading with
+"unsigned".
 
-`origin` is configured: `git@github.com:smkamranqadri/llamaport.git`. The repo
-is public and empty, so the first push is the moment of publication, and it is
-deliberately held until phase 3 lands a LICENSE and a stranger-facing README —
-a public repo with no licence is all-rights-reserved, which contradicts
-publishing it.
+`origin` is `git@github.com:smkamranqadri/llamaport.git`, renamed from
+`llama-port` so one name covers repo, app, crate and bundle identifier. The repo
+was already public, so the first push was the moment of publication; it was held
+until phase 3 had landed a LICENSE and a stranger-facing README, because a public
+repo with no licence is all-rights-reserved.
 
-It was renamed from `llama-port` to match the app, crate and bundle identifier,
-so one name covers all of them. GitHub redirects the old path.
+What the pre-publication scan found, kept because the next release needs it too:
+no secrets, no `.env` or key files tracked, every "token" match a lockfile hash
+or prose about Hugging Face tokens and GGUF tokenizers. `git grep` for a home
+path before every push — proof entries are written by pasting real output, so the
+account name comes back. All 54 commits are authored
+`Muhammad Kamran <smkamranqadri@yahoo.com>`, now permanent.
 
-Before pushing:
-
-- The local account name has been scrubbed from state proof entries — done in
-  phase 3. `git grep` for a home path before pushing, since proof entries are
-  written by pasting real output and it will come back.
-- Every commit is authored `Muhammad Kamran <smkamranqadri@yahoo.com>` and that
-  becomes permanent. Checked, not assumed: no secrets, no `.env` or key files
-  tracked, and every "token" match is a lockfile hash or prose about Hugging
-  Face tokens and GGUF tokenizers.
-
-`/security-review` may become usable once something is pushed, since its
-`origin/HEAD` will then resolve.
+`/security-review` was unusable throughout this work because it diffs against
+`origin/HEAD`, which did not resolve without a remote. It should work now.
 
 ## Closing conditions
 
