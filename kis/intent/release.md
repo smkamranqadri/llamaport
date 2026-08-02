@@ -69,15 +69,16 @@ shell returned "Not authorized to send Apple events to System Events (-1743)".
 DMG step from a terminal that has been granted Automation permission, and only
 looks at config if that fails too.
 
-**3 — Public face — DONE 2026-08-02 apart from screenshots.** README rewritten
-for a stranger, MIT LICENSE, and both first-launch empty states now say what to
-do rather than only what is wrong.
+**3 — Public face — DONE 2026-08-03.** README rewritten for a stranger, MIT
+LICENSE, `docs/library.png` on the front page, and both first-launch empty states
+now say what to do rather than only what is wrong.
 
-Screenshots are the author's to capture: screen recording is denied to the
-agent, and going around a denial is not an option. They land in `docs/` and get
-wired into the README. Capture the window alone rather than the desktop, and
-check the models directory path in shot — it shows the account name that was
-deliberately scrubbed from the repo.
+The screenshot was the author's to capture: screen recording is denied to the
+agent, and going around a denial is not an option. Retake it with
+`screencapture -o -w docs/library.png` if the UI changes — the window alone, not
+the desktop. It shows `/Users/mkamran/models` in the subtitle, which is the
+account name otherwise scrubbed from the repo; raised before capture and shipped
+anyway, so it is a decision rather than an oversight.
 
 The version display was added here after the app turned out to expose its
 version nowhere — no About item, nothing in the UI. Counted as release

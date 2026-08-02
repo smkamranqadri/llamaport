@@ -7,6 +7,10 @@ Hugging Face with resume that survives a kill.
 
 Apple Silicon only. This is an unsigned beta — see [Install](#install).
 
+![The Library screen, listing local GGUF models with quantisation, context length,
+size and modification date, and marking mixture-of-experts
+files](docs/library.png)
+
 ## Who it is for
 
 People already running llama.cpp locally who are tired of two specific things:

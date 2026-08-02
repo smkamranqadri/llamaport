@@ -3,8 +3,8 @@
 ```text
 Branch:   main. `origin` now configured, nothing pushed — the repo is public and
           empty, so the first push publishes. Held until phase 3.
-Task:     beta release phase 3, public face — done but for screenshots, which
-          the author is capturing. [intent/release.md](../intent/release.md)
+Task:     beta release. Phases 1, 2 and 3 done; only phase 4 ship remains.
+          [intent/release.md](../intent/release.md)
 Mode:     Phase
 Blocker:  none. Waiting in phase 4: `bundle_dmg.sh` needs Apple events, which
           this shell is not authorised for, so there is no finished `.dmg` yet.
