@@ -1,8 +1,8 @@
 # Downloader milestone
 
 Design lives in [docs/downloader-spec.md](../../docs/downloader-spec.md). This
-file holds only what the spec does not: the decisions taken, the phase split,
-and what closes each phase.
+file holds only what the spec does not: the decisions taken, what was carried
+rather than met, and the limits found in the building.
 
 Live status is in [state/current.md](../state/current.md), not here.
 
@@ -13,9 +13,14 @@ Live status is in [state/current.md](../state/current.md), not here.
   The codebase is blocking throughout and hands long work to `spawn_blocking`;
   8 sockets do not need an async runtime. `tokio` is already compiled in via
   tauri, but `reqwest` is not in the macOS build graph and would add ~40 crates.
-- **Engine before Discover.** Discover sits on top of the engine, so building
-  both at once means the first 21 GB transfer runs through two unproven layers.
-- **No Hugging Face token this milestone.** Public repos only; a gated repo is
+- **The rate limit is live.** `Control` carries it and the bucket re-reads it on
+  every charge, so a limit changed while a download runs applies to that
+  download. The alternative — fixing it in the `Spec` at the start — was
+  rejected: a limit is set while watching the transfer it is meant for.
+- **The floor on a limit is app policy, not engine mechanism.** `normalized_rate`
+  in `downloads.rs` bounds what may be asked for; the engine honours whatever it
+  is handed, which is what lets a test drive it at a byte a second.
+- **No Hugging Face token.** Public repos only; a gated repo is
   detected on resolve and reported plainly. Most GGUF quants are public, and a
   released app should not keep a bearer token in plaintext. The spec's
   strip-`Authorization`-on-redirect rule stays dormant until this is revisited.
@@ -37,14 +42,12 @@ Two carried forward rather than met:
   silent past `stall_after` is reissued, bounded by the 5-attempt limit, rather
   than only one silent while siblings move. Deliberate and accepted.
 
-## Remaining — polish and release-readiness
-
-Not planned yet.
-
 ## Verification
 
 `cargo test`, `cargo clippy -- -D warnings`, `cargo fmt --check`,
-`bun run build` — then a real transfer. Tests alone do not close phase 1.
+`bun run build` — then a real transfer. Tests alone have never been enough to
+close work on this subsystem, and were not enough for the speed limit either:
+what proved that was watching a running download change rate.
 
 Agreed 2026-08-02: the proof is a small (~1 GB) public GGUF from a repo such as
 bartowski or unsloth, killed mid-flight and resumed, verified against the real

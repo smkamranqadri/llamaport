@@ -38,6 +38,12 @@ Each is argued in the specs; this is the index, not a second copy.
   different answer; treating them alike either abandons recoverable transfers or
   hammers a wall.
 - One rate limit across all segments, not one per segment.
+- The rate is read from `Control` as the transfer runs rather than fixed when it
+  starts, so a limit changed mid-download applies to the one being watched. What
+  a user may ask for is bounded in the app; the engine honours what it is told.
+- Where a forecast cannot be avoided — time remaining — it is smoothed, withheld
+  until it settles, and worded as an approximation. Same reasoning as the memory
+  rule above.
 - A server that will not serve ranges is refused: no ranges means no resume, and
   an unresumable 20 GB transfer is a trap rather than a convenience.
 

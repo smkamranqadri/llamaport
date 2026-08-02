@@ -12,9 +12,9 @@ Two, each with its own spec, module and screen:
 
 ## Order
 
-1. **Download speed limit in the UI** — current work.
-2. **Packaging and release** — signing, notarization, a bundled `.app`, install
-   docs. Nothing beyond Tauri defaults exists today.
+1. **Packaging and release** — signing, notarization, a bundled `.app`, install
+   docs. Nothing beyond Tauri defaults exists today. Not planned yet, and the
+   three risks below are the reason to plan it rather than start it.
 
 ## Decided against
 
@@ -29,7 +29,7 @@ open. And pasting a URL into Downloads already closes the loop the project set
 out to close: `curl` not resuming was the problem, not finding the file.
 
 Its research was not wasted: what it established about the engine's limits is in
-[downloader.md](downloader.md) under "Carried into Discover".
+[downloader.md](downloader.md) under "Known limits of the engine".
 
 ## Risks
 
