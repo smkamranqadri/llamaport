@@ -18,11 +18,10 @@ import SettingsScreen from "./SettingsScreen";
 import type { ModelEntry, Orphan, RunnerSnapshot, Telemetry } from "./types";
 import "./App.css";
 
-type Screen = "library" | "discover" | "downloads" | "settings";
+type Screen = "library" | "downloads" | "settings";
 
-const NAV: { id: Screen; label: string; phase?: string }[] = [
+const NAV: { id: Screen; label: string }[] = [
   { id: "library", label: "Library" },
-  { id: "discover", label: "Discover", phase: "4" },
   { id: "downloads", label: "Downloads" },
   { id: "settings", label: "Settings" },
 ];
@@ -41,20 +40,6 @@ const IDLE: RunnerSnapshot = {
   restarted: false,
   serverCtx: null,
 };
-
-function Placeholder({ label, phase }: { label: string; phase: string }) {
-  return (
-    <>
-      <header className="screen-header">
-        <h1>{label}</h1>
-      </header>
-      <div className="empty">
-        <p className="empty-title">Not built yet</p>
-        <p className="empty-detail">Arrives in phase {phase}.</p>
-      </div>
-    </>
-  );
-}
 
 function NowRunning({
   runner,
@@ -143,8 +128,6 @@ export default function App() {
       .catch(() => {});
   }, []);
 
-  const active = NAV.find((item) => item.id === screen)!;
-
   const content = () => {
     if (selected) {
       return (
@@ -158,15 +141,6 @@ export default function App() {
         />
       );
     }
-    if (screen === "library") {
-      return (
-        <Library
-          key={catalogVersion}
-          runner={runner}
-          onSelect={setSelected}
-        />
-      );
-    }
     if (screen === "downloads") {
       return <Downloads onShowInLibrary={showInLibrary} />;
     }
@@ -177,7 +151,9 @@ export default function App() {
         />
       );
     }
-    return <Placeholder label={active.label} phase={active.phase!} />;
+    return (
+      <Library key={catalogVersion} runner={runner} onSelect={setSelected} />
+    );
   };
 
   return (
