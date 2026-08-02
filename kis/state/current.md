@@ -1,8 +1,9 @@
 # Current
 
 ```text
-Branch:   main, 7 ahead of origin, nothing uncommitted. `v0.1.0` is tagged at
-          `05c3a21`, so everything past it is unreleased and unpushed.
+Branch:   main, pushed and level with origin, nothing uncommitted. `v0.1.0` is
+          tagged back at `05c3a21`, so the seven commits since it are public on
+          `main` but not in any release.
 Task:     none in progress. The Web UI window is done and committed.
 Mode:     Fast
 Blocker:  none. One thing is unproved rather than blocking: the README's
