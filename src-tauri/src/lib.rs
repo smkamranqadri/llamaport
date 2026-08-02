@@ -82,7 +82,11 @@ impl AppState {
 
         let result = match probe::discover(configured.as_deref()) {
             Some(binary) => probe::probe(&binary),
-            None => Err("llama-server was not found on PATH or in the usual locations".into()),
+            None => Err(
+                "llama-server was not found on PATH or in the usual locations. \
+                 Install it with `brew install llama.cpp`, or set its path in Settings."
+                    .into(),
+            ),
         };
         *cached = Some(result.clone());
         result

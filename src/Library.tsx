@@ -104,6 +104,16 @@ export default function Library({
     void load();
   }, [load]);
 
+  const empty = {
+    title: "Models directory not found",
+    hint: "Create this folder, or point Settings at the one you keep models in.",
+  };
+  if (dir?.exists) {
+    empty.title = "No GGUF files here";
+    empty.hint =
+      "Fetch one from Downloads, or point Settings at the folder you keep models in.";
+  }
+
   return (
     <>
       <header className="screen-header">
@@ -125,10 +135,9 @@ export default function Library({
 
       {!loading && !failure && models.length === 0 && (
         <div className="empty">
-          <p className="empty-title">
-            {dir?.exists ? "No GGUF files here" : "Models directory not found"}
-          </p>
+          <p className="empty-title">{empty.title}</p>
           <p className="empty-detail">{dir?.path}</p>
+          <p className="empty-detail">{empty.hint}</p>
         </div>
       )}
 
