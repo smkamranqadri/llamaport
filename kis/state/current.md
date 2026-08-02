@@ -3,8 +3,8 @@
 ```text
 Branch:   main. `origin` now configured, nothing pushed — the repo is public and
           empty, so the first push publishes. Held until phase 3.
-Task:     beta release. Phases 1 and 2 done; nothing in progress.
-          [intent/release.md](../intent/release.md)
+Task:     beta release phase 3, public face — done but for screenshots, which
+          the author is capturing. [intent/release.md](../intent/release.md)
 Mode:     Phase
 Blocker:  none. Waiting in phase 4: `bundle_dmg.sh` needs Apple events, which
           this shell is not authorised for, so there is no finished `.dmg` yet.
@@ -76,7 +76,7 @@ Rename, 2026-08-02:
   the declining cases pass against the stub — they guard the clobber rule, not
   the move.
 - UI, three screenshots of the running app. Title bar, menu bar and
-  sidebar all read Llamaport; Library lists all 9 models at /Users/mkamran/models;
+  sidebar all read Llamaport; Library lists all 9 models in the models directory;
   Settings still resolves /opt/homebrew/bin/llama-server, version 10090, 321
   flags. The window opened at a usable size, which the roadmap's third risk says
   cannot be assumed.

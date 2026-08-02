@@ -69,9 +69,29 @@ shell returned "Not authorized to send Apple events to System Events (-1743)".
 DMG step from a terminal that has been granted Automation permission, and only
 looks at config if that fails too.
 
-**3 — Public face.** README rewritten for a stranger — what it is, who it is
-for, `brew install llama.cpp` first, screenshots, the unsigned-app steps. MIT
-LICENSE. A pass over the two empty states above.
+**3 — Public face — DONE 2026-08-02 apart from screenshots.** README rewritten
+for a stranger, MIT LICENSE, and both first-launch empty states now say what to
+do rather than only what is wrong.
+
+Screenshots are the author's to capture: screen recording is denied to the
+agent, and going around a denial is not an option. They land in `docs/` and get
+wired into the README. Capture the window alone rather than the desktop, and
+check the models directory path in shot — it shows the account name that was
+deliberately scrubbed from the repo.
+
+The version display was added here after the app turned out to expose its
+version nowhere — no About item, nothing in the UI. Counted as release
+infrastructure rather than a feature: a beta whose bug reports cannot be tied to
+a build wastes everyone's time. It reads the bundle version, not
+`CARGO_PKG_VERSION`, so it always matches the `.dmg` filename.
+
+The fresh-user check was run for real rather than reasoned about — the bundled
+binary launched against a throwaway `HOME`, which reproduces no config and no
+models directory exactly, and the author confirmed the empty state reads. The
+missing-`llama-server` state could not be reproduced the same way: `discover`
+falls back to hardcoded Homebrew paths, so short of hiding the author's binary
+it will always find one. Only the wording changed there, on a render path that
+already worked.
 
 **4 — Ship.** Build the `.dmg`, push, tag `v0.1.0`, GitHub release marked
 pre-release.
@@ -87,8 +107,9 @@ so one name covers all of them. GitHub redirects the old path.
 
 Before pushing:
 
-- Scrub `/Users/mkamran` from `kis/state/current.md`, which leaks the local
-  account name in proof entries.
+- The local account name has been scrubbed from state proof entries — done in
+  phase 3. `git grep` for a home path before pushing, since proof entries are
+  written by pasting real output and it will come back.
 - Every commit is authored `Muhammad Kamran <smkamranqadri@yahoo.com>` and that
   becomes permanent. Checked, not assumed: no secrets, no `.env` or key files
   tracked, and every "token" match is a lockfile hash or prose about Hugging
