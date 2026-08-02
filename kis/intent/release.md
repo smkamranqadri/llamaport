@@ -73,8 +73,27 @@ looks at config if that fails too.
 for, `brew install llama.cpp` first, screenshots, the unsigned-app steps. MIT
 LICENSE. A pass over the two empty states above.
 
-**4 — Ship.** Build the `.dmg`, publish the repo, tag `v0.1.0`, GitHub release
-marked pre-release.
+**4 — Ship.** Build the `.dmg`, push, tag `v0.1.0`, GitHub release marked
+pre-release.
+
+`origin` is configured: `git@github.com:smkamranqadri/llama-port.git`. The repo
+is public and empty, so the first push is the moment of publication, and it is
+deliberately held until phase 3 lands a LICENSE and a stranger-facing README —
+a public repo with no licence is all-rights-reserved, which contradicts
+publishing it. Note the repo is `llama-port` while the app and identifier are
+`llamaport`; the clone URL will not match the product name.
+
+Before pushing:
+
+- Scrub `/Users/mkamran` from `kis/state/current.md`, which leaks the local
+  account name in proof entries.
+- Every commit is authored `Muhammad Kamran <smkamranqadri@yahoo.com>` and that
+  becomes permanent. Checked, not assumed: no secrets, no `.env` or key files
+  tracked, and every "token" match is a lockfile hash or prose about Hugging
+  Face tokens and GGUF tokenizers.
+
+`/security-review` may become usable once something is pushed, since its
+`origin/HEAD` will then resolve.
 
 ## Closing conditions
 

@@ -1,7 +1,8 @@
 # Current
 
 ```text
-Branch:   main (clean, nothing pushed)
+Branch:   main. `origin` now configured, nothing pushed — the repo is public and
+          empty, so the first push publishes. Held until phase 3.
 Task:     beta release. Phases 1 and 2 done; nothing in progress.
           [intent/release.md](../intent/release.md)
 Mode:     Phase
