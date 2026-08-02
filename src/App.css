@@ -398,6 +398,12 @@ body,
   justify-content: space-between;
 }
 
+/* Restores the 12px the h2 gives up so the buttons can sit on its line. Skipped when
+   the head is alone in the panel, which is the Logs panel with its output hidden. */
+.panel-head:not(:last-child) {
+  margin-bottom: 12px;
+}
+
 .panel-head h2 {
   margin-bottom: 0;
 }

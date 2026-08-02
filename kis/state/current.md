@@ -61,9 +61,13 @@ Release, 2026-08-03:
 
 Chat button, 2026-08-03:
 
-- Not proved. `bun run build` exits 0, which is the whole of what a TypeScript
-  change gets here, and nobody has watched the browser open. Screen recording is
-  denied to the agent, so that step is the author's.
+- Works, confirmed by the author clicking it against a running model — the
+  browser opened llama.cpp's chat UI. A screenshot of the running app shows the
+  button in the Running panel head with qwen2.5-0.5b-instruct ready on :8888.
+  The agent could not check this itself; screen recording is denied here.
+- Not checked: the port fall-forward case, where the requested port is busy and
+  the server lands on another. The button reads `runner.port` rather than the
+  requested one, so it should follow, but nobody has made that happen.
 - The web UI being served was checked against the installed `llama-server --help`
   rather than assumed: `--ui, --webui, --no-ui, --no-webui  whether to enable the
   Web UI (default: enabled)`.
