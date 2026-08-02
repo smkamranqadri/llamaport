@@ -234,10 +234,34 @@ fn reaches_ready_reports_telemetry_and_stops() {
     runner.stop().expect("stop");
     assert_eq!(runner.snapshot().state, RunState::Idle);
 
+    let announced: Vec<String> = recorder
+        .of_type("runner:state")
+        .iter()
+        .filter_map(|s| s["state"].as_str().map(str::to_string))
+        .collect();
+    assert_eq!(
+        announced.last().map(String::as_str),
+        Some("idle"),
+        "stopping must be announced and not merely returned: the tray only listens"
+    );
+
     let _ = std::fs::remove_dir_all(&dir);
 }
 
-/// An explicit stop is how a run normally ends. It must bank a calibration sample:
+/// The other half of announcing a stop: `start` stops first, so a stop that changes
+/// nothing must stay silent or every launch would be preceded by a spurious Idle.
+#[test]
+fn stopping_when_nothing_runs_announces_nothing() {
+    let recorder = Arc::new(Recorder::default());
+    let runner = runner_with(recorder.clone());
+
+    runner.stop().expect("stop");
+
+    assert!(
+        recorder.of_type("runner:state").is_empty(),
+        "idle to idle is not a transition"
+    );
+}
 
 #[test]
 fn crash_before_ready_is_not_restarted() {

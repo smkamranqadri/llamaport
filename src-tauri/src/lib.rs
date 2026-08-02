@@ -593,10 +593,7 @@ pub fn run() {
                 .show_menu_on_left_click(true)
                 .on_menu_event(|app, event| match event.id().as_ref() {
                     "stop" => {
-                        let state = app.state::<AppState>();
-                        let _ = state.runner.stop();
-                        let snapshot = state.runner.snapshot();
-                        let _ = app.emit("runner:state", snapshot);
+                        let _ = app.state::<AppState>().runner.stop();
                     }
                     "show" => show_main_window(app),
                     "quit" => {

@@ -182,29 +182,38 @@ impl Runner {
     }
 
     pub fn stop(&self) -> Result<(), String> {
-        let mut child = {
+        let (mut child, before) = {
             let mut inner = self.inner.lock().expect("runner lock");
+            let before = inner.state;
             if inner.child.is_none() {
                 inner.state = RunState::Idle;
-                return Ok(());
+            } else {
+                inner.stopping = true;
+                inner.state = RunState::Stopping;
             }
-            inner.stopping = true;
-            inner.state = RunState::Stopping;
-            inner.child.take()
+            (inner.child.take(), before)
         };
 
         if let Some(child) = child.as_mut() {
             let _ = child.kill();
             let _ = child.wait();
+
+            let mut inner = self.inner.lock().expect("runner lock");
+            inner.state = RunState::Idle;
+            inner.stopping = false;
+            inner.port = None;
+            inner.started_secs = None;
+            inner.server_ctx = None;
+            clear_pidfile();
         }
 
-        let mut inner = self.inner.lock().expect("runner lock");
-        inner.state = RunState::Idle;
-        inner.stopping = false;
-        inner.port = None;
-        inner.started_secs = None;
-        inner.server_ctx = None;
-        clear_pidfile();
+        // On a real transition, on every path out. The tray learns the state only from this
+        // stream, so a silent Ready -> Idle left it advertising a model that had stopped.
+        // Guarded on the transition because `start` stops first, and an idle-to-idle stop
+        // would put a spurious Idle in front of every launch.
+        if self.inner.lock().expect("runner lock").state != before {
+            emit_state(&self.events, &self.inner);
+        }
         Ok(())
     }
 }
