@@ -55,6 +55,9 @@ bun run tauri dev
 
 ## Verify
 
+Also in the README. Both copies are deliberate: the session anchor loads this
+one, contributors read that one. Not a duplication to clean up.
+
 ```bash
 bun run build
 cargo test --manifest-path src-tauri/Cargo.toml
