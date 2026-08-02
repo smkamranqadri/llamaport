@@ -2,10 +2,12 @@
 
 ```text
 Branch:   main (clean, nothing pushed)
-Task:     none in progress
-Mode:     Standard
-Blocker:  none
-Next:     packaging and release ([intent/roadmap.md](../intent/roadmap.md)).
+Task:     beta release. Phase 2 identity done; nothing in progress.
+          [intent/release.md](../intent/release.md)
+Mode:     Phase
+Blocker:  none. One known problem waiting in phase 4: `bundle_dmg.sh` fails, so
+          there is no finished `.dmg` yet. The `.app` builds fine.
+Next:     phase 1 blockers, then 3 public face, then 4 ship.
 ```
 
 Run and verify commands: [knowledge/technical.md](../knowledge/technical.md).
@@ -32,6 +34,18 @@ The four commands were last run green after the rename, which is the whole tree:
 `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test`,
 `bun run build` — all exit 0, statuses captured directly rather than through a
 pipe. 137 tests across 10 binaries.
+
+Icon, 2026-08-02:
+
+- Three marks were rendered at 256px and at a real 32px and looked at before any
+  was offered, which is why two were reworked first: the llama read as a rabbit
+  and the abstract mark read as a wifi/broadcast icon, wrong for an app that
+  binds loopback only.
+- `Llamaport.app/Contents/Resources/icon.icns` is byte-identical to
+  `src-tauri/icons/icon.icns` by sha256, `CFBundleIconFile` points at it, and
+  `Resources/` holds exactly one icon. No Tauri logo survives in the bundle.
+- Not claimed: nobody has watched the icon appear in the Dock. What is proved is
+  that the bundle carries the mark and macOS is pointed at it.
 
 Rename, 2026-08-02:
 

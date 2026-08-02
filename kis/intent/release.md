@@ -49,9 +49,17 @@ compares `outer_size()` in physical pixels against 600/400 and then sets a
 `LogicalSize`. Reject `--host` and `--port` inside `rawArgs`, which the app
 already owns as real fields. Document the loopback-only, no-auth posture.
 
-**2 — Identity.** Three SVG marks, one chosen, `tauri icon` regenerates all 16
-icon files. The source SVG is committed as text. Independent of phase 1, and it
-needs a review round, so it goes first.
+**2 — Identity — DONE 2026-08-02.** A porthole mark, chosen over a harbour arrow
+and a llama head. `icon.svg` is the committed source; regenerate with
+`bunx tauri icon src-tauri/icons/icon.svg` and delete the iOS and Android sets
+it emits unasked. Reasoning for the choice is in the commit, not repeated here.
+
+Running `tauri build` for this phase surfaced a phase 4 problem early: the `.app`
+bundles cleanly but `bundle_dmg.sh` fails, leaving only the `rw.*` intermediate.
+No stale volume was mounted. The untested lead is that the script drives Finder
+through AppleScript to set the window appearance, and it was run from a
+background shell with no automation permission — try it from an interactive
+terminal before assuming the config is wrong.
 
 **3 — Public face.** README rewritten for a stranger — what it is, who it is
 for, `brew install llama.cpp` first, screenshots, the unsigned-app steps. MIT
