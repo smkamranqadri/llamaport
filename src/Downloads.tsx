@@ -11,7 +11,7 @@ import {
   onDownloadState,
   setDownloadOptions,
 } from "./api";
-import { formatBytes, formatRate } from "./format";
+import { formatBytes, formatDuration, formatRate } from "./format";
 import type {
   DirInfo,
   DownloadJob,
@@ -22,6 +22,24 @@ import type {
 type Recovery = "resume" | "restart" | "none";
 
 const MIB = 1024 ** 2;
+
+/// How much of the smoothed rate survives each new sample. The engine reports twice a
+/// second and the raw figure swings hard on an unlimited transfer; dividing the remaining
+/// bytes by it would produce an estimate that jumps between two minutes and twenty.
+const SMOOTHING = 0.7;
+
+/// Samples needed before an estimate is shown at all. The first second of a transfer knows
+/// nothing about how fast it will be.
+const SETTLED = 3;
+
+/// A rate the estimate is worth computing from: smoothed, and belonging to the phase that
+/// is being estimated. Verification re-reads the file at a different speed, and carrying
+/// the transfer rate into it would describe the wrong thing.
+interface Smoothed {
+  phase: DownloadPhase;
+  rate: number;
+  samples: number;
+}
 
 /// The engine charges a buffer at a time, so anything slower parks a segment for longer
 /// than a second and is raised to this on the way in.
@@ -71,6 +89,34 @@ function rateText(bytesPerSecond: number | null): string {
   return formatRate(bytesPerSecond);
 }
 
+/// An estimate, or nothing. Nothing is the honest answer more often than it looks: before
+/// the rate has settled, on a file whose size upstream never declared, and on a phase with
+/// no bytes left to move.
+function remainingText(job: DownloadJob, smoothed: Smoothed | undefined): string {
+  if (job.total == null) return "";
+  if (smoothed == null || smoothed.phase !== job.phase) return "";
+  if (smoothed.samples < SETTLED || smoothed.rate <= 0) return "";
+
+  const left = job.total - job.completed;
+  if (left <= 0) return "";
+  return ` · about ${formatDuration(left / smoothed.rate)} left`;
+}
+
+function smooth(
+  previous: Smoothed | undefined,
+  phase: DownloadPhase,
+  rate: number,
+): Smoothed {
+  if (previous == null || previous.phase !== phase) {
+    return { phase, rate, samples: 1 };
+  }
+  return {
+    phase,
+    rate: previous.rate * SMOOTHING + rate * (1 - SMOOTHING),
+    samples: previous.samples + 1,
+  };
+}
+
 function badgeFor(job: DownloadJob): { text: string; className: string } {
   if (job.state === "active") {
     if (job.phase == null) return { text: "starting", className: "badge" };
@@ -83,17 +129,19 @@ function badgeFor(job: DownloadJob): { text: string; className: string } {
   return { text: "failed", className: "badge badge-warn" };
 }
 
-function detail(job: DownloadJob): string {
+function detail(job: DownloadJob, smoothed: Smoothed | undefined): string {
   if (job.state === "complete") {
     return `In the models directory · ${formatBytes(job.completed)}`;
   }
   if (job.state === "active") {
     if (job.phase == null) return "Starting…";
     if (job.phase === "resolving") return "Asking Hugging Face for the file…";
+
+    const left = remainingText(job, smoothed);
     if (job.phase === "verifying") {
-      return `Reading the file back to check its digest · ${moved(job)} · ${rateText(job.bytesPerSecond)}`;
+      return `Reading the file back to check its digest · ${moved(job)} · ${rateText(job.bytesPerSecond)}${left}`;
     }
-    return `${moved(job)} · ${rateText(job.bytesPerSecond)}`;
+    return `${moved(job)} · ${rateText(job.bytesPerSecond)}${left}`;
   }
 
   const mode = recovery(job);
@@ -116,6 +164,7 @@ function detail(job: DownloadJob): string {
 
 function Row({
   job,
+  smoothed,
   busy,
   blocked,
   onCancel,
@@ -123,6 +172,7 @@ function Row({
   onShow,
 }: {
   job: DownloadJob;
+  smoothed: Smoothed | undefined;
   busy: boolean;
   blocked: boolean;
   onCancel: (id: string) => void;
@@ -190,7 +240,7 @@ function Row({
       )}
 
       {job.error && <p className="model-error">{job.error}</p>}
-      <p className="field-hint">{detail(job)}</p>
+      <p className="field-hint">{detail(job, smoothed)}</p>
     </li>
   );
 }
@@ -245,6 +295,7 @@ export default function Downloads({
   const [failure, setFailure] = useState<string | null>(null);
   const [options, setOptions] = useState<DownloadOptions | null>(null);
   const [limit, setLimit] = useState("");
+  const [rates, setRates] = useState<Record<string, Smoothed>>({});
 
   useEffect(() => {
     const readDir = () => getDirInfo().then(setDir).catch(() => {});
@@ -264,7 +315,7 @@ export default function Downloads({
         setJobs(next);
         readDir();
       }),
-      onDownloadProgress((progress) =>
+      onDownloadProgress((progress) => {
         setJobs((prev) =>
           prev.map((job) => {
             if (job.id !== progress.id) return job;
@@ -276,8 +327,15 @@ export default function Downloads({
               bytesPerSecond: progress.bytesPerSecond,
             };
           }),
-        ),
-      ),
+        );
+
+        const rate = progress.bytesPerSecond;
+        if (rate == null) return;
+        setRates((prev) => ({
+          ...prev,
+          [progress.id]: smooth(prev[progress.id], progress.phase, rate),
+        }));
+      }),
     ];
 
     return () => {
@@ -420,6 +478,7 @@ export default function Downloads({
             <Row
               key={job.id}
               job={job}
+              smoothed={rates[job.id]}
               busy={busy}
               blocked={active != null}
               onCancel={cancel}

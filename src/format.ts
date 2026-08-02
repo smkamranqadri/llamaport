@@ -17,6 +17,20 @@ export function formatRate(bytesPerSecond: number): string {
   return `${Math.round(bytesPerSecond / 1024)} KB/s`;
 }
 
+/// Coarse on purpose. A transfer with half an hour left does not know that to the second,
+/// and a figure that precise invites being believed.
+export function formatDuration(seconds: number): string {
+  if (seconds < 60) return `${Math.max(1, Math.round(seconds))}s`;
+
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `${minutes} min`;
+
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  if (rest === 0) return `${hours} hr`;
+  return `${hours} hr ${rest} min`;
+}
+
 export function formatContext(tokens: number): string {
   if (tokens >= 1024) {
     return `${Math.round(tokens / 1024)}K`;

@@ -1,12 +1,38 @@
 # Current
 
 ```text
-Branch:   main (uncommitted: KIS, docs, engine, command layer, frontend)
-Task:     none in progress — the live speed limit is done and proved
-Mode:     Standard, tdd for the engine
+Branch:   main (clean, nothing pushed)
+Task:     none in progress
+Mode:     Fast
 Blocker:  none
 Next:     nothing planned. Roadmap says packaging and release.
 ```
+
+## Time remaining — done 2026-08-02
+
+Frontend only. `formatDuration` in `format.ts`, and in `Downloads.tsx` an
+exponentially smoothed rate per job.
+
+The engine's `bytesPerSecond` is the difference between samples half a second
+apart, which swings hard when nothing is limiting the transfer. Dividing the
+remaining bytes by it directly would swing the estimate between two minutes and
+twenty, and this project's own rule is that a forecast wrong by 2x gets
+believed. So: smoothed at 0.7, held back until three samples have arrived, reset
+when the phase changes because verification re-reads the file at a different
+speed, and worded "about ... left".
+
+No estimate is shown when the size was never declared, before the rate settles,
+or when nothing is left to move.
+
+There is no frontend test framework — every test in this repo is Rust — so
+`formatDuration`, `smooth` and `remainingText` are covered by nothing but the
+typechecker and looking at it. That is the gap to close first if this screen
+grows any more arithmetic.
+
+Proved 2026-08-02 on an unlimited 656 MB transfer, which is the jumpy case:
+`50 MB of 656 MB · 1.8 MB/s · about 5 min left`. The estimate disagrees with the
+displayed rate on purpose — 606 MB at 1.8 MB/s would read as 6 min, and it says
+5 because it divides by the smoothed rate rather than the last sample.
 
 ## Speed limit — done 2026-08-02
 
