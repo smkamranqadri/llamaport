@@ -79,8 +79,15 @@ Requires Rust and [bun](https://bun.sh).
 
 ```bash
 bun install
-bun run tauri build
+CI=true bun run tauri build
 ```
+
+`CI=true` is not optional here. Without it the disk image step drives Finder
+through Apple events to style the window, which fails unless your terminal has
+been granted Automation permission — and takes the whole build down with it.
+Setting it skips only the cosmetic layout; the app, the `/Applications` symlink
+and the volume icon are unaffected. Drop it if you want the styled window and
+have granted the permission.
 
 For development:
 

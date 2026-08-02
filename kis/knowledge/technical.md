@@ -53,21 +53,6 @@ bun install
 bun run tauri dev
 ```
 
-## Release
-
-`origin` is https://github.com/smkamranqadri/llamaport. Builds are unsigned:
-there is no Apple Developer ID, so a downloaded build is quarantined and refused
-until the user opens System Settings and allows it.
-
-```bash
-CI=true bun run tauri build
-```
-
-`CI=true` is not optional. Without it `bundle_dmg.sh` drives Finder through Apple
-events to style the disk image window, which fails outright without Automation
-permission and takes the whole build down with it. Setting it skips only the
-cosmetic layout; the `/Applications` symlink and volume icon are unaffected.
-
 ## Verify
 
 ```bash

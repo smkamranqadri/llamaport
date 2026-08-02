@@ -74,9 +74,9 @@ from the same shell returned "Not authorized to send Apple events to System
 Events (-1743)".
 
 **Solved 2026-08-03 without granting anything**, by setting `CI` so create-dmg
-skips the Finder styling. The command and why it is mandatory now live with the
-other build facts in [knowledge/technical.md](../knowledge/technical.md); this
-plan does not repeat it.
+skips the Finder styling. The command and why it is mandatory belong in the
+README's build section, where a contributor hits the problem; KIS does not keep
+a second copy.
 
 **3 — Public face — DONE 2026-08-03.** README rewritten for a stranger, MIT
 LICENSE, `docs/library.png` on the front page, and both first-launch empty states
