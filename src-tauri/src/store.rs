@@ -7,11 +7,12 @@ use serde_json::{Map, Value};
 
 use std::collections::BTreeMap;
 
+use crate::downloads::Options;
 use crate::profile::Profile;
 
 /// Bumped whenever the shape changes. Absence means the original shape, which had no
 /// version field at all.
-pub const CURRENT_SCHEMA: u32 = 4;
+pub const CURRENT_SCHEMA: u32 = 5;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
@@ -23,6 +24,7 @@ pub struct Config {
     /// left rather than at a generic default. Not a profile system: there is one entry
     /// per model, it is written by launching, and nothing merges.
     pub last_used: BTreeMap<String, Profile>,
+    pub downloads: Options,
     /// Keys written by a different version of the app. Captured and written back
     /// untouched so that running an older build cannot silently delete newer settings.
     #[serde(flatten)]
@@ -302,6 +304,43 @@ mod tests {
             loaded.extra.contains_key("somethingFromANewerBuild"),
             "a key this build simply does not know must still survive"
         );
+    }
+
+    #[test]
+    fn a_config_without_download_settings_gets_the_defaults() {
+        let path = scratch("downloads-absent");
+        fs::write(&path, r#"{ "schemaVersion": 4, "modelsDir": "/models" }"#).expect("seed");
+
+        let loaded = load_from(&path);
+
+        assert_eq!(loaded.schema_version, CURRENT_SCHEMA);
+        assert_eq!(loaded.downloads.segments, 4);
+        assert_eq!(loaded.downloads.rate_limit, None);
+        assert!(loaded.downloads.verify);
+    }
+
+    #[test]
+    fn download_settings_round_trip_and_fall_back_field_by_field() {
+        let path = scratch("downloads");
+        let config = Config {
+            downloads: Options {
+                segments: 8,
+                rate_limit: Some(10_000_000),
+                verify: false,
+            },
+            ..Default::default()
+        };
+
+        save_to(&path, &config).expect("save");
+        let loaded = load_from(&path);
+        assert_eq!(loaded.downloads.segments, 8);
+        assert_eq!(loaded.downloads.rate_limit, Some(10_000_000));
+        assert!(!loaded.downloads.verify);
+
+        fs::write(&path, r#"{ "downloads": { "segments": 6 } }"#).expect("seed");
+        let partial = load_from(&path);
+        assert_eq!(partial.downloads.segments, 6);
+        assert!(partial.downloads.verify, "the rest fall back");
     }
 
     #[test]

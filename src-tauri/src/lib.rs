@@ -1,4 +1,6 @@
 pub mod catalog;
+pub mod download;
+pub mod downloads;
 pub mod estimate;
 pub mod gguf;
 pub mod health;
@@ -17,6 +19,7 @@ use tauri::tray::TrayIconBuilder;
 use tauri::{AppHandle, Emitter, Listener, Manager, State, WindowEvent, Wry};
 
 use catalog::{DirInfo, ModelEntry};
+use downloads::{DownloadJob, Downloads, Options};
 use estimate::Estimate;
 use probe::Capabilities;
 use profile::Profile;
@@ -41,6 +44,7 @@ struct AppState {
     models: Mutex<Vec<ModelEntry>>,
     caps: Mutex<Option<Result<Capabilities, String>>>,
     runner: Runner,
+    downloads: Downloads,
     tray: Mutex<Option<TrayHandles>>,
     orphan: Mutex<Vec<Orphan>>,
 }
@@ -116,6 +120,7 @@ struct PlanMemory {
 struct Settings {
     models_dir: String,
     llama_server_path: Option<String>,
+    downloads: Options,
     capabilities: Option<Capabilities>,
     capability_error: Option<String>,
 }
@@ -257,9 +262,20 @@ fn settings_view(state: &AppState) -> Settings {
     Settings {
         models_dir: store::models_dir(&config).to_string_lossy().into_owned(),
         llama_server_path: config.llama_server_path.clone(),
+        downloads: config.downloads.clone(),
         capabilities: caps.as_ref().ok().cloned(),
         capability_error: caps.err(),
     }
+}
+
+#[tauri::command]
+fn set_download_options(options: Options, state: State<'_, AppState>) -> Result<Settings, String> {
+    {
+        let mut config = state.config.lock().expect("config lock");
+        config.downloads = options;
+    }
+    state.save_config()?;
+    Ok(settings_view(&state))
 }
 
 #[tauri::command]
@@ -411,6 +427,43 @@ fn orphan_stop(pid: u32, state: State<'_, AppState>) -> Result<Vec<Orphan>, Stri
     Ok(orphan_status(state))
 }
 
+#[tauri::command]
+fn download_start(url: String, state: State<'_, AppState>) -> Result<Vec<DownloadJob>, String> {
+    let dir = state.models_dir();
+    let options = {
+        let config = state.config.lock().expect("config lock");
+        config.downloads.clone()
+    };
+    state.downloads.start(&url, &dir, &options)
+}
+
+#[tauri::command]
+fn download_cancel(id: String, state: State<'_, AppState>) -> Result<Vec<DownloadJob>, String> {
+    state.downloads.cancel(&id)
+}
+
+#[tauri::command]
+fn download_status(state: State<'_, AppState>) -> Vec<DownloadJob> {
+    state.downloads.snapshot()
+}
+
+#[tauri::command]
+fn download_clear(state: State<'_, AppState>) -> Vec<DownloadJob> {
+    state.downloads.clear()
+}
+
+/// Rescans after a download lands rather than waiting for the screen to ask, so the new
+/// file is launchable from the moment it exists — `runner_start` resolves the model
+/// against this list, and a screen that never refreshed would leave it unreachable.
+///
+/// Runs on the download's own thread, which is already off the main one.
+fn refresh_catalog(app: &AppHandle) {
+    let state = app.state::<AppState>();
+    let entries = catalog::scan(&state.models_dir());
+    *state.models.lock().expect("models lock") = entries.clone();
+    let _ = app.emit("catalog:changed", entries);
+}
+
 fn update_tray(app: &AppHandle, snapshot: &RunnerSnapshot) {
     let state = app.state::<AppState>();
     let tray = state.tray.lock().expect("tray lock");
@@ -469,12 +522,20 @@ pub fn run() {
             let handle = app.handle().clone();
 
             let runner = Runner::new(Arc::new(TauriEvents(handle.clone())));
+            let downloads = {
+                let handle = handle.clone();
+                Downloads::new(
+                    Arc::new(TauriEvents(handle.clone())),
+                    Arc::new(move || refresh_catalog(&handle)),
+                )
+            };
 
             app.manage(AppState {
                 config: Mutex::new(store::load()),
                 models: Mutex::new(Vec::new()),
                 caps: Mutex::new(None),
                 runner,
+                downloads,
                 tray: Mutex::new(None),
                 orphan: Mutex::new(runner::detect_orphans(None)),
             });
@@ -546,6 +607,11 @@ pub fn run() {
             health_test,
             orphan_status,
             orphan_stop,
+            download_start,
+            download_cancel,
+            download_status,
+            download_clear,
+            set_download_options,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
