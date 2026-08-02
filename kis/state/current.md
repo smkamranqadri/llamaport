@@ -26,6 +26,10 @@ screen, and a limit changed there reaches the transfer already running.
 The app is now Llamaport, identifier `com.mkamran.llamaport`, config under
 `Application Support/llamaport` ([intent/rename.md](../intent/rename.md)).
 
+A ready model offers "Chat in browser", which opens `llama-server`'s own web UI
+at the bound port. The app still has no chat of its own and is not getting one
+([knowledge/project.md](../knowledge/project.md)).
+
 Discover was planned and then dropped ([intent/roadmap.md](../intent/roadmap.md)).
 
 Everything is committed; `git log` is the record.
@@ -36,6 +40,19 @@ The four commands were last run green after the rename, which is the whole tree:
 `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test`,
 `bun run build` — all exit 0, statuses captured directly rather than through a
 pipe. 137 tests across 10 binaries.
+
+Chat button, 2026-08-03:
+
+- Not proved. `bun run build` exits 0, which is the whole of what a TypeScript
+  change gets here, and nobody has watched the browser open. Screen recording is
+  denied to the agent, so that step is the author's.
+- The web UI being served was checked against the installed `llama-server --help`
+  rather than assumed: `--ui, --webui, --no-ui, --no-webui  whether to enable the
+  Web UI (default: enabled)`.
+- Known dead end, deliberately unguarded: `--no-webui` typed into `rawArgs` sends
+  the button to a 404. `check_raw_args` blocks only `--host` and `--port`, and
+  `Capabilities.flags` lists `--webui` whether or not the UI is compiled in, so a
+  probe would answer a different question than the one asked.
 
 Tray staleness, 2026-08-03:
 

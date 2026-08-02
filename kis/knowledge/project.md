@@ -17,7 +17,9 @@ so downloads currently go through an external download manager.
 **In scope:** list models with real GGUF metadata, launch one, report what it
 costs, stop it, say whether it works; download with resume.
 
-**Out of scope:** a chat UI (`llama-server` ships one), non-macOS platforms,
+**Out of scope:** a chat UI of our own — `llama-server` ships one, enabled by
+default, and a ready model offers a button that opens it in the browser. That
+button is the decision holding, not an exception to it. Also out: non-macOS platforms,
 managing the llama.cpp installation itself, saved profiles or presets, API keys,
 binding anywhere but loopback.
 

@@ -73,6 +73,9 @@ cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
   non-obvious why only.
 - Capture a command's exit status directly. `cmd | tail -3; echo $?` reports
   `tail`'s status, which reported a failing clippy as clean twice in one session.
+- Leaving the app for a URL needs no Rust and no capability edit: `opener:default`
+  already grants `allow-default-urls`, which covers http. `reveal_path` is a
+  hand-rolled command only because it needs `open -R` semantics.
 - There is no frontend test framework. Every test is Rust, in `src-tauri/tests/`
   or an inline `#[cfg(test)]` module; TypeScript is covered by `tsc` and by
   looking at the screen. Logic worth testing belongs in Rust until that changes.

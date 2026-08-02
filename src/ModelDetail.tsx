@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   getLaunchPlan,
   healthTest,
+  openChat,
   revealPath,
   runnerStart,
   runnerStop,
@@ -255,6 +256,7 @@ export default function ModelDetail({
 
   const isCurrent = runner.modelId === model.id;
   const running = isCurrent && (runner.state === "starting" || runner.state === "ready");
+  const { port } = runner;
 
   useEffect(() => {
     getLaunchPlan(model.id)
@@ -409,6 +411,17 @@ export default function ModelDetail({
           <div className="panel-head">
             <h2>Running</h2>
             <span className="actions">
+              {port != null && (
+                <button
+                  className="button"
+                  onClick={() => {
+                    setFailure(null);
+                    openChat(port).catch((e) => setFailure(String(e)));
+                  }}
+                >
+                  Chat in browser ↗
+                </button>
+              )}
               <button
                 className="button"
                 disabled={testing}
