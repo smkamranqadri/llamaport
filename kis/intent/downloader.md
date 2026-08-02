@@ -37,12 +37,9 @@ Two carried forward rather than met:
   silent past `stall_after` is reissued, bounded by the 5-attempt limit, rather
   than only one silent while siblings move. Deliberate and accepted.
 
-## Phase 2 — Discover
+## Remaining — polish and release-readiness
 
-Hugging Face search, repo file listing, quant selection with sizes. Hands a URL
-to the engine phase 1 proved.
-
-## Phase 3 — polish and release-readiness
+Not planned yet.
 
 ## Verification
 
@@ -57,12 +54,23 @@ explicitly, not assumed.
 Use the tdd skill for the engine: the retry taxonomy and resume logic are cheap
 to get wrong and expensive to discover at 97% of 21 GB.
 
-## Carried into phase 2
+## Known limits of the engine
 
-- Hugging Face omits `x-linked-size` and `x-linked-etag` on non-LFS files. The
-  engine refuses a file with no declared size, so Discover must not offer one.
+Found while planning Discover, which was then dropped ([roadmap.md](roadmap.md)).
+They are facts about the engine and outlive that plan.
+
+- Hugging Face omits `x-linked-size` and `x-linked-etag` on non-LFS files, and
+  the engine refuses a file with no declared size. In a repo tree an `lfs` object
+  on the entry is exactly the condition under which those headers exist.
+- A quant too big for one file ships as `{name}-00001-of-00003.gguf`. The engine
+  takes one file per job and refuses a second rather than queueing, so a split
+  set has to be fetched a part at a time.
 - Pause is not a state: cancel leaves the `.part` and sidecar, and starting the
   same URL again resumes. Add a real Paused state only if the UI wants a pause
   button.
 - One at a time is enforced by refusing, not queueing, so there is no Queued
-  state. Discover offering a "download all" would need one.
+  state. Any "download all" would need one.
+- `resolution_against_a_silent_server_is_bounded_by_its_timeouts` guards less
+  than its name claims: it pins that *some* timeout bounds resolution, not which
+  one — removing either the read timeout or the overall timeout alone still
+  passes. Tighten it if that code is touched.
