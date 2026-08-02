@@ -76,12 +76,14 @@ LICENSE. A pass over the two empty states above.
 **4 — Ship.** Build the `.dmg`, push, tag `v0.1.0`, GitHub release marked
 pre-release.
 
-`origin` is configured: `git@github.com:smkamranqadri/llama-port.git`. The repo
+`origin` is configured: `git@github.com:smkamranqadri/llamaport.git`. The repo
 is public and empty, so the first push is the moment of publication, and it is
 deliberately held until phase 3 lands a LICENSE and a stranger-facing README —
 a public repo with no licence is all-rights-reserved, which contradicts
-publishing it. Note the repo is `llama-port` while the app and identifier are
-`llamaport`; the clone URL will not match the product name.
+publishing it.
+
+It was renamed from `llama-port` to match the app, crate and bundle identifier,
+so one name covers all of them. GitHub redirects the old path.
 
 Before pushing:
 
