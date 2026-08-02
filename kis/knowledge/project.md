@@ -1,7 +1,7 @@
 # Project
 
-A macOS app for running local GGUF models under `llama-server`, and (not yet
-built) downloading them from Hugging Face with working resume.
+A macOS app for running local GGUF models under `llama-server`, and downloading
+them from Hugging Face with working resume.
 
 **For:** the author first, other local-LLM users on Apple Silicon second. Stage
 is MVP heading for release, so packaging and other people's machines are real
@@ -32,6 +32,14 @@ Each is argued in the specs; this is the index, not a second copy.
 - Find stray servers by scanning processes, not by reading a pidfile.
 - No profile system: a model's form opens with its last **successful** launch.
 - Loopback only, no authentication.
+- Downloads re-resolve the redirect on every resume, because the CDN signature
+  expires and re-requesting the original URL is exactly where `curl -C -` fails.
+- A failure is transient, an expired signature, or fatal, and each gets a
+  different answer; treating them alike either abandons recoverable transfers or
+  hammers a wall.
+- One rate limit across all segments, not one per segment.
+- A server that will not serve ranges is refused: no ranges means no resume, and
+  an unresumable 20 GB transfer is a trap rather than a convenience.
 
 Detail: [runner spec](../../docs/runner-spec.md),
 [downloader spec](../../docs/downloader-spec.md).

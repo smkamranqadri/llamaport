@@ -4,7 +4,7 @@ Design lives in [docs/downloader-spec.md](../../docs/downloader-spec.md). This
 file holds only what the spec does not: the decisions taken, the phase split,
 and what closes each phase.
 
-Status: **approved 2026-08-02.** Phase 1 not started.
+Live status is in [state/current.md](../state/current.md), not here.
 
 ## Decisions
 
@@ -23,29 +23,19 @@ Status: **approved 2026-08-02.** Phase 1 not started.
   and is skippable.
 - **Downloads land in the configured models directory.**
 
-## Phase 1 — engine and Downloads screen
+## Phase 1 — engine and Downloads screen — DONE 2026-08-02
 
-The engine per the spec, plus a Downloads screen driven by a pasted Hugging Face
-URL: progress, speed, pause, resume, cancel. Default 4 segments.
+Every closing condition met except one, proved by a real 676 MB transfer that was
+killed, resumed, verified and landed in the models directory.
 
-Closes when:
+Two carried forward rather than met:
 
-- Resume survives a full process exit, restarting each segment from the sidecar.
-- A 403 on an expired CDN signature re-resolves and continues, invisibly.
-- A segment reporting zero bytes for 30 s while siblings progress is killed and
-  the range reissued.
-- The rate limit is shared across segments, not applied per segment.
-- An etag mismatch discards and restarts; a 404 or a missing `accept-ranges`
-  stops without retrying.
-- Free disk is checked before enqueueing.
-- The finished file lands in the models directory and appears in Library.
-- The transfer beats a single connection.
-
-Likely files: new `src-tauri/src/download.rs` and
-`src-tauri/tests/download_resume.rs`; `lib.rs` commands and events; `store.rs`
-settings with a schema bump to 5; `Cargo.toml` for ureq's TLS feature; new
-`src/Downloads.tsx` replacing the placeholder at `App.tsx:163`; `api.ts`,
-`types.ts`, `App.css`.
+- **"Beats a single connection" was never measured.** The observed rate varied
+  90 KB/s to 1.4 MB/s and the line, not the engine, looked like the limit. It
+  needs a like-for-like comparison against `curl` before anyone claims it.
+- **Stall detection ignores the spec's sibling-progress condition.** Any segment
+  silent past `stall_after` is reissued, bounded by the 5-attempt limit, rather
+  than only one silent while siblings move. Deliberate and accepted.
 
 ## Phase 2 — Discover
 
@@ -67,11 +57,12 @@ explicitly, not assumed.
 Use the tdd skill for the engine: the retry taxonomy and resume logic are cheap
 to get wrong and expensive to discover at 97% of 21 GB.
 
-## Risks and assumptions
+## Carried into phase 2
 
-- ureq 2.12's TLS feature name needs confirming before the engine is written.
-  The loopback callers in `health.rs` and `runner.rs` are unaffected either way.
-- `catalog.rs:131` filters on the `.gguf` extension, so `.part` and `.part.json`
-  are ignored for free — but a completed download must trigger a rescan.
-- Hugging Face may omit `x-linked-size` and `x-linked-etag` on non-LFS files.
-- A 30 s stall threshold could false-positive on a very slow link.
+- Hugging Face omits `x-linked-size` and `x-linked-etag` on non-LFS files. The
+  engine refuses a file with no declared size, so Discover must not offer one.
+- Pause is not a state: cancel leaves the `.part` and sidecar, and starting the
+  same URL again resumes. Add a real Paused state only if the UI wants a pause
+  button.
+- One at a time is enforced by refusing, not queueing, so there is no Queued
+  state. Discover offering a "download all" would need one.
