@@ -19,6 +19,10 @@ export function listModels(): Promise<ModelEntry[]> {
   return invoke<ModelEntry[]>("catalog_list");
 }
 
+export function appVersion(): Promise<string> {
+  return invoke<string>("app_version");
+}
+
 export function getDirInfo(): Promise<DirInfo> {
   return invoke<DirInfo>("catalog_dir_info");
 }

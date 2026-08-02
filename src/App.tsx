@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import {
+  appVersion,
   listModels,
   onCatalogChanged,
   onRunnerLog,
@@ -87,8 +88,10 @@ export default function App() {
   const [logs, setLogs] = useState<string[]>([]);
   const [orphans, setOrphans] = useState<Orphan[]>([]);
   const [catalogVersion, setCatalogVersion] = useState(0);
+  const [version, setVersion] = useState("");
 
   useEffect(() => {
+    appVersion().then(setVersion).catch(() => {});
     runnerStatus().then(setRunner).catch(() => {});
     runnerLogs().then(setLogs).catch(() => {});
     const scan = () => orphanStatus().then(setOrphans).catch(() => {});
@@ -159,7 +162,10 @@ export default function App() {
   return (
     <div className="app">
       <nav className="sidebar">
-        <div className="sidebar-title">Llamaport</div>
+        <div className="sidebar-title">
+          Llamaport
+          {version && <span className="sidebar-version">{version}</span>}
+        </div>
         <ul className="nav">
           {NAV.map((item) => (
             <li key={item.id}>

@@ -285,6 +285,13 @@ fn set_download_options(options: Options, state: State<'_, AppState>) -> Result<
     Ok(settings_view(&state))
 }
 
+/// Read from the bundle rather than `CARGO_PKG_VERSION`, so what a tester quotes is the
+/// same string as the `.dmg` they downloaded.
+#[tauri::command]
+fn app_version(app: AppHandle) -> String {
+    app.package_info().version.to_string()
+}
+
 #[tauri::command]
 fn get_settings(state: State<'_, AppState>) -> Settings {
     settings_view(&state)
@@ -633,6 +640,7 @@ pub fn run() {
             launch_plan,
             set_llama_server_path,
             get_settings,
+            app_version,
             runner_status,
             runner_logs,
             reveal_path,
