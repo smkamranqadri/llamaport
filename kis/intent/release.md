@@ -73,17 +73,10 @@ through Apple events to set the disk image window, and an unrelated `osascript`
 from the same shell returned "Not authorized to send Apple events to System
 Events (-1743)".
 
-**Solved 2026-08-03 without granting anything.** `create-dmg` skips the Finder
-window styling when `CI` is set, so the build needs no Apple events at all:
-
-```bash
-CI=true bun run tauri build
-```
-
-The only thing given up is the cosmetic window layout — background image and icon
-positions. The `/Applications` symlink, the volume icon and the drag-to-install
-structure are all still there. Prefer this over granting Automation permission,
-because it also means the build works unattended.
+**Solved 2026-08-03 without granting anything**, by setting `CI` so create-dmg
+skips the Finder styling. The command and why it is mandatory now live with the
+other build facts in [knowledge/technical.md](../knowledge/technical.md); this
+plan does not repeat it.
 
 **3 — Public face — DONE 2026-08-03.** README rewritten for a stranger, MIT
 LICENSE, `docs/library.png` on the front page, and both first-launch empty states

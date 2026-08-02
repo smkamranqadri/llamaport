@@ -1,16 +1,15 @@
 # Current
 
 ```text
-Branch:   main, one commit ahead of origin — the chat button is not pushed and
-          not in the release.
+Branch:   main, 2 ahead of origin. `v0.1.0` is tagged at `05c3a21`, so anything
+          past it is unreleased.
 Task:     none in progress. v0.1.0 is out.
 Mode:     Fast
-Blocker:  none. Two things are unproved rather than blocking: nobody has watched
-          the chat button open a browser, and the README's "Open Anyway" steps
-          have never met a real Gatekeeper prompt.
-Next:     watch the chat button work, then push it. Separately, download the
-          `.dmg` from the release page in a browser and follow the README's
-          Install section as a stranger would.
+Blocker:  none. One thing is unproved rather than blocking: the README's
+          "Open Anyway" steps have never met a real Gatekeeper prompt.
+Next:     download the `.dmg` from the release page in a browser and follow the
+          README's Install section as a stranger would. Then wait for the beta
+          to say something.
 ```
 
 Run and verify commands: [knowledge/technical.md](../knowledge/technical.md).
@@ -33,7 +32,8 @@ at the bound port. The app still has no chat of its own and is not getting one
 
 **v0.1.0 is published**, unsigned, as a GitHub pre-release with the `.dmg`
 attached: https://github.com/smkamranqadri/llamaport/releases/tag/v0.1.0. The tag
-sits at `05c3a21`; `main` has since moved one commit past it.
+sits at `05c3a21`; `main` has moved past it and is not pushed, so the released
+build and the tree are not the same thing.
 
 Discover was planned and then dropped ([intent/roadmap.md](../intent/roadmap.md)).
 
