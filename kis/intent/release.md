@@ -43,11 +43,15 @@ found. Both empty states have to explain themselves.
 
 ## Phases
 
-**1 — Blockers.** Startup asserts a usable window rather than leaving it to a
-tray item nobody knows exists. Fix the unit mix in `show_main_window`, which
-compares `outer_size()` in physical pixels against 600/400 and then sets a
-`LogicalSize`. Reject `--host` and `--port` inside `rawArgs`, which the app
-already owns as real fields. Document the loopback-only, no-auth posture.
+**1 — Blockers — DONE 2026-08-02.** `show_main_window` is already called at the end of `setup`;
+the planning note that said only the tray called it was wrong. The real defect
+is that it returns early when there is no window, so the observed "no window at
+all, empty Window menu" case has no recovery — it rebuilds from config instead.
+Also fix the unit mix, which compares `outer_size()` in physical pixels against
+600/400 and then sets a `LogicalSize`, so a 400x300 window reads as fine on a 2x
+display. Reject `--host` and `--port` inside `rawArgs`, which the app already
+owns as real fields. Update the README's security paragraph, which describes the
+pass-through this phase removes.
 
 **2 — Identity — DONE 2026-08-02.** A porthole mark, chosen over a harbour arrow
 and a llama head. `icon.svg` is the committed source; regenerate with
@@ -56,10 +60,14 @@ it emits unasked. Reasoning for the choice is in the commit, not repeated here.
 
 Running `tauri build` for this phase surfaced a phase 4 problem early: the `.app`
 bundles cleanly but `bundle_dmg.sh` fails, leaving only the `rw.*` intermediate.
-No stale volume was mounted. The untested lead is that the script drives Finder
-through AppleScript to set the window appearance, and it was run from a
-background shell with no automation permission — try it from an interactive
-terminal before assuming the config is wrong.
+No stale volume was mounted.
+
+The cause is confirmed, not guessed. `bundle_dmg.sh` drives Finder through Apple
+events to set the disk image window, and an unrelated `osascript` from the same
+shell returned "Not authorized to send Apple events to System Events (-1743)".
+`tauri build --bundles app` exits 0, so nothing else is wrong. Phase 4 runs the
+DMG step from a terminal that has been granted Automation permission, and only
+looks at config if that fails too.
 
 **3 — Public face.** README rewritten for a stranger — what it is, who it is
 for, `brew install llama.cpp` first, screenshots, the unsigned-app steps. MIT
@@ -90,9 +98,16 @@ status captured directly. Then `bun run tauri build`, and the closing conditions
 against the built `.app` and the downloaded `.dmg` — not against `tauri dev`,
 because dev is exactly what a tester does not run.
 
-`/security-review` on the phase 1 diff. The app runs an unauthenticated local
-server and phase 1 touches the argv seam; that is the one place where a small
-mistake is a real vulnerability in a public build.
+`/security-review` does not run on this project: it diffs against
+`origin/HEAD...` and there is no remote. Phase 1's argv seam was reviewed by
+hand instead, and that review is what added the argv ordering below. Decide
+whether that skill is usable here before phase 4 relies on it.
+
+The review's one structural finding is worth keeping: `check_raw_args` is a
+blocklist, and llama.cpp adds flags faster than this app tracks them. So the
+app's `--host` and `--port` are appended *after* `rawArgs`, and win by being
+last. `rawArgs` still overrides everything else, which is what it is for. Where
+the server binds no longer depends on the blocklist being complete.
 
 ## Carried, not met
 

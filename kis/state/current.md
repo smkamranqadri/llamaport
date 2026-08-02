@@ -2,11 +2,12 @@
 
 ```text
 Branch:   main (clean, nothing pushed)
-Task:     beta release. Phase 2 identity done; nothing in progress.
+Task:     beta release. Phases 1 and 2 done; nothing in progress.
           [intent/release.md](../intent/release.md)
 Mode:     Phase
-Blocker:  none. One known problem waiting in phase 4: `bundle_dmg.sh` fails, so
-          there is no finished `.dmg` yet. The `.app` builds fine.
+Blocker:  none. Waiting in phase 4: `bundle_dmg.sh` needs Apple events, which
+          this shell is not authorised for, so there is no finished `.dmg` yet.
+          `tauri build --bundles app` exits 0.
 Next:     phase 1 blockers, then 3 public face, then 4 ship.
 ```
 
@@ -34,6 +35,19 @@ The four commands were last run green after the rename, which is the whole tree:
 `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test`,
 `bun run build` — all exit 0, statuses captured directly rather than through a
 pipe. 137 tests across 10 binaries.
+
+Blockers, 2026-08-02:
+
+- 144 tests, up 7. The guard's tests fail against a gutted `check_raw_args`; the
+  two asserting that unrelated flags still pass survive it, as a permissive stub
+  should.
+- `--no-host` and `--reuse-port` were checked against the installed
+  `llama-server --help` rather than assumed: both are real flags, neither is
+  blocked, and neither `--host` nor `--port` has a short alias in that build.
+- The window fix is confirmed by the author looking at it, not by this session.
+  Screen recording and Apple events are both denied here, so window geometry
+  could not be read. Five launches of the bundled `.app` each survived, which
+  proves the process starts and nothing more.
 
 Icon, 2026-08-02:
 
