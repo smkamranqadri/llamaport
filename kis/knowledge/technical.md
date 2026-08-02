@@ -34,6 +34,12 @@ than adding a third idiom.
 Config is one JSON file at schema 5, every field `#[serde(default)]`, with
 unknown keys preserved through a load/save round-trip.
 
+Everything the app keeps lives in `~/Library/Application Support/llamaport`:
+that config, the runner pidfile, the last run log. `store::adopt_legacy_dir`
+takes over the directory left under the old `llama-cpp-hub` name, once, as the
+first statement in `setup` — before the pidfile is read or the config is loaded,
+both of which are in that same block.
+
 ## Run
 
 ```bash

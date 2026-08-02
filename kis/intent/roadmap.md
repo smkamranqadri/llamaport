@@ -12,7 +12,10 @@ Two, each with its own spec, module and screen:
 
 ## Order
 
-1. **Packaging and release** — signing, notarization, a bundled `.app`, install
+1. ~~**Rename to Llamaport**~~ — done 2026-08-02, before packaging, because the
+   bundle identifier is free to change until something is signed and step 2 signs
+   it. [rename.md](rename.md).
+2. **Packaging and release** — signing, notarization, a bundled `.app`, install
    docs. Nothing beyond Tauri defaults exists today. Not planned yet, and the
    three risks below are the reason to plan it rather than start it.
 
@@ -38,6 +41,10 @@ Its research was not wasted: what it established about the engine's limits is in
   tool; a release blocker. Decide before step 2.
 - The runner spec has no "known gaps" section, but `README.md:48` sends readers
   to one. Fix the reference or write the section.
+- `README.md:6` still says downloading "is designed but **not built**". It has
+  been built and proved. Deliberately left out of the rename diff so a real
+  correction was not hidden inside a mechanical one. The README is what a reader
+  meets first, so this is a release blocker, not a tidy-up.
 - The app can start with an unusable window. Observed twice in one session: once
   with no window at all and the Window menu empty, once at 60x60.
   `show_main_window` asserts a usable frame and does not reliably achieve it.

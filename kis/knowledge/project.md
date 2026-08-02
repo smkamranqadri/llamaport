@@ -1,7 +1,8 @@
 # Project
 
-A macOS app for running local GGUF models under `llama-server`, and downloading
-them from Hugging Face with working resume.
+**Llamaport.** A macOS app for running local GGUF models under `llama-server`,
+and downloading them from Hugging Face with working resume. Named 2026-08-02,
+before packaging: models arrive at a port, and `llama-server` binds one.
 
 **For:** the author first, other local-LLM users on Apple Silicon second. Stage
 is MVP heading for release, so packaging and other people's machines are real
@@ -46,6 +47,10 @@ Each is argued in the specs; this is the index, not a second copy.
   rule above.
 - A server that will not serve ranges is refused: no ranges means no resume, and
   an unresumable 20 GB transfer is a trap rather than a convenience.
+- The name does not lead with llama.cpp. A shipped `llama.cpp hub` claims a
+  project it is not part of, and sits unfindable next to it in any search. The
+  names ruled out on collision are in [rename.md](../intent/rename.md), so this
+  is not reopened a third time.
 
 Detail: [runner spec](../../docs/runner-spec.md),
 [downloader spec](../../docs/downloader-spec.md).
