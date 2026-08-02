@@ -3,12 +3,12 @@
 ```text
 Branch:   main. `origin` now configured, nothing pushed — the repo is public and
           empty, so the first push publishes. Held until phase 3.
-Task:     beta release. Phases 1, 2 and 3 done; only phase 4 ship remains.
+Task:     beta release phase 4, ship — in progress. `.dmg` built and verified;
+          push, tag and release remain.
           [intent/release.md](../intent/release.md)
 Mode:     Phase
-Blocker:  none. Waiting in phase 4: `bundle_dmg.sh` needs Apple events, which
-          this shell is not authorised for, so there is no finished `.dmg` yet.
-          `tauri build --bundles app` exits 0.
+Blocker:  none. The `.dmg` no longer needs Apple events: `CI=true` makes
+          create-dmg skip the Finder styling.
 Next:     phase 1 blockers, then 3 public face, then 4 ship.
 ```
 

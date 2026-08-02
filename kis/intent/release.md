@@ -62,12 +62,22 @@ Running `tauri build` for this phase surfaced a phase 4 problem early: the `.app
 bundles cleanly but `bundle_dmg.sh` fails, leaving only the `rw.*` intermediate.
 No stale volume was mounted.
 
-The cause is confirmed, not guessed. `bundle_dmg.sh` drives Finder through Apple
-events to set the disk image window, and an unrelated `osascript` from the same
-shell returned "Not authorized to send Apple events to System Events (-1743)".
-`tauri build --bundles app` exits 0, so nothing else is wrong. Phase 4 runs the
-DMG step from a terminal that has been granted Automation permission, and only
-looks at config if that fails too.
+The cause was confirmed rather than guessed: `bundle_dmg.sh` drives Finder
+through Apple events to set the disk image window, and an unrelated `osascript`
+from the same shell returned "Not authorized to send Apple events to System
+Events (-1743)".
+
+**Solved 2026-08-03 without granting anything.** `create-dmg` skips the Finder
+window styling when `CI` is set, so the build needs no Apple events at all:
+
+```bash
+CI=true bun run tauri build
+```
+
+The only thing given up is the cosmetic window layout — background image and icon
+positions. The `/Applications` symlink, the volume icon and the drag-to-install
+structure are all still there. Prefer this over granting Automation permission,
+because it also means the build works unattended.
 
 **3 — Public face — DONE 2026-08-03.** README rewritten for a stranger, MIT
 LICENSE, `docs/library.png` on the front page, and both first-launch empty states
