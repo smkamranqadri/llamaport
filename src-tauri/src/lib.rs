@@ -351,6 +351,9 @@ fn runner_start(
     if let Some(error) = plan.capability_error {
         return Err(error);
     }
+    // Checked on the resolved profile, not the draft: a remembered profile written by an
+    // older build can carry raw arguments this one refuses.
+    plan.profile.check_raw_args()?;
 
     let caps = state.capabilities()?;
     let predicted_base = plan
@@ -497,14 +500,35 @@ fn update_tray(app: &AppHandle, snapshot: &RunnerSnapshot) {
 /// restore a frame far smaller than the configured minimum — observed at 91x97, which is
 /// indistinguishable from the app having no window at all. Assert a sane size rather than
 /// trusting what was restored.
+/// Asserts a usable main window, rebuilding it when there is none.
+///
+/// Both failures have been seen: no window at all with an empty Window menu, and one at
+/// 60x60. Recovery cannot depend on the tray, because someone meeting the app for the
+/// first time has no reason to look there.
 fn show_main_window(app: &AppHandle) {
-    let Some(window) = app.get_webview_window("main") else {
-        return;
+    let window = match app.get_webview_window("main") {
+        Some(window) => window,
+        None => {
+            let Some(config) = app.config().app.windows.first().cloned() else {
+                return;
+            };
+            let Ok(builder) = tauri::WebviewWindowBuilder::from_config(app, &config) else {
+                return;
+            };
+            let Ok(window) = builder.build() else {
+                return;
+            };
+            window
+        }
     };
 
+    // outer_size is physical and the threshold is logical; on a 2x display comparing them
+    // directly calls every window twice the size it is.
+    let scale = window.scale_factor().unwrap_or(1.0);
     let too_small = window
         .outer_size()
-        .map(|size| size.width < 600 || size.height < 400)
+        .map(|size| size.to_logical::<f64>(scale))
+        .map(|size| size.width < 600.0 || size.height < 400.0)
         .unwrap_or(true);
 
     if too_small {

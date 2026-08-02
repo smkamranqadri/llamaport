@@ -45,6 +45,9 @@ last launched with, and a successful launch updates that.
 Memory is reported, not predicted: exact weights and KV cache arithmetic before
 launch, live system memory and swap while running, and no verdict in between.
 
-The server binds to `127.0.0.1` and has no authentication. `rawArgs` is passed
-through verbatim, so `--host 0.0.0.0` typed there would expose an unauthenticated
-server to the network — see the known gaps in the runner spec.
+The server binds to `127.0.0.1` and has no authentication, so anything that can
+reach it can use it. Extra arguments are passed to `llama-server` verbatim, with
+one exception: `--host` and `--port` are refused there, because the app owns both
+and `llama-server` takes the last value it is given. Without that, a `--host
+0.0.0.0` typed into extra arguments would put an unauthenticated server on the
+network while the app went on reporting it as loopback.

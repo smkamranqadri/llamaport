@@ -41,6 +41,12 @@ impl Default for Profile {
     }
 }
 
+/// Flags the app owns, and the field that owns each. It binds loopback deliberately and
+/// tracks the port to find the server again, so a raw argument setting either would win —
+/// llama-server takes the last occurrence — and leave the app supervising an address it
+/// does not know about.
+const OWNED_FLAGS: [(&str, &str); 2] = [("--host", "Host"), ("--port", "Port")];
+
 pub fn default_alias(display_name: &str) -> String {
     display_name
         .trim()
@@ -51,6 +57,22 @@ pub fn default_alias(display_name: &str) -> String {
 }
 
 impl Profile {
+    pub fn check_raw_args(&self) -> Result<(), String> {
+        for arg in &self.raw_args {
+            let flag = arg.trim().split('=').next().unwrap_or("");
+            for (owned, field) in OWNED_FLAGS {
+                if flag == owned {
+                    return Err(format!(
+                        "{owned} belongs to the {field} field, not to extra arguments. \
+                         llama-server takes the last value it is given, so this would \
+                         override {field} without the app knowing where the server is."
+                    ));
+                }
+            }
+        }
+        Ok(())
+    }
+
     /// Renders argv gated on what the installed build actually accepts. `--metrics` is
     /// added silently because the telemetry view depends on it and it costs nothing.
     pub fn args(&self, model_path: &str, caps: &Capabilities) -> Vec<String> {
@@ -61,10 +83,6 @@ impl Profile {
             args.push(self.alias.clone());
         }
 
-        args.push("--host".into());
-        args.push(self.host.clone());
-        args.push("--port".into());
-        args.push(self.port.to_string());
         args.push("-c".into());
         args.push(self.ctx.to_string());
         args.push("-ngl".into());
@@ -103,6 +121,15 @@ impl Profile {
         }
 
         args.extend(self.raw_args.iter().cloned());
+
+        // Last, so they win. `check_raw_args` already refuses these, but that is a
+        // blocklist against an upstream that adds flags faster than this app tracks them,
+        // and where the server binds is the one thing that must not depend on it.
+        args.push("--host".into());
+        args.push(self.host.clone());
+        args.push("--port".into());
+        args.push(self.port.to_string());
+
         args
     }
 }
@@ -207,6 +234,84 @@ mod tests {
             render_command("llama-server", &args),
             "llama-server -m '/Users/me/my models/a.gguf'"
         );
+    }
+
+    fn with_raw(args: &[&str]) -> Profile {
+        Profile {
+            raw_args: args.iter().map(|a| a.to_string()).collect(),
+            ..Profile::default()
+        }
+    }
+
+    #[test]
+    fn raw_args_may_not_set_what_the_app_owns() {
+        for arg in ["--host", "--port"] {
+            let message = with_raw(&[arg, "0.0.0.0"])
+                .check_raw_args()
+                .expect_err("must be refused");
+            assert!(message.contains(arg), "names the flag: {message}");
+        }
+
+        let host = with_raw(&["--host", "0.0.0.0"])
+            .check_raw_args()
+            .expect_err("must be refused");
+        assert!(
+            host.contains("Host"),
+            "names the field that owns it: {host}"
+        );
+    }
+
+    #[test]
+    fn the_equals_form_is_refused_too() {
+        let message = with_raw(&["--host=0.0.0.0"])
+            .check_raw_args()
+            .expect_err("--host=value is the same flag");
+        assert!(message.contains("--host"));
+    }
+
+    #[test]
+    fn the_app_binding_wins_even_if_a_raw_arg_slips_past_the_guard() {
+        let profile = with_raw(&["--host", "0.0.0.0", "--port", "1234"]);
+        let args = profile.args("/m.gguf", &full_caps());
+
+        let last_host = args.iter().rposition(|a| a == "--host").expect("--host");
+        let last_port = args.iter().rposition(|a| a == "--port").expect("--port");
+        assert_eq!(
+            args.get(last_host + 1).map(String::as_str),
+            Some("127.0.0.1")
+        );
+        assert_eq!(args.get(last_port + 1).map(String::as_str), Some("8888"));
+    }
+
+    #[test]
+    fn a_leading_space_does_not_smuggle_an_owned_flag_past() {
+        with_raw(&[" --host", "0.0.0.0"])
+            .check_raw_args()
+            .expect_err("whitespace is not a different flag");
+    }
+
+    #[test]
+    fn flags_that_merely_start_the_same_are_not_blocked() {
+        with_raw(&["--no-host", "--reuse-port"])
+            .check_raw_args()
+            .expect("real llama-server flags that are not the ones the app owns");
+    }
+
+    #[test]
+    fn unrelated_raw_args_still_pass() {
+        with_raw(&["--threads", "8", "--mlock", "--no-warmup"])
+            .check_raw_args()
+            .expect("nothing the app owns");
+    }
+
+    #[test]
+    fn a_value_that_merely_looks_like_an_owned_flag_passes() {
+        with_raw(&["--alias", "--port"])
+            .check_raw_args()
+            .expect_err("a bare --port is refused wherever it sits");
+        with_raw(&["--chat-template", "host--port"])
+            .check_raw_args()
+            .expect("substrings are not flags");
     }
 
     #[test]
