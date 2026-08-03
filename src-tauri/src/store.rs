@@ -5,14 +5,14 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use crate::downloads::{DownloadJob, Options};
 use crate::profile::Profile;
 
 /// Bumped whenever the shape changes. Absence means the original shape, which had no
 /// version field at all.
-pub const CURRENT_SCHEMA: u32 = 5;
+pub const CURRENT_SCHEMA: u32 = 6;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
@@ -25,6 +25,11 @@ pub struct Config {
     /// per model, it is written by launching, and nothing merges.
     pub last_used: BTreeMap<String, Profile>,
     pub downloads: Options,
+    /// Models the user has starred, by the same identity `last_used` is keyed on —
+    /// `(size, hash of the leading bytes)`, which survives a rename or a directory move.
+    /// An id naming no model on disk is kept: the file may be on a volume that is not
+    /// mounted, and forgetting the star would lose it for good.
+    pub favourites: BTreeSet<String>,
     /// Keys written by a different version of the app. Captured and written back
     /// untouched so that running an older build cannot silently delete newer settings.
     #[serde(flatten)]
@@ -392,6 +397,28 @@ mod tests {
         let partial = load_from(&path);
         assert_eq!(partial.downloads.segments, 6);
         assert!(partial.downloads.verify, "the rest fall back");
+    }
+
+    #[test]
+    fn favourites_round_trip_and_survive_a_config_that_predates_them() {
+        let path = scratch("favourites");
+        let config = Config {
+            favourites: ["abc".to_string(), "def".to_string()].into_iter().collect(),
+            ..Default::default()
+        };
+
+        save_to(&path, &config).expect("save");
+        let loaded = load_from(&path);
+        assert!(loaded.favourites.contains("abc") && loaded.favourites.contains("def"));
+
+        fs::write(&path, r#"{ "schemaVersion": 5, "modelsDir": "/models" }"#).expect("seed");
+        let older = load_from(&path);
+        assert_eq!(older.schema_version, CURRENT_SCHEMA);
+        assert!(
+            older.favourites.is_empty(),
+            "a config written before favourites existed simply has none"
+        );
+        assert_eq!(older.models_dir.as_deref(), Some("/models"));
     }
 
     #[test]

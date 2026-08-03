@@ -214,7 +214,59 @@ async fn catalog_list(state: State<'_, AppState>) -> Result<Vec<ModelEntry>, Str
         .await
         .map_err(|e| e.to_string())?;
     *state.models.lock().expect("models lock") = entries.clone();
-    Ok(entries)
+    Ok(arranged(&state, entries))
+}
+
+/// The catalog is stored in scan order and handed to the screen in display order. The
+/// stored order is what `model()` resolves against, and starring a model is not a reason
+/// to renumber it.
+fn arranged(state: &AppState, entries: Vec<ModelEntry>) -> Vec<ModelEntry> {
+    let config = state.config.lock().expect("config lock");
+    catalog::arrange(entries, &config.favourites)
+}
+
+#[tauri::command]
+fn model_favourite(
+    model_id: String,
+    favourite: bool,
+    state: State<'_, AppState>,
+) -> Result<Vec<ModelEntry>, String> {
+    {
+        let mut config = state.config.lock().expect("config lock");
+        if favourite {
+            config.favourites.insert(model_id);
+        } else {
+            config.favourites.remove(&model_id);
+        }
+    }
+    state.save_config()?;
+    let entries = state.models.lock().expect("models lock").clone();
+    Ok(arranged(&state, entries))
+}
+
+/// Moves every file the model is made of to the Trash, then rescans.
+///
+/// The star is left alone deliberately: the identity survives the file, so a model deleted
+/// and downloaded again comes back starred. A stale favourite costs nothing.
+#[tauri::command]
+async fn model_delete(
+    model_id: String,
+    state: State<'_, AppState>,
+) -> Result<Vec<ModelEntry>, String> {
+    let model = state.model(&model_id)?;
+    catalog::deletable(&model, state.runner.snapshot().model_id.as_deref())?;
+
+    let files = catalog::files_of(&model);
+    tauri::async_runtime::spawn_blocking(move || catalog::trash(&files))
+        .await
+        .map_err(|e| e.to_string())??;
+
+    let dir = state.models_dir();
+    let entries = tauri::async_runtime::spawn_blocking(move || catalog::scan(&dir))
+        .await
+        .map_err(|e| e.to_string())?;
+    *state.models.lock().expect("models lock") = entries.clone();
+    Ok(arranged(&state, entries))
 }
 
 #[tauri::command]
@@ -709,6 +761,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             catalog_list,
             catalog_dir_info,
+            model_favourite,
+            model_delete,
             set_models_dir,
             launch_plan,
             set_llama_server_path,

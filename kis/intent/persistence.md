@@ -81,7 +81,7 @@ private), `store.rs`, `lib.rs`, `Downloads.tsx`, `api.ts`, `types.ts`.
 Use the tdd skill here. The state machine and the reconciliation are the same
 class of thing as the resume logic: cheap to get wrong, expensive to discover.
 
-## Parcel 2 — favourites and delete
+## Parcel 2 — favourites and delete — DONE 2026-08-03
 
 `favourites` in `Config`, keyed on the existing model id — `(size, hash of the
 leading bytes)`, stable across renames and directory moves
@@ -89,12 +89,21 @@ leading bytes)`, stable across renames and directory moves
 Schema goes to 6. A star in the row; favourites sort above everything, then
 alphabetical as now. Delete moves to Trash.
 
-Trash is unsettled in one respect. `osascript` telling Finder to delete matches
-the existing `open -R` shell-out and adds no dependency, but triggers a one-time
-Automation prompt that on an unsigned app looks alarming. The `trash` crate uses
-`NSFileManager` and prompts for nothing, at the cost of the objc2 tree against a
-dependency list that is five long and deliberate. **Take osascript, then look at
-the real dialog.** Swap if it is as bad as suspected — it is one function.
+**Trash is settled, 2026-08-03, and by neither option the plan weighed.** The
+choice looked like Finder-via-`osascript` (no dependency, but a one-time
+Automation prompt that on an unsigned app looks alarming) against the `trash`
+crate (no prompt, at the cost of the objc2 tree). `osascript -l JavaScript` is a
+third: it reaches `NSFileManager.trashItemAtURL` through the ObjC bridge, so it
+never involves Finder, never prompts, and adds nothing to `Cargo.toml`. Probed
+before it was designed around — a file in `/tmp` was trashed and left its
+location.
+
+Settled by the first real deletion: the author deleted a model and it was in the
+Trash.
+
+The confirmation cannot be `window.confirm` — it returns no usable answer in this
+webview, so guarding on it refuses every delete instead of asking about one. The
+row asks for itself.
 
 ## Parcel 3 — launch defaults
 

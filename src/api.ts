@@ -23,6 +23,17 @@ export function appVersion(): Promise<string> {
   return invoke<string>("app_version");
 }
 
+export function setFavourite(
+  modelId: string,
+  favourite: boolean,
+): Promise<ModelEntry[]> {
+  return invoke<ModelEntry[]>("model_favourite", { modelId, favourite });
+}
+
+export function deleteModel(modelId: string): Promise<ModelEntry[]> {
+  return invoke<ModelEntry[]>("model_delete", { modelId });
+}
+
 export function getDirInfo(): Promise<DirInfo> {
   return invoke<DirInfo>("catalog_dir_info");
 }

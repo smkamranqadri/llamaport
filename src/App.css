@@ -1011,3 +1011,78 @@ input[type="range"] {
 .kv-bar.is-verifying span {
   background: #7c5cff;
 }
+
+/* Library rows carry a star and a delete either side of the row button, so the row's
+   own border moves out to the item that now spans the full width. */
+.model-item {
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+}
+
+.model-item:last-child {
+  border-bottom: none;
+}
+
+.model-item .model-row {
+  flex: 1;
+  min-width: 0;
+  border-bottom: none;
+}
+
+.model-item:hover {
+  background: var(--bg-hover);
+}
+
+.star {
+  flex: none;
+  padding: 8px 4px 8px 12px;
+  font-size: 15px;
+  line-height: 1;
+  color: var(--text-muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.star.is-on {
+  color: var(--accent);
+}
+
+.star:hover {
+  color: var(--accent);
+}
+
+/* Present but not shouting: deleting is rare, and a row of loud red buttons reads as a
+   list of things to delete. */
+.button-quiet {
+  margin-right: 10px;
+  opacity: 0;
+  transition: opacity 120ms;
+}
+
+.model-item:hover .button-quiet,
+.button-quiet:focus-visible,
+.button-quiet:disabled {
+  opacity: 1;
+}
+
+.button-quiet:disabled {
+  color: var(--text-muted);
+}
+
+.model-item.is-confirming {
+  gap: 16px;
+  padding: 11px 14px 11px 12px;
+  background: color-mix(in srgb, var(--danger) 8%, transparent);
+}
+
+.model-item.is-confirming .model-identity {
+  flex: 1;
+}
+
+.confirm-actions {
+  display: flex;
+  flex: none;
+  gap: 8px;
+}

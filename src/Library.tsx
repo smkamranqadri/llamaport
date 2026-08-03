@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { getDirInfo, listModels } from "./api";
+import { deleteModel, getDirInfo, listModels, setFavourite } from "./api";
 import { formatBytes, formatContext, formatRelative } from "./format";
 import type { DirInfo, ModelEntry, RunnerSnapshot } from "./types";
 
@@ -21,23 +21,76 @@ function Badges({ model }: { model: ModelEntry }) {
   );
 }
 
+/// What a delete is about to take. A shard set is several files and one model, and the
+/// count is the part worth showing before the question is answered.
+function deleteScope(model: ModelEntry): string {
+  const parts = model.shards?.present ?? 1;
+  const files = parts === 1 ? "1 file" : `${parts} files`;
+  return `${files} · ${formatBytes(model.sizeBytes)}`;
+}
+
 function ModelRow({
   model,
   runner,
   onSelect,
+  onFavourite,
+  onDelete,
 }: {
   model: ModelEntry;
   runner: RunnerSnapshot;
   onSelect: (model: ModelEntry) => void;
+  onFavourite: (model: ModelEntry) => void;
+  onDelete: (model: ModelEntry) => void;
 }) {
   const md = model.metadata;
   const incomplete = model.shards && model.shards.missing.length > 0;
   const isRunning =
     runner.modelId === model.id &&
     (runner.state === "starting" || runner.state === "ready");
+  const [confirming, setConfirming] = useState(false);
+
+  // Asked in the row rather than through `window.confirm`: that returns no usable answer
+  // in this webview, so a guard on it refuses every delete instead of asking about one.
+  if (confirming) {
+    return (
+      <li className="model-item is-confirming">
+        <span className="model-identity">
+          <span className="model-name">
+            Move {model.displayName} to the Trash?
+          </span>
+          <span className="model-file">
+            {deleteScope(model)} · you can put it back until you empty the Trash
+          </span>
+        </span>
+        <span className="confirm-actions">
+          <button className="button" onClick={() => setConfirming(false)}>
+            Cancel
+          </button>
+          <button
+            className="button button-danger"
+            onClick={() => {
+              setConfirming(false);
+              onDelete(model);
+            }}
+          >
+            Move to Trash
+          </button>
+        </span>
+      </li>
+    );
+  }
 
   return (
-    <li>
+    <li className="model-item">
+      <button
+        className={`star${model.favourite ? " is-on" : ""}`}
+        title={model.favourite ? "Remove from favourites" : "Add to favourites"}
+        aria-pressed={model.favourite}
+        onClick={() => onFavourite(model)}
+      >
+        {model.favourite ? "★" : "☆"}
+      </button>
+
       <button
         className={`model-row${model.error ? " is-broken" : ""}${isRunning ? " is-running" : ""}`}
         onClick={() => onSelect(model)}
@@ -69,6 +122,19 @@ function ModelRow({
         <span className="model-stat model-muted">
           {model.modifiedSecs ? formatRelative(model.modifiedSecs) : ""}
         </span>
+      </button>
+
+      <button
+        className="button button-danger button-quiet"
+        title={
+          isRunning
+            ? "Stop this model before deleting it"
+            : "Move this model to the Trash"
+        }
+        disabled={isRunning}
+        onClick={() => setConfirming(true)}
+      >
+        Delete
       </button>
     </li>
   );
@@ -103,6 +169,19 @@ export default function Library({
   useEffect(() => {
     void load();
   }, [load]);
+
+  const favourite = useCallback((model: ModelEntry) => {
+    setFavourite(model.id, !model.favourite)
+      .then(setModels)
+      .catch((e) => setFailure(String(e)));
+  }, []);
+
+  const remove = useCallback((model: ModelEntry) => {
+    setFailure(null);
+    deleteModel(model.id)
+      .then(setModels)
+      .catch((e) => setFailure(String(e)));
+  }, []);
 
   const empty = {
     title: "Models directory not found",
@@ -149,6 +228,8 @@ export default function Library({
               model={model}
               runner={runner}
               onSelect={onSelect}
+              onFavourite={favourite}
+              onDelete={remove}
             />
           ))}
         </ul>

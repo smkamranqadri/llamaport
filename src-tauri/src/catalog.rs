@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs::{self, File};
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -34,6 +34,9 @@ pub struct ModelEntry {
     pub shards: Option<ShardInfo>,
     pub metadata: Option<GgufMetadata>,
     pub error: Option<String>,
+    /// Set by `arrange`, which is the only thing that knows the config. False on a raw
+    /// scan rather than absent, so the screen never has to reason about a missing field.
+    pub favourite: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -190,6 +193,7 @@ fn build_entry(
         shards,
         metadata,
         error,
+        favourite: false,
     }
 }
 
@@ -236,6 +240,118 @@ pub fn scan(dir: &Path) -> Vec<ModelEntry> {
 
     entries.sort_by_key(|e| e.display_name.to_lowercase());
     entries
+}
+
+/// Favourites to the top, and nothing else touched.
+///
+/// A stable partition rather than a re-sort: `scan` has already ordered the entries, and
+/// a list that reshuffles for reasons the user cannot see is worse than an unsorted one.
+/// A starred id that names no model here is kept, not dropped — the file may be on a disk
+/// that is not mounted, and forgetting the star would be losing it for good.
+pub fn arrange(entries: Vec<ModelEntry>, favourites: &BTreeSet<String>) -> Vec<ModelEntry> {
+    let (mut starred, rest): (Vec<_>, Vec<_>) = entries
+        .into_iter()
+        .partition(|entry| favourites.contains(&entry.id));
+    starred.iter_mut().for_each(|entry| entry.favourite = true);
+    [starred, rest].concat()
+}
+
+/// Whether the file may be taken out from under whatever is using it. A running server
+/// reads tensors on demand, so deleting its model leaves it serving until it needs a page
+/// that is no longer there.
+pub fn deletable(entry: &ModelEntry, running: Option<&str>) -> Result<(), String> {
+    if running == Some(entry.id.as_str()) {
+        return Err(format!(
+            "{} is running — stop it before deleting it",
+            entry.display_name
+        ));
+    }
+    Ok(())
+}
+
+/// Every file one catalog entry is made of.
+///
+/// A shard set is one model across several filenames and only its first part is recorded
+/// on the entry, so the rest are found the way the scan grouped them: by base name. What
+/// is on disk decides, not what the set declares — an incomplete set still deletes the
+/// parts it does have.
+pub fn files_of(entry: &ModelEntry) -> Vec<PathBuf> {
+    let path = PathBuf::from(&entry.path);
+    if entry.shards.is_none() {
+        return vec![path];
+    }
+
+    let base = path
+        .file_stem()
+        .and_then(|stem| stem.to_str())
+        .and_then(parse_shard)
+        .map(|(base, _, _)| base.to_string());
+    let (Some(base), Some(dir)) = (base, path.parent()) else {
+        return vec![path];
+    };
+
+    let mut parts: Vec<PathBuf> = collect_gguf_files(dir)
+        .into_iter()
+        .filter(|file| parse_shard(&file.stem).is_some_and(|(found, _, _)| found == base))
+        .map(|file| file.path)
+        .collect();
+    parts.sort();
+    if parts.is_empty() {
+        return vec![path];
+    }
+    parts
+}
+
+/// Moves files to the Trash, so a mistaken delete of a 20 GB quant is recoverable.
+///
+/// Through JavaScript for Automation rather than Finder: `osascript -l JavaScript` reaches
+/// `NSFileManager.trashItemAtURL` over the ObjC bridge, which asks Finder for nothing and
+/// so raises no Automation prompt — the thing that made the obvious `tell application
+/// "Finder" to delete` unattractive on an unsigned app. Shelling out matches how the app
+/// already reveals a file, and adds no dependency.
+///
+/// All or nothing is not on offer: each file is its own call, and a failure part-way
+/// through leaves the rest where they are and says which one stopped it.
+pub fn trash(paths: &[PathBuf]) -> Result<(), String> {
+    for path in paths {
+        let script = format!(
+            r#"ObjC.import("Foundation");
+               var error = Ref();
+               var url = $.NSURL.fileURLWithPath({});
+               $.NSFileManager.defaultManager
+                   .trashItemAtURLResultingItemURLError(url, null, error)
+                 ? "ok"
+                 : "failed: " + error[0].localizedDescription.js"#,
+            json_string(&path.to_string_lossy())
+        );
+
+        let output = std::process::Command::new("osascript")
+            .arg("-l")
+            .arg("JavaScript")
+            .arg("-e")
+            .arg(&script)
+            .output()
+            .map_err(|e| e.to_string())?;
+
+        let said = String::from_utf8_lossy(&output.stdout);
+        if !output.status.success() || said.trim() != "ok" {
+            let detail = match said.trim() {
+                "" => String::from_utf8_lossy(&output.stderr).trim().to_string(),
+                reported => reported.to_string(),
+            };
+            return Err(format!(
+                "could not move {} to the Trash: {detail}",
+                path.file_name().unwrap_or_default().to_string_lossy()
+            ));
+        }
+    }
+    Ok(())
+}
+
+/// A path reaches the script as a JavaScript literal, so it has to be escaped as one — a
+/// model named with a quote would otherwise end the string and run as code.
+fn json_string(value: &str) -> String {
+    serde_json::to_string(value).unwrap_or_else(|_| "\"\"".to_string())
 }
 
 /// Available and total bytes on the volume holding `dir`, picking the deepest matching
@@ -290,6 +406,185 @@ mod tests {
     fn model_names_are_not_mistaken_for_quants() {
         assert!(!is_quant_token("QWEN3"));
         assert!(is_quant_token("Q4_K_M"));
+    }
+
+    fn stub(name: &str) -> ModelEntry {
+        ModelEntry {
+            id: format!("id-{name}"),
+            display_name: name.to_string(),
+            file_name: format!("{name}.gguf"),
+            path: format!("/models/{name}.gguf"),
+            size_bytes: 1,
+            modified_secs: None,
+            quant: None,
+            shards: None,
+            metadata: None,
+            error: None,
+            favourite: false,
+        }
+    }
+
+    fn named(entries: &[ModelEntry]) -> Vec<String> {
+        entries.iter().map(|e| e.display_name.clone()).collect()
+    }
+
+    fn touch(dir: &Path, name: &str) {
+        fs::write(dir.join(name), b"gguf").expect("seed file");
+    }
+
+    fn scratch(name: &str) -> PathBuf {
+        let dir =
+            std::env::temp_dir().join(format!("llama-hub-catalog-{name}-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).expect("scratch dir");
+        dir
+    }
+
+    /// A shard set is one model wearing several filenames. Deleting the entry the Library
+    /// shows must take all of them: leaving the other parts behind wastes the disk space
+    /// the delete was for, and leaves an incomplete set the Library then complains about.
+    #[test]
+    fn a_delete_takes_every_part_of_a_shard_set_and_nothing_else() {
+        let dir = scratch("files-of");
+        touch(&dir, "Big-Q4_K_M-00001-of-00003.gguf");
+        touch(&dir, "Big-Q4_K_M-00002-of-00003.gguf");
+        touch(&dir, "Big-Q4_K_M-00003-of-00003.gguf");
+        touch(&dir, "Small-Q4_K_M.gguf");
+        touch(&dir, "Unrelated-Q8_0-00001-of-00002.gguf");
+
+        let entries = scan(&dir);
+        let big = entries
+            .iter()
+            .find(|e| e.shards.is_some())
+            .expect("the shard set is one entry");
+
+        let mut taken = files_of(big);
+        taken.sort();
+        assert_eq!(
+            taken,
+            vec![
+                dir.join("Big-Q4_K_M-00001-of-00003.gguf"),
+                dir.join("Big-Q4_K_M-00002-of-00003.gguf"),
+                dir.join("Big-Q4_K_M-00003-of-00003.gguf"),
+            ],
+            "a shard set goes as a unit, and takes nothing that is not part of it"
+        );
+
+        let small = entries
+            .iter()
+            .find(|e| e.file_name == "Small-Q4_K_M.gguf")
+            .expect("the single file is an entry");
+        assert_eq!(files_of(small), vec![dir.join("Small-Q4_K_M.gguf")]);
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// A set with a part missing is still a set. Deleting it should clear what is there
+    /// rather than refuse because of what is not.
+    #[test]
+    fn a_delete_takes_the_parts_an_incomplete_set_does_have() {
+        let dir = scratch("files-of-incomplete");
+        touch(&dir, "Big-Q4_K_M-00001-of-00003.gguf");
+        touch(&dir, "Big-Q4_K_M-00003-of-00003.gguf");
+
+        let entries = scan(&dir);
+        let mut taken = files_of(&entries[0]);
+        taken.sort();
+        assert_eq!(
+            taken,
+            vec![
+                dir.join("Big-Q4_K_M-00001-of-00003.gguf"),
+                dir.join("Big-Q4_K_M-00003-of-00003.gguf"),
+            ]
+        );
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// Favourites are how a library of thirty models stays usable, so they go to the top
+    /// — but only that. Within each group the existing alphabetical order stands, or the
+    /// list would reshuffle for reasons the user cannot see.
+    #[test]
+    fn favourites_sort_above_everything_and_change_nothing_else() {
+        // As `scan` hands them over: already alphabetical. `arrange` partitions and must
+        // not re-sort, so what it is given is what each group keeps.
+        let entries: Vec<ModelEntry> = ["alpha", "bravo", "charlie", "delta"]
+            .iter()
+            .map(|name| stub(name))
+            .collect();
+
+        let none = BTreeSet::new();
+        assert_eq!(
+            named(&arrange(entries.clone(), &none)),
+            ["alpha", "bravo", "charlie", "delta"],
+            "with no favourites the order is the one the scan produced"
+        );
+
+        let starred: BTreeSet<String> = ["id-delta".to_string(), "id-bravo".to_string()]
+            .into_iter()
+            .collect();
+        let ordered = arrange(entries.clone(), &starred);
+        assert_eq!(
+            named(&ordered),
+            ["bravo", "delta", "alpha", "charlie"],
+            "favourites first, each group still alphabetical"
+        );
+        assert_eq!(
+            ordered.iter().map(|e| e.favourite).collect::<Vec<_>>(),
+            [true, true, false, false],
+            "the screen draws the star from the entry, so it has to be marked"
+        );
+
+        // A favourite for a model that is no longer in the directory is not an error: the
+        // file may come back, and dropping the star for a model on a detached disk would
+        // lose it for good.
+        let stale: BTreeSet<String> = ["id-gone".to_string()].into_iter().collect();
+        assert_eq!(
+            named(&arrange(entries, &stale)),
+            ["alpha", "bravo", "charlie", "delta"]
+        );
+    }
+
+    /// Deleting the file out from under a running server is how you get a model that
+    /// serves until it needs to read a tensor it no longer has.
+    #[test]
+    fn the_model_the_runner_is_running_cannot_be_deleted() {
+        let model = stub("alpha");
+
+        assert!(deletable(&model, Some("id-alpha")).is_err());
+        let refused = deletable(&model, Some("id-alpha")).expect_err("refused");
+        assert!(refused.contains("running"), "{refused}");
+
+        assert!(
+            deletable(&model, Some("id-other")).is_ok(),
+            "a different model running is no reason to refuse"
+        );
+        assert!(deletable(&model, None).is_ok());
+    }
+
+    /// Really moves real files, because a delete that silently does nothing is the worst
+    /// possible outcome and no stand-in would catch it. The odd name is the injection
+    /// case: the path reaches an interpreter, so a quote in a model name must not end the
+    /// string it is inside.
+    #[test]
+    fn trashing_takes_real_files_including_awkwardly_named_ones() {
+        let dir = scratch("trash");
+        let plain = dir.join("Plain-Q4_K_M.gguf");
+        let awkward = dir.join(r#"Odd "quoted" \name.gguf"#);
+        fs::write(&plain, b"gguf").expect("seed");
+        fs::write(&awkward, b"gguf").expect("seed");
+
+        trash(&[plain.clone(), awkward.clone()]).expect("trashed");
+
+        assert!(!plain.exists(), "the file is still there");
+        assert!(!awkward.exists(), "the awkward name defeated the delete");
+
+        assert!(
+            trash(&[dir.join("never-existed.gguf")]).is_err(),
+            "a delete that finds nothing must say so rather than report success"
+        );
+
+        let _ = fs::remove_dir_all(&dir);
     }
 
     #[test]

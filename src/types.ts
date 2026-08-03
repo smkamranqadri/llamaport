@@ -33,6 +33,7 @@ export interface ModelEntry {
   shards: ShardInfo | null;
   metadata: GgufMetadata | null;
   error: string | null;
+  favourite: boolean;
 }
 
 export interface DirInfo {

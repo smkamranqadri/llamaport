@@ -4,15 +4,15 @@
 Branch:   main, parcel 1 uncommitted, two commits ahead of origin. `v0.1.0` is
           tagged back at `05c3a21`, so everything since is on `main` but in no
           release.
-Task:     Persistence phase, parcel 1 — done and confirmed in the running app,
-          uncommitted. [intent/persistence.md](../intent/persistence.md).
+Task:     Persistence phase, parcel 3 next — launch defaults. Parcels 1 and 2
+          are committed and confirmed in the running app.
+          [intent/persistence.md](../intent/persistence.md).
 Mode:     Phase, three parcels
-Blocker:  none. Two things unproved rather than blocking: the README's "Open
-          Anyway" steps have never met a real Gatekeeper prompt, and whether
-          the Finder Automation dialog on Trash is tolerable (parcel 2).
-Next:     commit parcel 1, then start parcel 2 — Library favourites and delete.
-          Discard and the History pages have still not been looked at. Push is
-          outstanding and unrelated.
+Blocker:  none. Unproved rather than blocking: the README's "Open Anyway" steps
+          have never met a real Gatekeeper prompt, and Discard and the Downloads
+          History pages have not been looked at.
+Next:     parcel 3 — launch defaults in Settings, seeding a model that has never
+          been launched. Push is outstanding and unrelated.
 ```
 
 Run and verify commands: [knowledge/technical.md](../knowledge/technical.md).
@@ -56,7 +56,33 @@ included: `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`,
 `cargo test`, `bun run build` — all exit 0, statuses captured directly rather
 than through a pipe. 153 tests, up 8.
 
-Download persistence (parcel 1), 2026-08-03:
+Favourites and delete (parcel 2), 2026-08-03:
+
+- Trash goes through `osascript -l JavaScript` to `NSFileManager.trashItemAtURL`,
+  which involves Finder in nothing and so raises no Automation prompt. That was
+  the parcel's open risk and it is closed by a third option neither the plan nor
+  the roadmap had considered.
+- Real files were really trashed by the test, including one named
+  `Odd "quoted" \name.gguf` — the path reaches an interpreter, so a quote in a
+  model name must not end the string it sits in.
+- **Confirmed by the author in the running app**: stars, the sort, and a real
+  delete that really landed in the Trash. So the API contract is no longer being
+  taken on faith — the file was seen in the Trash.
+- **A bug the suite could not have caught, found by the author clicking.**
+  Delete did nothing at all: the confirmation was `window.confirm`, which returns
+  no usable answer in this webview, so `if (!window.confirm(...)) return` refused
+  every delete before it started. `tsc` was content — `confirm` is typed as
+  returning `boolean`, so the code was type-correct and behaviourally wrong. It
+  now asks in the row itself and depends on no host dialog. This is the second
+  defect in this project found by using the app rather than by testing it.
+- One test was wrong and the code was right: the ordering test fed `arrange`
+  unsorted entries and expected them sorted. `arrange` partitions and
+  deliberately does not re-sort — `scan` is what orders. The test was fixed, not
+  the function.
+- Six new tests, each checked against a gutted implementation and failed.
+- Still not looked at: Discard and the Downloads History pages, from parcel 1.
+
+Download persistence (parcel 1), 2026-08-03 — committed `33d492e`:
 
 - **Proved against the real CDN, not only the stand-in.** 676 MB from Hugging
   Face, stopped at 135,397,705 bytes, and then a `Downloads` built from scratch —
