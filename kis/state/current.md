@@ -92,6 +92,9 @@ Release review, 2026-08-03 — the reason v0.2.0 is not what it was going to be:
 - Each fix reproduces its exploit first and fails against the fix gutted: the
   symlink test asserts the victim file's contents survive, the sidecar test
   panics if the engine is reached at all.
-- The reviewer was a code-review subagent, **not** the `/security-review` skill —
-  whether that skill runs here is still untested
+- The reviewer was a code-review subagent, **not** the `/security-review` skill.
+  That skill was failing on an unresolvable `origin/HEAD`, now fixed with
+  `git remote set-head origin -a` — cloning writes that ref, adding a remote to
+  an existing repository does not. It resolves but has still never reviewed
+  anything here, and against a pushed `main` it has an empty diff to work with
   ([intent/release.md](../intent/release.md)).

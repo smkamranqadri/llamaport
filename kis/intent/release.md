@@ -19,8 +19,20 @@ being acted on, both fixed, and the `.dmg` rebuilt. Had it not run, the second
 would now be in a public unsigned build.
 
 The reviewer was a general code-review subagent given the `v0.1.0..main` diff and
-told where to look, **not** the `/security-review` skill. Whether that skill runs
-here is still open: it needs a remote, which now exists, but nobody has tried it.
+told where to look, **not** the `/security-review` skill.
+
+**That skill's blocker is now understood and fixed, 2026-08-03.** It failed on
+`origin/HEAD...` for a *second* reason after the remote was added:
+`refs/remotes/origin/HEAD` never existed locally. Cloning sets it; a remote added
+to an existing repository does not. `git remote set-head origin -a` writes it,
+and both `git log` and `git diff` against `origin/HEAD...` then resolve.
+
+Two things about it are still worth knowing. It has never actually reviewed
+anything here — the ref resolves, but nobody has run the skill to completion. And
+`origin/HEAD...main` is an empty diff whenever `main` is pushed, so it has
+nothing to look at unless there is uncommitted or unpushed work. Reviewing a
+*release* means diffing the previous tag, which is what was done by hand for
+v0.2.0 and is not what this skill does.
 
 ## v0.1.0 — first beta
 
