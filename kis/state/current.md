@@ -1,9 +1,8 @@
 # Current
 
 ```text
-Branch:   main, parcel 1 uncommitted, two commits ahead of origin. `v0.1.0` is
-          tagged back at `05c3a21`, so everything since is on `main` but in no
-          release.
+Branch:   main, clean, five commits ahead of origin. `v0.1.0` is tagged back at
+          `05c3a21`, so everything since is on `main` but in no release.
 Task:     none in progress. The Persistence phase is finished — all three
           parcels committed and confirmed in the running app.
           [intent/persistence.md](../intent/persistence.md).
@@ -11,7 +10,7 @@ Mode:     Phase, three parcels
 Blocker:  none. Unproved rather than blocking: the README's "Open Anyway" steps
           have never met a real Gatekeeper prompt, and Discard and the Downloads
           History pages have not been looked at.
-Next:     push — eleven commits are unpushed. Then decide whether the tree past
+Next:     push — five commits are unpushed. Then decide whether the tree past
           `v0.1.0` wants a `v0.1.1`, since the release and the tree have now
           diverged considerably.
 ```
