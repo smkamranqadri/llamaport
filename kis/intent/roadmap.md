@@ -21,10 +21,16 @@ Two, each with its own spec, module and screen:
    the app is wanted. Revisit if the beta lands — and note the bundle identifier
    is now effectively fixed, since changing it strands existing installs.
 
-3. **Persistence** — planned 2026-08-03, in progress.
+3. ~~**Persistence**~~ — done 2026-08-03, all three parcels.
    [persistence.md](persistence.md). Downloads that survive a restart, Library
-   favourites and delete, launch defaults. This is the beta talking: every item
+   favourites and delete, launch defaults. This was the beta talking: every item
    came from the author using the built app, which is what step 2 was for.
+4. ~~**v0.2.0**~~ — shipped 2026-08-03 with three security fixes the release
+   review turned up. [release.md](release.md).
+
+5. **Nothing planned.** Two things are owed rather than planned: the README's
+   "Open Anyway" steps have still never met a real Gatekeeper prompt, and Discard
+   and the Downloads History pages have never been looked at.
 
 ## Decided against
 

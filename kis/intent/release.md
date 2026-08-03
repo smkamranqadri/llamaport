@@ -1,4 +1,28 @@
-# First beta release
+# Releases
+
+## v0.2.0 — shipped 2026-08-03
+
+https://github.com/smkamranqadri/llamaport/releases/tag/v0.2.0 — pre-release,
+unsigned, the whole Persistence phase plus three security fixes.
+
+The process below worked unchanged: bump three version files, four commands,
+`CI=true bun run tauri build`, mount and check the `.dmg`, scan for a home path
+and secrets, tag, push, `gh release create --prerelease`, then download the
+published asset back and compare digests. Both builds were byte-identical to
+what was published.
+
+**A security review is now part of shipping, because this one changed the
+release.** It found a symlinked `.part` being written through — live in v0.1.0,
+predating everything the phase touched — and a resume that never re-validated its
+URL, which the phase had just introduced. Both were confirmed in the code before
+being acted on, both fixed, and the `.dmg` rebuilt. Had it not run, the second
+would now be in a public unsigned build.
+
+The reviewer was a general code-review subagent given the `v0.1.0..main` diff and
+told where to look, **not** the `/security-review` skill. Whether that skill runs
+here is still open: it needs a remote, which now exists, but nobody has tried it.
+
+## v0.1.0 — first beta
 
 Planned 2026-08-02, shipped 2026-08-03.
 https://github.com/smkamranqadri/llamaport/releases/tag/v0.1.0

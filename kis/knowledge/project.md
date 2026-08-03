@@ -50,7 +50,10 @@ Each is argued in the specs; this is the index, not a second copy.
 - Read GGUF headers directly, and walk the entire KV block.
 - One model at a time; a busy port refuses the launch instead of moving.
 - Find stray servers by scanning processes, not by reading a pidfile.
-- No profile system: a model's form opens with its last **successful** launch.
+- No profile system, and no merging. A form opens on the most specific whole
+  profile there is: what is being edited, else this model's last **successful**
+  launch, else the launch defaults set in Settings, else the built-in values.
+  Defaults seed a model nobody has launched; they never overrule one that has.
 - Extra arguments may not set what a field already owns. `--host` and `--port`
   for safety — the app must know where the server is. `--alias` for a different
   reason: the field exists, so a second one only makes the launch disagree with
@@ -83,6 +86,10 @@ Each is argued in the specs; this is the index, not a second copy.
   are invisible to the catalog, so without it they accumulate unseen and their
   bytes are unreachable — which is how 5.66 GiB of a 16.45 GiB quant sat
   stranded until 2026-08-03.
+- What the app reads off its own disk is not trusted because it wrote it. A path
+  in the history decides what a resume writes and a discard deletes, so it is
+  rebuilt from the models directory rather than believed; a URL in a sidecar is
+  checked against the same rule a pasted one meets.
 - History is never trimmed; the screen pages it. A cap would be a number nobody
   has evidence for.
 - A server that will not serve ranges is refused: no ranges means no resume, and

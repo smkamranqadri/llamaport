@@ -37,8 +37,10 @@ the event stream, so a state change that only returns leaves the menu bar stale.
 Assert on what was emitted, not only on the snapshot: the snapshot is right in
 exactly the case this gets wrong.
 
-Config is one JSON file at schema 5, every field `#[serde(default)]`, with
-unknown keys preserved through a load/save round-trip.
+Config is one JSON file at schema 6, every field `#[serde(default)]`, with
+unknown keys preserved through a load/save round-trip. `migrate` strips keys the
+app deliberately retired, so a new field must never reuse a retired name — serde
+would claim it first and adopt settings from a build several schemas old.
 
 Finished downloads live beside it in `downloads.json`, written atomically on
 state transitions and never on a progress tick. A file of its own because a
@@ -97,6 +99,17 @@ cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
   `{dest}.part.json` — so a partial is found by scanning the models directory for
   the sidecar suffix and stripping it. `catalog::scan` filters on the `.gguf`
   extension and will never see either.
+- The models directory and the config directory hold **untrusted input**. A `.part`,
+  a `.part.json` and `downloads.json` are files anything with write access can
+  create, and each of them names something the app then acts on — a URL to fetch,
+  a path to write, a path to delete. Every one is re-validated on the way in.
+  Two live holes came from forgetting this.
+- A `.part` is opened with `O_NOFOLLOW` (`custom_flags`), never a plain `open`.
+  `lstat`-then-open is two syscalls with a window between them, which is not a
+  guard against a link planted on purpose.
+- `admit` is not the only gate a transfer passes. Anything that starts one —
+  today `start` and `resume` — validates the URL itself. Resume once did not, and
+  that asymmetry was the whole vulnerability.
 - There is no frontend test framework. Every test is Rust, in `src-tauri/tests/`
   or an inline `#[cfg(test)]` module; TypeScript is covered by `tsc` and by
   looking at the screen. Logic worth testing belongs in Rust until that changes.
