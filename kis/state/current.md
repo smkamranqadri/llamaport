@@ -1,8 +1,9 @@
 # Current
 
 ```text
-Branch:   main, clean, five commits ahead of origin. `v0.1.0` is tagged back at
-          `05c3a21`, so everything since is on `main` but in no release.
+Branch:   main, clean and pushed. `v0.1.0` is tagged back at `05c3a21`, so the
+          sixteen commits since it are on `main` but in no release — including
+          the whole Persistence phase.
 Task:     none in progress. The Persistence phase is finished — all three
           parcels committed and confirmed in the running app.
           [intent/persistence.md](../intent/persistence.md).
@@ -10,9 +11,10 @@ Mode:     Phase, three parcels
 Blocker:  none. Unproved rather than blocking: the README's "Open Anyway" steps
           have never met a real Gatekeeper prompt, and Discard and the Downloads
           History pages have not been looked at.
-Next:     push — five commits are unpushed. Then decide whether the tree past
-          `v0.1.0` wants a `v0.1.1`, since the release and the tree have now
-          diverged considerably.
+Next:     decide whether the tree past `v0.1.0` wants a `v0.1.1`. The published
+          `.dmg` has none of the Persistence phase, so anyone installing from
+          the release page gets a build that loses download history. Discard
+          and the Downloads History pages are still unlooked-at.
 ```
 
 Run and verify commands: [knowledge/technical.md](../knowledge/technical.md).
