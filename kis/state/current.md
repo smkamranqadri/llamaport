@@ -1,18 +1,17 @@
 # Current
 
 ```text
-Branch:   main, level with origin. Uncommitted: `src-tauri/src/profile.rs` and
-          `src/ProfileForm.tsx` — the extra-arguments fix below. `v0.1.0` is
-          tagged back at `05c3a21`, so the eight commits since it are public on
-          `main` but not in any release.
-Task:     extra arguments could not be typed. Fixed, verified, not committed.
+Branch:   main, nothing uncommitted, two commits ahead of origin (`6795f73`, the
+          extra-arguments fix, and this note). `v0.1.0` is tagged back at
+          `05c3a21`, so the ten commits since it are on `main` but not in any
+          release.
+Task:     none in progress. Extra arguments is fixed and committed.
 Mode:     Fast
 Blocker:  none. One thing is unproved rather than blocking: the README's
           "Open Anyway" steps have never met a real Gatekeeper prompt.
-Next:     commit the two files. Then download the `.dmg` from the release page
-          in a browser and follow the README's Install section as a stranger
-          would. Decide separately whether the eight commits past the tag want
-          a `v0.1.1`.
+Next:     push. Then download the `.dmg` from the release page in a browser and
+          follow the README's Install section as a stranger would. Decide
+          separately whether the nine commits past the tag want a `v0.1.1`.
 ```
 
 Run and verify commands: [knowledge/technical.md](../knowledge/technical.md).
