@@ -1086,3 +1086,9 @@ input[type="range"] {
   flex: none;
   gap: 8px;
 }
+
+.panel-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+}

@@ -30,6 +30,11 @@ pub struct Config {
     /// An id naming no model on disk is kept: the file may be on a volume that is not
     /// mounted, and forgetting the star would lose it for good.
     pub favourites: BTreeSet<String>,
+    /// Where a model that has never been launched opens its form. Deliberately *not*
+    /// named `defaultProfile`: that key was retired in v3 and is stripped from `extra`
+    /// below, and a real field of that name would be claimed by serde first — silently
+    /// adopting launch settings written by a build two schemas old.
+    pub launch_defaults: Option<Profile>,
     /// Keys written by a different version of the app. Captured and written back
     /// untouched so that running an older build cannot silently delete newer settings.
     #[serde(flatten)]
@@ -419,6 +424,45 @@ mod tests {
             "a config written before favourites existed simply has none"
         );
         assert_eq!(older.models_dir.as_deref(), Some("/models"));
+    }
+
+    #[test]
+    fn launch_defaults_round_trip_and_never_come_from_the_retired_key() {
+        let path = scratch("launch-defaults");
+        let config = Config {
+            launch_defaults: Some(Profile {
+                ctx: 8192,
+                ngl: "24".into(),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+
+        save_to(&path, &config).expect("save");
+        let loaded = load_from(&path);
+        let defaults = loaded.launch_defaults.expect("remembered");
+        assert_eq!(defaults.ctx, 8192);
+        assert_eq!(defaults.ngl, "24");
+
+        // The trap. v1 configs on real machines carry a `defaultProfile` from the profile
+        // system v3 removed. It must stay retired rather than being read back in under a
+        // new name and quietly deciding how every unlaunched model launches.
+        fs::write(
+            &path,
+            r#"{
+              "defaultProfile": { "port": 9999, "ctx": 4096, "ngl": "0" },
+              "modelsDir": "/models"
+            }"#,
+        )
+        .expect("seed");
+
+        let migrated = load_from(&path);
+        assert!(
+            migrated.launch_defaults.is_none(),
+            "a retired key was adopted as the new one"
+        );
+        assert!(!migrated.extra.contains_key("defaultProfile"));
+        assert_eq!(migrated.models_dir.as_deref(), Some("/models"));
     }
 
     #[test]

@@ -128,14 +128,17 @@ struct Settings {
     models_dir: String,
     llama_server_path: Option<String>,
     downloads: Options,
+    /// Absent until the user sets them, which is what tells the screen to offer the
+    /// built-in values rather than pretending they were chosen.
+    launch_defaults: Option<Profile>,
     capabilities: Option<Capabilities>,
     capability_error: Option<String>,
 }
 
 /// Fills in what the user has not chosen: an alias derived from the model's name, and a
 /// context clamped to what the file actually supports.
-fn resolve(model: &ModelEntry, draft: Option<Profile>) -> Profile {
-    let mut resolved = draft.unwrap_or_default();
+fn resolve(model: &ModelEntry, chosen: Profile) -> Profile {
+    let mut resolved = chosen;
     if resolved.alias.trim().is_empty() {
         resolved.alias = profile::default_alias(&model.display_name);
     }
@@ -152,12 +155,15 @@ fn build_plan(
 ) -> Result<LaunchPlan, String> {
     let model = state.model(model_id)?;
 
-    let remembered = {
+    let (remembered, defaults) = {
         let config = state.config.lock().expect("config lock");
-        config.last_used.get(&model.id).cloned()
+        (
+            config.last_used.get(&model.id).cloned(),
+            config.launch_defaults.clone(),
+        )
     };
 
-    let profile = resolve(&model, draft.or(remembered));
+    let profile = resolve(&model, profile::seed(draft, remembered, defaults));
 
     let estimate = model.metadata.as_ref().and_then(|md| {
         estimate::estimate(
@@ -323,6 +329,7 @@ fn settings_view(state: &AppState) -> Settings {
         models_dir: store::models_dir(&config).to_string_lossy().into_owned(),
         llama_server_path: config.llama_server_path.clone(),
         downloads: config.downloads.clone(),
+        launch_defaults: config.launch_defaults.clone(),
         capabilities: caps.as_ref().ok().cloned(),
         capability_error: caps.err(),
     }
@@ -338,6 +345,25 @@ fn set_download_options(options: Options, state: State<'_, AppState>) -> Result<
     state.save_config()?;
     // A limit is changed while watching the transfer it is meant for, not before the next.
     state.downloads.set_rate_limit(rate_limit);
+    Ok(settings_view(&state))
+}
+
+/// Where a model that has never been launched opens its form. `None` clears them back to
+/// the built-in values.
+///
+/// Nothing already remembered is touched: these seed a model with no history, and
+/// rewriting what a model was actually launched with would be a different feature and a
+/// worse one.
+#[tauri::command]
+fn set_launch_defaults(
+    defaults: Option<Profile>,
+    state: State<'_, AppState>,
+) -> Result<Settings, String> {
+    {
+        let mut config = state.config.lock().expect("config lock");
+        config.launch_defaults = defaults;
+    }
+    state.save_config()?;
     Ok(settings_view(&state))
 }
 
@@ -784,6 +810,7 @@ pub fn run() {
             download_status,
             download_clear,
             set_download_options,
+            set_launch_defaults,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

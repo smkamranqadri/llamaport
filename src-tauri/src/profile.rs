@@ -5,8 +5,8 @@ use crate::probe::Capabilities;
 pub const DEFAULT_PORT: u16 = 8888;
 pub const DEFAULT_CTX: u64 = 65536;
 
-/// The values one launch uses. Nothing persists these — the form starts from
-/// `Profile::default()` each time and edits last as long as the page is open.
+/// The values one launch uses. Where a form opens on them is decided by `seed`: what a
+/// model was last launched with, else the configured defaults, else these.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct Profile {
@@ -48,6 +48,19 @@ impl Default for Profile {
 /// field, so a second one is a mistake rather than a choice.
 const OWNED_FLAGS: [(&str, &str); 3] =
     [("--alias", "Alias"), ("--host", "Host"), ("--port", "Port")];
+
+/// Which settings a form opens on, most specific first: what is being edited, then what
+/// this model was last launched with, then the defaults, then the built-in ones.
+///
+/// Whole profiles rather than a merge. Taking the context from one and the cache types
+/// from another produces a combination nobody chose and the screen cannot explain.
+pub fn seed(
+    draft: Option<Profile>,
+    remembered: Option<Profile>,
+    defaults: Option<Profile>,
+) -> Profile {
+    draft.or(remembered).or(defaults).unwrap_or_default()
+}
 
 pub fn default_alias(display_name: &str) -> String {
     display_name
@@ -154,6 +167,64 @@ fn shell_quote(value: &str) -> String {
 
 #[cfg(test)]
 mod tests {
+    /// The form opens on the most specific settings there are. Defaults are a starting
+    /// point for a model nobody has launched yet — they never overrule what a model was
+    /// actually launched with, which is the whole reason `last_used` exists.
+    #[test]
+    fn a_form_opens_on_the_most_specific_settings_there_are() {
+        let defaults = Profile {
+            ctx: 8192,
+            ngl: "24".into(),
+            parallel: 4,
+            ..Default::default()
+        };
+        let remembered = Profile {
+            ctx: 32768,
+            ..Default::default()
+        };
+        let draft = Profile {
+            ctx: 4096,
+            ..Default::default()
+        };
+
+        assert_eq!(
+            seed(None, None, None).ctx,
+            DEFAULT_CTX,
+            "with nothing stored the built-in default stands"
+        );
+        assert_eq!(
+            seed(None, None, Some(defaults.clone())).ctx,
+            8192,
+            "a model never launched opens on the defaults"
+        );
+        assert_eq!(
+            seed(None, Some(remembered.clone()), Some(defaults.clone())).ctx,
+            32768,
+            "a model that has been launched opens on its own last launch, not the defaults"
+        );
+        assert_eq!(
+            seed(
+                Some(draft.clone()),
+                Some(remembered.clone()),
+                Some(defaults.clone())
+            )
+            .ctx,
+            4096,
+            "what the user is editing right now beats everything stored"
+        );
+
+        // Whole profiles, not a merge. Half of one set of settings and half of another is
+        // a combination nobody chose and nobody can see.
+        let seeded = seed(None, None, Some(defaults));
+        assert_eq!(seeded.ngl, "24");
+        assert_eq!(seeded.parallel, 4);
+        let launched = seed(None, Some(remembered), None);
+        assert_eq!(
+            launched.ngl, "all",
+            "an unset field falls back within its own profile, not across to another"
+        );
+    }
+
     use super::*;
     use std::collections::BTreeSet;
 

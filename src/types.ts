@@ -202,6 +202,8 @@ export interface Settings {
   modelsDir: string;
   llamaServerPath: string | null;
   downloads: DownloadOptions;
+  /// Null until the user sets them: the built-in values are then in force.
+  launchDefaults: Profile | null;
   capabilities: Capabilities | null;
   capabilityError: string | null;
 }

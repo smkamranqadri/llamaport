@@ -63,6 +63,12 @@ export function setDownloadOptions(
   return invoke<Settings>("set_download_options", { options });
 }
 
+export function setLaunchDefaults(
+  defaults: Profile | null,
+): Promise<Settings> {
+  return invoke<Settings>("set_launch_defaults", { defaults });
+}
+
 export function runnerStatus(): Promise<RunnerSnapshot> {
   return invoke<RunnerSnapshot>("runner_status");
 }

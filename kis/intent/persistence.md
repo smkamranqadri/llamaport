@@ -105,10 +105,15 @@ The confirmation cannot be `window.confirm` — it returns no usable answer in t
 webview, so guarding on it refuses every delete instead of asking about one. The
 row asks for itself.
 
-## Parcel 3 — launch defaults
+## Parcel 3 — launch defaults — DONE 2026-08-03
 
-`launch_defaults: Option<Profile>` in `Config`, a Settings panel, and seeding in
-`build_plan` where `resolve` currently falls back to `Profile::default()`.
+`launch_defaults: Option<Profile>` in `Config`, a Settings panel reusing
+`ProfileForm` with `showAlias={false}` — an alias is per-model and derived from
+the name, so it is not a thing to default — and `profile::seed` deciding
+precedence: draft, then `last_used`, then the defaults, then `Profile::default`.
+
+Whole profiles, never a merge. Taking the context from one and the cache types
+from another produces a combination nobody chose and the screen cannot explain.
 
 ## Acceptance
 

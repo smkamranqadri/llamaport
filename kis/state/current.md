@@ -4,15 +4,16 @@
 Branch:   main, parcel 1 uncommitted, two commits ahead of origin. `v0.1.0` is
           tagged back at `05c3a21`, so everything since is on `main` but in no
           release.
-Task:     Persistence phase, parcel 3 next — launch defaults. Parcels 1 and 2
-          are committed and confirmed in the running app.
+Task:     none in progress. The Persistence phase is finished — all three
+          parcels committed and confirmed in the running app.
           [intent/persistence.md](../intent/persistence.md).
 Mode:     Phase, three parcels
 Blocker:  none. Unproved rather than blocking: the README's "Open Anyway" steps
           have never met a real Gatekeeper prompt, and Discard and the Downloads
           History pages have not been looked at.
-Next:     parcel 3 — launch defaults in Settings, seeding a model that has never
-          been launched. Push is outstanding and unrelated.
+Next:     push — eleven commits are unpushed. Then decide whether the tree past
+          `v0.1.0` wants a `v0.1.1`, since the release and the tree have now
+          diverged considerably.
 ```
 
 Run and verify commands: [knowledge/technical.md](../knowledge/technical.md).
@@ -55,6 +56,24 @@ The four commands were last run green over the working tree, uncommitted changes
 included: `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`,
 `cargo test`, `bun run build` — all exit 0, statuses captured directly rather
 than through a pipe. 153 tests, up 8.
+
+Launch defaults (parcel 3), 2026-08-03:
+
+- Precedence is one pure function, `profile::seed`: draft, then `last_used`,
+  then the configured defaults, then the built-in ones. It was in `lib.rs`, where
+  nothing can reach it; moving it is what made it testable. The test fails
+  against an order that puts defaults ahead of `last_used`, which is the mistake
+  that would quietly overwrite a tuned model.
+- The retired-key trap is pinned by a test that fails when the field is named
+  `defaultProfile`: a v1 config on this machine carries one from the profile
+  system v3 removed, and serde would claim it before `extra` ever saw it.
+- 161 tests, up 2. Both new ones checked against a gutted implementation.
+- **`clippy` failed and I read it as passing** — `echo $?` after a `grep` reports
+  the grep. That is the exact trap
+  [knowledge/technical.md](../knowledge/technical.md) already warns about, and it
+  caught a second reader within the day. Statuses are captured on their own line
+  now.
+- **Confirmed by the author in the running app**: the Settings panel works.
 
 Favourites and delete (parcel 2), 2026-08-03:
 

@@ -1,6 +1,29 @@
 import { useEffect, useState } from "react";
-import { getSettings, setLlamaServerPath, setModelsDir } from "./api";
-import type { Settings } from "./types";
+import {
+  getSettings,
+  setLaunchDefaults,
+  setLlamaServerPath,
+  setModelsDir,
+} from "./api";
+import ProfileForm from "./ProfileForm";
+import type { Profile, Settings } from "./types";
+
+/// What a model opens on before anyone has launched it. Mirrors `Profile::default()` in
+/// Rust; the two only have to agree on what the form shows, because a launch sends the
+/// whole profile rather than the fields that differ from it.
+const BUILT_IN: Profile = {
+  alias: "",
+  host: "127.0.0.1",
+  port: 8888,
+  ctx: 65536,
+  ngl: "all",
+  parallel: 1,
+  flashAttn: true,
+  cacheTypeK: "q8_0",
+  cacheTypeV: "q8_0",
+  jinja: true,
+  rawArgs: [],
+};
 
 export default function SettingsScreen({
   onModelsDirChanged,
@@ -12,6 +35,7 @@ export default function SettingsScreen({
   const [binary, setBinary] = useState("");
   const [saved, setSaved] = useState<string | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
+  const [defaults, setDefaults] = useState<Profile | null>(null);
 
   useEffect(() => {
     getSettings()
@@ -19,6 +43,7 @@ export default function SettingsScreen({
         setSettings(next);
         setDir(next.modelsDir);
         setBinary(next.llamaServerPath ?? "");
+        setDefaults(next.launchDefaults);
       })
       .catch((e) => setFailure(String(e)));
   }, []);
@@ -129,6 +154,54 @@ export default function SettingsScreen({
         )}
       </section>
 
+      <section className="panel">
+        <h2>Launch defaults</h2>
+        <p className="field-hint">
+          Where a model opens the first time you launch it. A model you have
+          already launched opens on its own last successful launch instead, so
+          changing these never overwrites anything you have tuned.
+        </p>
+
+        <ProfileForm
+          value={defaults ?? BUILT_IN}
+          maxCtx={null}
+          showAlias={false}
+          onChange={setDefaults}
+        />
+
+        <div className="panel-actions">
+          <button
+            className="button button-primary"
+            onClick={() =>
+              setLaunchDefaults(defaults)
+                .then((next) => {
+                  setSettings(next);
+                  setDefaults(next.launchDefaults);
+                  flash("saved");
+                })
+                .catch((e) => setFailure(String(e)))
+            }
+          >
+            Save defaults
+          </button>
+          {settings.launchDefaults && (
+            <button
+              className="button"
+              onClick={() =>
+                setLaunchDefaults(null)
+                  .then((next) => {
+                    setSettings(next);
+                    setDefaults(next.launchDefaults);
+                    flash("back to the built-in values");
+                  })
+                  .catch((e) => setFailure(String(e)))
+              }
+            >
+              Reset
+            </button>
+          )}
+        </div>
+      </section>
     </>
   );
 }
