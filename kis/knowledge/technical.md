@@ -76,6 +76,14 @@ cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
   non-obvious why only.
 - Capture a command's exit status directly. `cmd | tail -3; echo $?` reports
   `tail`'s status, which reported a failing clippy as clean twice in one session.
+- macOS substitutes an em dash for `--` inside the webview's text fields, so a
+  flag typed into any field is corrupted before it reaches Rust and
+  `llama-server` rejects it. A field that takes flags undoes the substitution on
+  input. Only a token's leading dash can be one — substitution needs two
+  hyphens, so hyphens inside `--cache-type-k` are the user's own.
+- A field whose value is a parsed list rendered back as text cannot be typed
+  into: the separator is dropped the instant it is typed. Such a field keeps its
+  own text and re-seeds from props only when they disagree.
 - `on_window_event` fires for every window, so any handler there must check
   `window.label()`. The close-hides-instead rule is the main window's alone.
 - There is no frontend test framework. Every test is Rust, in `src-tauri/tests/`

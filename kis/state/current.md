@@ -1,16 +1,18 @@
 # Current
 
 ```text
-Branch:   main, pushed and level with origin, nothing uncommitted. `v0.1.0` is
-          tagged back at `05c3a21`, so the seven commits since it are public on
+Branch:   main, level with origin. Uncommitted: `src-tauri/src/profile.rs` and
+          `src/ProfileForm.tsx` — the extra-arguments fix below. `v0.1.0` is
+          tagged back at `05c3a21`, so the eight commits since it are public on
           `main` but not in any release.
-Task:     none in progress. The Web UI window is done and committed.
+Task:     extra arguments could not be typed. Fixed, verified, not committed.
 Mode:     Fast
 Blocker:  none. One thing is unproved rather than blocking: the README's
           "Open Anyway" steps have never met a real Gatekeeper prompt.
-Next:     download the `.dmg` from the release page in a browser and follow the
-          README's Install section as a stranger would. Decide separately
-          whether the seven unpushed commits want a `v0.1.1`.
+Next:     commit the two files. Then download the `.dmg` from the release page
+          in a browser and follow the README's Install section as a stranger
+          would. Decide separately whether the eight commits past the tag want
+          a `v0.1.1`.
 ```
 
 Run and verify commands: [knowledge/technical.md](../knowledge/technical.md).
@@ -35,19 +37,36 @@ no chat of its own and is not getting one
 
 **v0.1.0 is published**, unsigned, as a GitHub pre-release with the `.dmg`
 attached: https://github.com/smkamranqadri/llamaport/releases/tag/v0.1.0. The tag
-sits at `05c3a21`; `main` has moved past it and is not pushed, so the released
-build and the tree are not the same thing.
+sits at `05c3a21`; `main` has moved eight commits past it and is pushed, so the
+released build and the tree are not the same thing.
 
 Discover was planned and then dropped ([intent/roadmap.md](../intent/roadmap.md)).
 
-Everything is committed; `git log` is the record.
+Apart from the two files named above, `git log` is the record.
 
 ## Proof
 
-The four commands were last run green after the rename, which is the whole tree:
-`cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test`,
-`bun run build` — all exit 0, statuses captured directly rather than through a
-pipe. 137 tests across 10 binaries.
+The four commands were last run green over the working tree, uncommitted changes
+included: `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`,
+`cargo test`, `bun run build` — all exit 0, statuses captured directly rather
+than through a pipe. 145 tests.
+
+Extra arguments, 2026-08-03:
+
+- Found by the author using the app: `--alias qwen-2.5-0.5b` in Extra arguments
+  reached `llama-server` as `—alias` and the launch exited 1. The rendered
+  command showed it quoted, which `shell_quote` only does for a non-ASCII
+  character — macOS had substituted the dash. Two defects in one field: that,
+  and the field being a controlled input over `rawArgs.join(" ")`, so a space
+  could not be typed at all and only a paste ever worked. Both are now
+  constraints in [knowledge/technical.md](../knowledge/technical.md).
+- `--alias` joins `--host`/`--port` in `OWNED_FLAGS`, so the duplicate is
+  refused by name instead of launching under a name the form does not show.
+- 145 tests, four commands green, each status captured directly. Weaker than
+  usual on one point: the dash fix is TypeScript, and there is no frontend test
+  framework, so it is covered by `tsc` and by reading it, not by a test. The
+  Rust half is covered. Nobody has yet typed `--threads 8` into the running app
+  and watched it survive.
 
 Release, 2026-08-03:
 

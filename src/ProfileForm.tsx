@@ -1,8 +1,19 @@
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import type { Profile } from "./types";
 
 const CACHE_TYPES = ["f16", "bf16", "q8_0", "q5_1", "q5_0", "q4_1", "q4_0"];
 const CTX_STEP = 4096;
+
+// macOS substitutes a dash for the `--` that starts every llama-server flag, and the
+// server rejects what comes out. Only a token's leading dash can be one: substitution
+// needs two hyphens, so `--cache-type-k` keeps the single hyphens inside it.
+function undoDashSubstitution(text: string) {
+  return text.replace(/(^|\s)[–—]/g, "$1--");
+}
+
+function splitArgs(text: string) {
+  return text.split(" ").filter((a) => a.length > 0);
+}
 
 function Field({
   label,
@@ -35,6 +46,16 @@ export default function ProfileForm({
 }) {
   const set = <K extends keyof Profile>(key: K, next: Profile[K]) =>
     onChange({ ...value, [key]: next });
+
+  // The field holds text, not the parsed list: joining the list back would delete the
+  // space the moment it is typed, and one argument cannot be separated from the next.
+  const [rawText, setRawText] = useState(() => value.rawArgs.join(" "));
+  const incoming = value.rawArgs.join(" ");
+  useEffect(() => {
+    if (splitArgs(rawText).join(" ") !== incoming) {
+      setRawText(incoming);
+    }
+  }, [incoming]);
 
   const ctxCeiling = maxCtx ?? 131072;
 
@@ -150,13 +171,12 @@ export default function ProfileForm({
         hint="space separated, passed through verbatim"
       >
         <input
-          value={value.rawArgs.join(" ")}
-          onChange={(e) =>
-            set(
-              "rawArgs",
-              e.currentTarget.value.split(" ").filter((a) => a.length > 0),
-            )
-          }
+          value={rawText}
+          onChange={(e) => {
+            const text = undoDashSubstitution(e.currentTarget.value);
+            setRawText(text);
+            set("rawArgs", splitArgs(text));
+          }}
         />
       </Field>
     </div>

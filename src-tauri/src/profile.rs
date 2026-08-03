@@ -41,11 +41,13 @@ impl Default for Profile {
     }
 }
 
-/// Flags the app owns, and the field that owns each. It binds loopback deliberately and
-/// tracks the port to find the server again, so a raw argument setting either would win —
-/// llama-server takes the last occurrence — and leave the app supervising an address it
-/// does not know about.
-const OWNED_FLAGS: [(&str, &str); 2] = [("--host", "Host"), ("--port", "Port")];
+/// Flags the app owns, and the field that owns each. `--host` and `--port` are the ones
+/// that must not move: it binds loopback deliberately and tracks the port to find the
+/// server again, so a raw argument setting either would leave the app supervising an
+/// address it does not know about. `--alias` is here because the form already has the
+/// field, so a second one is a mistake rather than a choice.
+const OWNED_FLAGS: [(&str, &str); 3] =
+    [("--alias", "Alias"), ("--host", "Host"), ("--port", "Port")];
 
 pub fn default_alias(display_name: &str) -> String {
     display_name
@@ -64,8 +66,8 @@ impl Profile {
                 if flag == owned {
                     return Err(format!(
                         "{owned} belongs to the {field} field, not to extra arguments. \
-                         llama-server takes the last value it is given, so this would \
-                         override {field} without the app knowing where the server is."
+                         llama-server takes the last value it is given, so a second one \
+                         here only makes the launch disagree with what the form shows."
                     ));
                 }
             }
@@ -245,7 +247,7 @@ mod tests {
 
     #[test]
     fn raw_args_may_not_set_what_the_app_owns() {
-        for arg in ["--host", "--port"] {
+        for arg in ["--alias", "--host", "--port"] {
             let message = with_raw(&[arg, "0.0.0.0"])
                 .check_raw_args()
                 .expect_err("must be refused");
@@ -258,6 +260,14 @@ mod tests {
         assert!(
             host.contains("Host"),
             "names the field that owns it: {host}"
+        );
+
+        let alias = with_raw(&["--alias", "qwen"])
+            .check_raw_args()
+            .expect_err("the form already has an Alias field");
+        assert!(
+            alias.contains("Alias"),
+            "names the field that owns it: {alias}"
         );
     }
 
@@ -306,7 +316,7 @@ mod tests {
 
     #[test]
     fn a_value_that_merely_looks_like_an_owned_flag_passes() {
-        with_raw(&["--alias", "--port"])
+        with_raw(&["--chat-template", "--port"])
             .check_raw_args()
             .expect_err("a bare --port is refused wherever it sits");
         with_raw(&["--chat-template", "host--port"])

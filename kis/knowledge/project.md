@@ -51,6 +51,10 @@ Each is argued in the specs; this is the index, not a second copy.
 - One model at a time; a busy port refuses the launch instead of moving.
 - Find stray servers by scanning processes, not by reading a pidfile.
 - No profile system: a model's form opens with its last **successful** launch.
+- Extra arguments may not set what a field already owns. `--host` and `--port`
+  for safety — the app must know where the server is. `--alias` for a different
+  reason: the field exists, so a second one only makes the launch disagree with
+  what the form shows. The refusal names the field that owns the flag.
 - Loopback only, no authentication.
 - Downloads re-resolve the redirect on every resume, because the CDN signature
   expires and re-requesting the original URL is exactly where `curl -C -` fails.
