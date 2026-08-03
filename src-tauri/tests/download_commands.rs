@@ -1020,21 +1020,24 @@ fn restoring_seeds_the_history_without_colliding_with_new_ids() {
     let engine: Engine = Arc::new(|_: &Spec, _: &Control, _: &dyn ProgressSink| Ok(()));
     let manager = manager(engine);
 
-    manager.downloads.restore(vec![
-        job("dl-1", URL, FILE, DownloadState::Complete),
-        job(
-            "dl-7",
-            "https://huggingface.co/a/b/resolve/main/x.gguf",
-            "x.gguf",
-            DownloadState::Failed,
-        ),
-        job(
-            "dl-9",
-            "https://huggingface.co/a/b/resolve/main/y.gguf",
-            "y.gguf",
-            DownloadState::Active,
-        ),
-    ]);
+    manager.downloads.restore(
+        vec![
+            job("dl-1", URL, FILE, DownloadState::Complete),
+            job(
+                "dl-7",
+                "https://huggingface.co/a/b/resolve/main/x.gguf",
+                "x.gguf",
+                DownloadState::Failed,
+            ),
+            job(
+                "dl-9",
+                "https://huggingface.co/a/b/resolve/main/y.gguf",
+                "y.gguf",
+                DownloadState::Active,
+            ),
+        ],
+        &dir,
+    );
 
     let restored = manager.downloads.snapshot();
     assert_eq!(
@@ -1057,5 +1060,69 @@ fn restoring_seeds_the_history_without_colliding_with_new_ids() {
         !["dl-1", "dl-7"].contains(&fresh.id.as_str()),
         "a new transfer took an id the restored history already uses: {}",
         fresh.id
+    );
+}
+
+/// A sidecar is a file in a folder, not a promise. Anything that can write to the models
+/// directory can put one there, and an adopted row wears a model's filename and a
+/// half-finished progress bar — which is the opposite of the suspicion a pasted URL earns.
+///
+/// `admit` is the only place a URL is checked, and `resume` does not go through it. So the
+/// check has to happen on the way back in as well, or Resume is an unvalidated fetch.
+#[test]
+fn a_partial_naming_somewhere_other_than_hugging_face_cannot_be_resumed() {
+    let dir = scratch("hostile-sidecar");
+    seed_partial(
+        &dir,
+        FILE,
+        "https://attacker.example/collect?u=victim",
+        12_000,
+        64_000,
+    );
+
+    let engine: Engine = Arc::new(|_: &Spec, _: &Control, _: &dyn ProgressSink| {
+        panic!("the engine must never be reached for an unvalidated URL")
+    });
+    let manager = manager(engine);
+
+    let adopted = manager.downloads.adopt(&dir);
+    assert_eq!(
+        adopted.len(),
+        1,
+        "it is still listed, so it can be discarded"
+    );
+    assert!(
+        !adopted[0].resumable,
+        "the screen offers Resume on `resumable`, so this is what stops the fetch"
+    );
+
+    let refused = manager
+        .downloads
+        .resume(&adopted[0].id, &dir, &Options::default())
+        .expect_err("a command is reachable without the button");
+    assert!(
+        refused.contains("Hugging Face") || refused.contains("huggingface"),
+        "{refused}"
+    );
+}
+
+/// The history file is on disk beside the config, and `path` in it decides what a resume
+/// writes and what a discard deletes. Trusting it makes those arbitrary; the destination
+/// is derived from the models directory instead, so the stored value cannot aim them.
+#[test]
+fn a_restored_row_cannot_point_the_app_outside_the_models_directory() {
+    let dir = scratch("hostile-history");
+    let engine: Engine = Arc::new(|_: &Spec, _: &Control, _: &dyn ProgressSink| Ok(()));
+    let manager = manager(engine);
+
+    let mut hostile = job("dl-1", URL, FILE, DownloadState::Failed);
+    hostile.path = "/Users/victim/Library/LaunchAgents/com.evil.plist".into();
+    manager.downloads.restore(vec![hostile], &dir);
+
+    let restored = manager.downloads.snapshot();
+    assert_eq!(
+        restored[0].path,
+        dir.join(FILE).to_string_lossy(),
+        "a path read off disk must not survive into anything that touches the filesystem"
     );
 }

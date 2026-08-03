@@ -427,13 +427,29 @@ fn resume_state(dest: &Path, part: &Path, total: u64, etag: Option<&str>) -> Opt
     Some(sidecar)
 }
 
+/// Opens the partial, refusing to follow a symlink.
+///
+/// `O_NOFOLLOW` rather than an `lstat` first: a check followed by an open is two syscalls
+/// with a window between them, and this one has to hold against a link planted on purpose.
+/// Nothing else guards it — `admit` looks at the destination and never at the `.part`
+/// beside it, so without this a download the user started themselves writes wherever a
+/// planted link points.
 fn open_part(part: &Path, total: u64) -> Result<File, String> {
+    use std::os::unix::fs::OpenOptionsExt;
+
     let file = OpenOptions::new()
         .create(true)
         .truncate(false)
         .write(true)
+        .custom_flags(libc::O_NOFOLLOW)
         .open(part)
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| {
+            format!(
+                "could not open {}: {e}. A partial download that is a symbolic link is \
+                 refused rather than followed.",
+                part.file_name().unwrap_or_default().to_string_lossy()
+            )
+        })?;
     file.set_len(total).map_err(|e| e.to_string())?;
     Ok(file)
 }

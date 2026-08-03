@@ -118,7 +118,10 @@ impl DownloadJob {
         job.state = DownloadState::Paused;
         job.completed = partial.completed;
         job.total = Some(partial.total);
-        job.resumable = partial.resumable;
+        // A sidecar is a file anything can write. One naming somewhere this app would
+        // never have downloaded from is listed so it can be discarded, but never offered
+        // a Resume — the screen draws that button from this flag.
+        job.resumable = partial.resumable && file_name_for(&partial.source_url).is_ok();
         job.started_secs = std::fs::metadata(download::sidecar_path(dest))
             .and_then(|meta| meta.modified())
             .ok()
@@ -387,10 +390,18 @@ impl Downloads {
     /// Only finished rows are taken: a transfer cannot survive the process that was
     /// running it, and one restored as Active would sit there forever holding the line.
     /// Whatever was unfinished is on the disk instead, and `adopt` is what finds it.
-    pub fn restore(&self, history: Vec<DownloadJob>) {
+    ///
+    /// The path is rebuilt from the models directory rather than believed. It decides what
+    /// a resume writes and what a discard deletes, and this file sits on disk where
+    /// anything that can write to it could aim both.
+    pub fn restore(&self, history: Vec<DownloadJob>, models_dir: &Path) {
         let mut jobs = self.jobs.lock().expect("downloads lock");
-        for view in history.into_iter().filter(|view| view.state.finished()) {
+        for mut view in history.into_iter().filter(|view| view.state.finished()) {
             self.reserve(&view.id);
+            view.path = models_dir
+                .join(&view.file_name)
+                .to_string_lossy()
+                .into_owned();
             jobs.push(Tracked {
                 view,
                 control: Arc::new(Control::default()),
@@ -484,6 +495,15 @@ impl Downloads {
         let (url, dest, snapshot) = {
             let mut jobs = self.jobs.lock().expect("downloads lock");
             resumable(&views(&jobs), id)?;
+            // `admit` is where a URL is checked, and a resume does not pass through it.
+            // For an adopted row the URL came out of a sidecar on disk, so this is the
+            // only thing between a planted file and a fetch from anywhere.
+            let checked = jobs
+                .iter()
+                .find(|job| job.view.id == id)
+                .map(|job| job.view.url.clone())
+                .ok_or_else(|| format!("no download {id}"))?;
+            file_name_for(&checked)?;
             std::fs::create_dir_all(models_dir).map_err(|e| e.to_string())?;
 
             let job = jobs

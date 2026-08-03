@@ -724,9 +724,10 @@ pub fn run() {
             // the `.part` files a previous run left in the models directory.
             {
                 let state = app.state::<AppState>();
-                state
-                    .downloads
-                    .restore(store::load_history(&store::history_path()));
+                state.downloads.restore(
+                    store::load_history(&store::history_path()),
+                    &state.models_dir(),
+                );
                 state.downloads.adopt(&state.models_dir());
             }
 

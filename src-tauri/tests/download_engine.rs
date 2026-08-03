@@ -2051,3 +2051,41 @@ fn a_partial_on_disk_describes_itself_without_the_network() {
         "a sidecar that cannot be read names no file, so there is nothing to list"
     );
 }
+
+/// A `.part` that is a symlink must not be written through.
+///
+/// `admit` only looks at the destination, never at the `.part` beside it, so a symlink
+/// planted in the models directory turns an ordinary download the user started themselves
+/// into a write to wherever it points. The models directory is user-configurable to any
+/// folder — `~/Downloads`, say — and `.part` files are invisible to the catalog by design,
+/// so nothing would surface it.
+#[test]
+fn a_symlinked_part_file_is_refused_rather_than_written_through() {
+    let body = body_of(64_000);
+    let server = start(body.clone());
+    let dir = scratch("symlink-part");
+    let dest = dir.join("model.gguf");
+    let part = dir.join("model.gguf.part");
+
+    let victim = dir.join("precious.plist");
+    std::fs::write(&victim, b"do not touch").expect("seed victim");
+    std::os::unix::fs::symlink(&victim, &part).expect("plant symlink");
+
+    let error = download::download(
+        &spec(server.url(), dest.clone()),
+        &download::Control::default(),
+        &Silent,
+    )
+    .expect_err("a symlinked part file must not be downloaded into");
+    assert!(!error.is_empty());
+
+    assert_eq!(
+        std::fs::read(&victim).expect("victim must survive"),
+        b"do not touch",
+        "the download was written through the symlink"
+    );
+    assert!(
+        !dest.exists(),
+        "nothing may be renamed into place from a refused transfer"
+    );
+}
