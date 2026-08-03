@@ -234,6 +234,7 @@ async fn set_models_dir(path: String, state: State<'_, AppState>) -> Result<DirI
     state.save_config()?;
 
     let dir = state.models_dir();
+    state.downloads.adopt(&dir);
     tauri::async_runtime::spawn_blocking(move || catalog::dir_info(&dir))
         .await
         .map_err(|e| e.to_string())
@@ -494,13 +495,31 @@ fn download_start(url: String, state: State<'_, AppState>) -> Result<Vec<Downloa
 }
 
 #[tauri::command]
-fn download_cancel(id: String, state: State<'_, AppState>) -> Result<Vec<DownloadJob>, String> {
-    state.downloads.cancel(&id)
+fn download_pause(id: String, state: State<'_, AppState>) -> Result<Vec<DownloadJob>, String> {
+    state.downloads.pause(&id)
 }
 
 #[tauri::command]
+fn download_resume(id: String, state: State<'_, AppState>) -> Result<Vec<DownloadJob>, String> {
+    let dir = state.models_dir();
+    let options = {
+        let config = state.config.lock().expect("config lock");
+        config.downloads.clone()
+    };
+    state.downloads.resume(&id, &dir, &options)
+}
+
+#[tauri::command]
+fn download_discard(id: String, state: State<'_, AppState>) -> Result<Vec<DownloadJob>, String> {
+    state.downloads.discard(&id)
+}
+
+/// Rescans for partials as well as reporting: a `.part` can appear in the models directory
+/// while the app is running — left by an older build, or copied in — and the screen asking
+/// for status is the moment the user is looking for it.
+#[tauri::command]
 fn download_status(state: State<'_, AppState>) -> Vec<DownloadJob> {
-    state.downloads.snapshot()
+    state.downloads.adopt(&state.models_dir())
 }
 
 #[tauri::command]
@@ -608,6 +627,9 @@ pub fn run() {
                     Arc::new(TauriEvents(handle.clone())),
                     Arc::new(move || refresh_catalog(&handle)),
                 )
+                .persisting_with(Arc::new(|jobs| {
+                    let _ = store::save_history(&store::history_path(), jobs);
+                }))
             };
 
             app.manage(AppState {
@@ -619,6 +641,16 @@ pub fn run() {
                 tray: Mutex::new(None),
                 orphan: Mutex::new(runner::detect_orphans(None)),
             });
+
+            // What finished came from the history file; what did not is on the disk, in
+            // the `.part` files a previous run left in the models directory.
+            {
+                let state = app.state::<AppState>();
+                state
+                    .downloads
+                    .restore(store::load_history(&store::history_path()));
+                state.downloads.adopt(&state.models_dir());
+            }
 
             let status = MenuItem::with_id(app, "status", "No model running", false, None::<&str>)?;
             let stop = MenuItem::with_id(app, "stop", "Stop model", false, None::<&str>)?;
@@ -692,7 +724,9 @@ pub fn run() {
             orphan_status,
             orphan_stop,
             download_start,
-            download_cancel,
+            download_pause,
+            download_resume,
+            download_discard,
             download_status,
             download_clear,
             set_download_options,

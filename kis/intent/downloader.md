@@ -68,9 +68,9 @@ They are facts about the engine and outlive that plan.
 - A quant too big for one file ships as `{name}-00001-of-00003.gguf`. The engine
   takes one file per job and refuses a second rather than queueing, so a split
   set has to be fetched a part at a time.
-- Pause is not a state: cancel leaves the `.part` and sidecar, and starting the
-  same URL again resumes. Add a real Paused state only if the UI wants a pause
-  button.
+- ~~Pause is not a state.~~ It is one as of 2026-08-03: the UI wanted the button,
+  and the row that survives a restart needed a name.
+  [persistence.md](persistence.md).
 - One at a time is enforced by refusing, not queueing, so there is no Queued
   state. Any "download all" would need one.
 - `resolution_against_a_silent_server_is_bounded_by_its_timeouts` guards less

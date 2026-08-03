@@ -40,8 +40,15 @@ exactly the case this gets wrong.
 Config is one JSON file at schema 5, every field `#[serde(default)]`, with
 unknown keys preserved through a load/save round-trip.
 
+Finished downloads live beside it in `downloads.json`, written atomically on
+state transitions and never on a progress tick. A file of its own because a
+transfer settles often and the config holds the models directory, the
+llama-server path and every remembered launch — an unreadable history should cost
+the user their history and nothing else.
+
 Everything the app keeps lives in `~/Library/Application Support/llamaport`:
-that config, the runner pidfile, the last run log. `store::adopt_legacy_dir`
+that config, `downloads.json`, the runner pidfile, the last run log.
+`store::adopt_legacy_dir`
 takes over the directory left under the old `llama-cpp-hub` name, once, as the
 first statement in `setup` — before the pidfile is read or the config is loaded,
 both of which are in that same block.
@@ -86,6 +93,10 @@ cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
   own text and re-seeds from props only when they disagree.
 - `on_window_event` fires for every window, so any handler there must check
   `window.label()`. The close-hides-instead rule is the main window's alone.
+- A `.part` and its sidecar are named from the destination — `{dest}.part` and
+  `{dest}.part.json` — so a partial is found by scanning the models directory for
+  the sidecar suffix and stripping it. `catalog::scan` filters on the `.gguf`
+  extension and will never see either.
 - There is no frontend test framework. Every test is Rust, in `src-tauri/tests/`
   or an inline `#[cfg(test)]` module; TypeScript is covered by `tsc` and by
   looking at the screen. Logic worth testing belongs in Rust until that changes.

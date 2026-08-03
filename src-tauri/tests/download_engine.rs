@@ -1969,3 +1969,85 @@ fn the_reporting_interval_bounds_verification_too() {
     assert_eq!(verifying[0].completed, 0, "saw {verifying:?}");
     assert_eq!(verifying[1].completed, total, "saw {verifying:?}");
 }
+
+/// What a `.part` amounts to, read from the disk alone.
+///
+/// This is the whole recovery story: the app restarts knowing nothing, finds a sidecar,
+/// and has to say what file it belongs to and whether the bytes beside it can be
+/// continued — all without asking the network, which may not be there.
+#[test]
+fn a_partial_on_disk_describes_itself_without_the_network() {
+    let dir = scratch("partial");
+    let dest = dir.join("model.gguf");
+    let part = dir.join("model.gguf.part");
+    let sidecar = dir.join("model.gguf.part.json");
+
+    let seed = |segments: &str, total: u64| {
+        std::fs::write(
+            &sidecar,
+            format!(
+                r#"{{"sourceUrl":"https://huggingface.co/a/b/resolve/main/model.gguf",
+                     "total":{total},"etag":null,"segments":[{segments}]}}"#
+            ),
+        )
+        .expect("seed sidecar");
+    };
+    let whole = r#"{"start":0,"end":15999,"completed":16000},
+                   {"start":16000,"end":31999,"completed":4000},
+                   {"start":32000,"end":47999,"completed":0},
+                   {"start":48000,"end":63999,"completed":0}"#;
+
+    assert!(
+        download::partial_at(&dest).is_none(),
+        "a directory with no sidecar in it has no partial to report"
+    );
+
+    std::fs::write(&part, vec![0u8; 64_000]).expect("seed part");
+    seed(whole, 64_000);
+
+    let found = download::partial_at(&dest).expect("a sidecar beside its part is a partial");
+    assert_eq!(
+        found.source_url, "https://huggingface.co/a/b/resolve/main/model.gguf",
+        "the URL has to come back or there is nothing to resume from"
+    );
+    assert_eq!(found.total, 64_000);
+    assert_eq!(
+        found.completed, 20_000,
+        "the bytes on disk are the sum across segments, not the first one's"
+    );
+    assert!(found.resumable);
+
+    // Each of these is a partial the user can still see and discard, but not continue.
+    std::fs::remove_file(&part).expect("remove part");
+    let orphan = download::partial_at(&dest).expect("a sidecar alone is still worth reporting");
+    assert!(
+        !orphan.resumable,
+        "there are no bytes to continue from, so offering a resume would be a lie"
+    );
+
+    std::fs::write(&part, vec![0u8; 40_000]).expect("truncated part");
+    let truncated = download::partial_at(&dest).expect("reported");
+    assert!(
+        !truncated.resumable,
+        "the part is preallocated to the full size, so a shorter one was replaced out of \
+         band and the ranges the sidecar calls complete are not on disk"
+    );
+
+    std::fs::write(&part, vec![0u8; 64_000]).expect("restore part");
+    seed(
+        r#"{"start":0,"end":15999,"completed":16000},
+           {"start":40000,"end":63999,"completed":0}"#,
+        64_000,
+    );
+    let holed = download::partial_at(&dest).expect("reported");
+    assert!(
+        !holed.resumable,
+        "segments that do not tile the file describe some other file"
+    );
+
+    std::fs::write(&sidecar, "{ not json").expect("malformed sidecar");
+    assert!(
+        download::partial_at(&dest).is_none(),
+        "a sidecar that cannot be read names no file, so there is nothing to list"
+    );
+}

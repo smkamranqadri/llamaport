@@ -21,8 +21,10 @@ Two, each with its own spec, module and screen:
    the app is wanted. Revisit if the beta lands — and note the bundle identifier
    is now effectively fixed, since changing it strands existing installs.
 
-3. **Nothing planned.** The next move is whatever the beta says: install
-   friction, bug reports, or silence. Do not plan features against silence.
+3. **Persistence** — planned 2026-08-03, in progress.
+   [persistence.md](persistence.md). Downloads that survive a restart, Library
+   favourites and delete, launch defaults. This is the beta talking: every item
+   came from the author using the built app, which is what step 2 was for.
 
 ## Decided against
 

@@ -220,16 +220,49 @@ fn reading_agent(stall_after: Duration) -> ureq::Agent {
         .build()
 }
 
-fn part_path(dest: &Path) -> PathBuf {
+pub fn part_path(dest: &Path) -> PathBuf {
     let mut name = dest.as_os_str().to_os_string();
     name.push(".part");
     PathBuf::from(name)
 }
 
-fn sidecar_path(dest: &Path) -> PathBuf {
+pub fn sidecar_path(dest: &Path) -> PathBuf {
     let mut name = dest.as_os_str().to_os_string();
     name.push(".part.json");
     PathBuf::from(name)
+}
+
+/// An interrupted transfer as the disk alone describes it.
+///
+/// The sidecar is the only account of a partial that survives the process, and on a
+/// restart it is read before anything has been resolved — so nothing here may depend on
+/// the network. `resumable` is the same judgement `resume_state` makes, minus the size
+/// the server would report, which is not available yet.
+#[derive(Debug, Clone)]
+pub struct Partial {
+    pub source_url: String,
+    pub total: u64,
+    pub completed: u64,
+    pub resumable: bool,
+}
+
+/// What the `.part` beside `dest` amounts to, or nothing when no readable sidecar names
+/// it. An unresumable partial is still returned: it occupies disk and the user is owed
+/// the chance to see it and throw it away.
+pub fn partial_at(dest: &Path) -> Option<Partial> {
+    let raw = std::fs::read_to_string(sidecar_path(dest)).ok()?;
+    let sidecar: Sidecar = serde_json::from_str(&raw).ok()?;
+
+    let intact = std::fs::metadata(part_path(dest))
+        .map(|meta| meta.len() == sidecar.total)
+        .unwrap_or(false);
+
+    Some(Partial {
+        completed: sidecar.segments.iter().map(|s| s.completed).sum(),
+        resumable: intact && tiles(&sidecar.segments, sidecar.total),
+        source_url: sidecar.source_url,
+        total: sidecar.total,
+    })
 }
 
 /// A 403 means different things either side of a redirect: on the origin URL the repo is

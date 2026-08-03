@@ -1,8 +1,10 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import {
-  downloadCancel,
   downloadClear,
+  downloadDiscard,
+  downloadPause,
+  downloadResume,
   downloadStart,
   downloadStatus,
   getDirInfo,
@@ -20,6 +22,10 @@ import type {
 } from "./types";
 
 type Recovery = "resume" | "restart" | "none";
+
+/// Finished rows shown at once. The history is never trimmed — a page is how a list of
+/// every model ever fetched stays readable.
+const PAGE = 25;
 
 const MIB = 1024 ** 2;
 
@@ -65,7 +71,9 @@ const UNRESUMABLE = [
 
 /// The failures arrive as prose, and prose is the only thing there is to read them from.
 function recovery(job: DownloadJob): Recovery {
-  if (job.state === "cancelled") return "resume";
+  // A paused transfer is resumed by id rather than by URL, so it is not a recovery at
+  // all — except when its bytes are gone, which is the one case it cannot be.
+  if (job.state === "paused") return "none";
   if (job.state !== "failed") return "none";
 
   const cause = job.error ?? "";
@@ -123,8 +131,8 @@ function badgeFor(job: DownloadJob): { text: string; className: string } {
     return { text: PHASE_LABEL[job.phase], className: "badge badge-moe" };
   }
   if (job.state === "complete") return { text: "complete", className: "badge" };
-  if (job.state === "cancelled") {
-    return { text: "cancelled", className: "badge badge-quiet" };
+  if (job.state === "paused") {
+    return { text: "paused", className: "badge badge-quiet" };
   }
   return { text: "failed", className: "badge badge-warn" };
 }
@@ -142,6 +150,21 @@ function detail(job: DownloadJob, smoothed: Smoothed | undefined): string {
       return `Reading the file back to check its digest · ${moved(job)} · ${rateText(job.bytesPerSecond)}${left}`;
     }
     return `${moved(job)} · ${rateText(job.bytesPerSecond)}${left}`;
+  }
+
+  if (job.state === "paused") {
+    if (!job.resumable) {
+      return "The partial file beside this one is gone, so there is nothing left to continue — discard it to clear the sidecar.";
+    }
+    // `completed` counts the phase, not the transfer: one stopped mid-verify has every
+    // byte on disk already, and reporting the digest's read position as progress lies.
+    if (job.phase === "verifying") {
+      return "Paused while the digest was being checked — the bytes are all here, so resuming re-checks them.";
+    }
+    if (job.total == null) {
+      return "Paused before any bytes moved — resuming starts from the beginning.";
+    }
+    return `Paused at ${moved(job)} — resuming picks up from there.`;
   }
 
   const mode = recovery(job);
@@ -167,7 +190,9 @@ function Row({
   smoothed,
   busy,
   blocked,
-  onCancel,
+  onPause,
+  onResume,
+  onDiscard,
   onRetry,
   onShow,
 }: {
@@ -175,7 +200,9 @@ function Row({
   smoothed: Smoothed | undefined;
   busy: boolean;
   blocked: boolean;
-  onCancel: (id: string) => void;
+  onPause: (id: string) => void;
+  onResume: (id: string) => void;
+  onDiscard: (id: string) => void;
   onRetry: (url: string) => void;
   onShow: (path: string) => void;
 }) {
@@ -204,11 +231,26 @@ function Row({
 
         <span className="actions">
           {job.state === "active" && (
+            <button className="button" onClick={() => onPause(job.id)}>
+              Pause
+            </button>
+          )}
+          {job.state === "paused" && job.resumable && (
+            <button
+              className="button button-primary"
+              disabled={busy || blocked}
+              onClick={() => onResume(job.id)}
+            >
+              Resume
+            </button>
+          )}
+          {job.state !== "complete" && (
             <button
               className="button button-danger"
-              onClick={() => onCancel(job.id)}
+              title="Stop this transfer and delete the bytes it has fetched"
+              onClick={() => onDiscard(job.id)}
             >
-              Cancel
+              Discard
             </button>
           )}
           {mode !== "none" && (
@@ -275,14 +317,6 @@ function limitHint(typed: string, applied: number | null): string {
   return `Limited to ${formatRate(applied)}. A change applies to the download running now, not only the next one.`;
 }
 
-/// One row per file: a resume starts a fresh job for a URL that already has one, and two
-/// rows for the same file read as a bug rather than as history.
-function newestPerUrl(jobs: DownloadJob[]): DownloadJob[] {
-  const byUrl = new Map<string, DownloadJob>();
-  jobs.forEach((job) => byUrl.set(job.url, job));
-  return [...byUrl.values()].reverse();
-}
-
 export default function Downloads({
   onShowInLibrary,
 }: {
@@ -296,6 +330,7 @@ export default function Downloads({
   const [options, setOptions] = useState<DownloadOptions | null>(null);
   const [limit, setLimit] = useState("");
   const [rates, setRates] = useState<Record<string, Smoothed>>({});
+  const [page, setPage] = useState(PAGE);
 
   useEffect(() => {
     const readDir = () => getDirInfo().then(setDir).catch(() => {});
@@ -366,12 +401,19 @@ export default function Downloads({
     });
   };
 
-  const cancel = useCallback((id: string) => {
-    setFailure(null);
-    downloadCancel(id)
-      .then(setJobs)
-      .catch((e) => setFailure(String(e)));
-  }, []);
+  const act = useCallback(
+    (run: (id: string) => Promise<DownloadJob[]>) => (id: string) => {
+      setFailure(null);
+      run(id)
+        .then(setJobs)
+        .catch((e) => setFailure(String(e)));
+    },
+    [],
+  );
+
+  const pause = useMemo(() => act(downloadPause), [act]);
+  const resume = useMemo(() => act(downloadResume), [act]);
+  const discard = useMemo(() => act(downloadDiscard), [act]);
 
   const applyLimit = (event: FormEvent) => {
     event.preventDefault();
@@ -393,8 +435,12 @@ export default function Downloads({
   };
 
   const active = jobs.find((job) => job.state === "active");
-  const rows = newestPerUrl(jobs);
-  const settled = rows.some((job) => job.state !== "active");
+  const unfinished = jobs.filter(
+    (job) => job.state === "active" || job.state === "paused",
+  );
+  // Newest first, and never trimmed — only ever shown a page at a time.
+  const history = jobs.filter((job) => !unfinished.includes(job)).reverse();
+  const shown = history.slice(0, page);
 
   return (
     <>
@@ -406,7 +452,7 @@ export default function Downloads({
             {dir?.freeBytes != null && ` · ${formatBytes(dir.freeBytes)} free`}
           </p>
         </div>
-        {settled && (
+        {history.length > 0 && (
           <button
             className="button"
             onClick={() =>
@@ -462,7 +508,7 @@ export default function Downloads({
 
       {failure && <p className="notice notice-error">{failure}</p>}
 
-      {rows.length === 0 && (
+      {jobs.length === 0 && (
         <div className="empty">
           <p className="empty-title">Nothing downloaded yet</p>
           <p className="empty-detail">
@@ -472,21 +518,56 @@ export default function Downloads({
         </div>
       )}
 
-      {rows.length > 0 && (
+      {unfinished.length > 0 && (
         <ul className="model-list">
-          {rows.map((job) => (
+          {unfinished.map((job) => (
             <Row
               key={job.id}
               job={job}
               smoothed={rates[job.id]}
               busy={busy}
               blocked={active != null}
-              onCancel={cancel}
+              onPause={pause}
+              onResume={resume}
+              onDiscard={discard}
               onRetry={(target) => void request(target)}
               onShow={onShowInLibrary}
             />
           ))}
         </ul>
+      )}
+
+      {history.length > 0 && (
+        <>
+          <h2 className="panel-head">
+            History · {history.length} download
+            {history.length === 1 ? "" : "s"}
+          </h2>
+          <ul className="model-list">
+            {shown.map((job) => (
+              <Row
+                key={job.id}
+                job={job}
+                smoothed={rates[job.id]}
+                busy={busy}
+                blocked={active != null}
+                onPause={pause}
+                onResume={resume}
+                onDiscard={discard}
+                onRetry={(target) => void request(target)}
+                onShow={onShowInLibrary}
+              />
+            ))}
+          </ul>
+          {shown.length < history.length && (
+            <button
+              className="button"
+              onClick={() => setPage((seen) => seen + PAGE)}
+            >
+              Load more ({history.length - shown.length} older)
+            </button>
+          )}
+        </>
       )}
     </>
   );

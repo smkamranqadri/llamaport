@@ -46,13 +46,26 @@ impl Default for Options {
     }
 }
 
+/// `Paused` is what a stopped transfer has always been: cancelling leaves the `.part` and
+/// the sidecar on disk and starting the same URL again resumes from them. Naming it that
+/// is what lets the row survive a restart and offer a button rather than an apology.
+///
+/// There is no `Discarded`: discarding removes the row along with the bytes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum DownloadState {
     Active,
+    Paused,
     Complete,
-    Cancelled,
     Failed,
+}
+
+impl DownloadState {
+    /// Whether this job is over. History is exactly what is finished — a paused transfer
+    /// is unfinished business that lives on disk, not a record of something that happened.
+    pub fn finished(self) -> bool {
+        matches!(self, DownloadState::Complete | DownloadState::Failed)
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -71,6 +84,9 @@ pub struct DownloadJob {
     pub error: Option<String>,
     pub started_secs: Option<u64>,
     pub finished_secs: Option<u64>,
+    /// Whether the bytes this row points at can be continued. Only ever false on a paused
+    /// transfer adopted from a `.part` that no longer holds what its sidecar claims.
+    pub resumable: bool,
 }
 
 impl DownloadJob {
@@ -91,7 +107,24 @@ impl DownloadJob {
             error: None,
             started_secs: now_secs(),
             finished_secs: None,
+            resumable: true,
         }
+    }
+
+    /// A transfer this app never started, rebuilt from the `.part` a previous run left in
+    /// the models directory. The sidecar is the only account of it there is.
+    pub fn adopted(id: &str, dest: &Path, partial: &download::Partial) -> Self {
+        let mut job = Self::begin(id, &partial.source_url, dest);
+        job.state = DownloadState::Paused;
+        job.completed = partial.completed;
+        job.total = Some(partial.total);
+        job.resumable = partial.resumable;
+        job.started_secs = std::fs::metadata(download::sidecar_path(dest))
+            .and_then(|meta| meta.modified())
+            .ok()
+            .and_then(|at| at.duration_since(UNIX_EPOCH).ok())
+            .map(|since| since.as_secs());
+        job
     }
 }
 
@@ -133,6 +166,19 @@ pub fn file_name_for(url: &str) -> Result<String, String> {
 pub fn admit(url: &str, models_dir: &Path, jobs: &[DownloadJob]) -> Result<PathBuf, String> {
     let file_name = file_name_for(url)?;
 
+    // A paused row already points at this file's `.part`. Starting again would open a
+    // second row over the same bytes, and the two would fight over them.
+    if let Some(job) = jobs
+        .iter()
+        .filter(|j| j.state == DownloadState::Paused)
+        .find(|j| j.url == url || j.file_name == file_name)
+    {
+        return Err(format!(
+            "{} is paused — resume it from the list below rather than starting it again",
+            job.file_name
+        ));
+    }
+
     if let Some(job) = jobs.iter().find(|j| j.state == DownloadState::Active) {
         if job.url == url {
             return Err(format!("{file_name} is already downloading"));
@@ -166,11 +212,36 @@ pub fn cancellable(jobs: &[DownloadJob], id: &str) -> Result<bool, String> {
     Ok(job.state == DownloadState::Active)
 }
 
-/// A cancellation reaches the caller as an error, and it is not one.
+/// Whether a job may be put back on the engine. The one-at-a-time rule is the same one
+/// `admit` enforces and is enforced here too: a resume is a transfer starting, and it
+/// competes for the same pipe as any other.
+pub fn resumable(jobs: &[DownloadJob], id: &str) -> Result<(), String> {
+    let job = jobs
+        .iter()
+        .find(|job| job.id == id)
+        .ok_or_else(|| format!("no download {id}"))?;
+
+    if job.state == DownloadState::Active {
+        return Err(format!("{} is already downloading", job.file_name));
+    }
+    if job.state == DownloadState::Complete {
+        return Err(format!("{} has already been downloaded", job.file_name));
+    }
+    if let Some(running) = jobs.iter().find(|job| job.state == DownloadState::Active) {
+        return Err(format!(
+            "{} is still downloading — this app downloads one file at a time",
+            running.file_name
+        ));
+    }
+    Ok(())
+}
+
+/// A cancellation reaches the caller as an error, and it is not one — it is a pause, and
+/// the bytes it stopped on are still on disk.
 pub fn settle(result: Result<(), String>) -> (DownloadState, Option<String>) {
     match result {
         Ok(()) => (DownloadState::Complete, None),
-        Err(cause) if cause == CANCELLED => (DownloadState::Cancelled, None),
+        Err(cause) if cause == CANCELLED => (DownloadState::Paused, None),
         Err(cause) => (DownloadState::Failed, Some(cause)),
     }
 }
@@ -208,10 +279,57 @@ fn now_secs() -> Option<u64> {
 struct Tracked {
     view: DownloadJob,
     control: Arc<Control>,
+    /// Set before the cancel that stops a discarded transfer, and read on the settle path
+    /// where the engine has already let the `.part` go.
+    discarding: bool,
 }
 
 fn views(jobs: &[Tracked]) -> Vec<DownloadJob> {
     jobs.iter().map(|job| job.view.clone()).collect()
+}
+
+fn finished(jobs: &Mutex<Vec<Tracked>>) -> Vec<DownloadJob> {
+    jobs.lock()
+        .expect("downloads lock")
+        .iter()
+        .map(|job| job.view.clone())
+        .filter(|view| view.state.finished())
+        .collect()
+}
+
+const SIDECAR_SUFFIX: &str = ".part.json";
+
+/// Every interrupted transfer the models directory is holding, keyed by where it was
+/// headed. `.part` files are invisible to the catalog, which scans for `.gguf`, so
+/// without this they accumulate unseen and their bytes are unreachable.
+fn partials_in(models_dir: &Path) -> Vec<(PathBuf, download::Partial)> {
+    let Ok(entries) = std::fs::read_dir(models_dir) else {
+        return Vec::new();
+    };
+
+    let mut found = Vec::new();
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
+            continue;
+        };
+        let Some(stem) = name.strip_suffix(SIDECAR_SUFFIX) else {
+            continue;
+        };
+        let dest = path.with_file_name(stem);
+        if let Some(partial) = download::partial_at(&dest) {
+            found.push((dest, partial));
+        }
+    }
+    found.sort_by(|(a, _), (b, _)| a.cmp(b));
+    found
+}
+
+/// Removes the bytes an abandoned transfer left behind. Both files or neither: a sidecar
+/// without its `.part` is exactly the junk this exists to clear.
+pub fn discard_files(dest: &Path) {
+    let _ = std::fs::remove_file(download::part_path(dest));
+    let _ = std::fs::remove_file(download::sidecar_path(dest));
 }
 
 /// Run once a file has landed in the models directory, so whoever owns the catalog can
@@ -224,11 +342,18 @@ pub type Landed = Arc<dyn Fn() + Send + Sync>;
 pub type Engine =
     Arc<dyn Fn(&Spec, &Control, &dyn ProgressSink) -> Result<(), String> + Send + Sync>;
 
+/// Where finished jobs are written so they outlive the process.
+///
+/// Only finished ones: an unfinished transfer is described by the sidecar beside its
+/// `.part`, which is the only account of it that cannot go stale while it runs.
+pub type Persist = Arc<dyn Fn(&[DownloadJob]) + Send + Sync>;
+
 pub struct Downloads {
     jobs: Arc<Mutex<Vec<Tracked>>>,
     events: Events,
     landed: Landed,
     engine: Engine,
+    persist: Persist,
     next: AtomicU64,
 }
 
@@ -243,12 +368,77 @@ impl Downloads {
             events,
             landed,
             engine,
+            persist: Arc::new(|_| {}),
             next: AtomicU64::new(1),
         }
     }
 
+    pub fn persisting_with(mut self, persist: Persist) -> Self {
+        self.persist = persist;
+        self
+    }
+
     pub fn snapshot(&self) -> Vec<DownloadJob> {
         views(&self.jobs.lock().expect("downloads lock"))
+    }
+
+    /// Seeds the history a previous run wrote down.
+    ///
+    /// Only finished rows are taken: a transfer cannot survive the process that was
+    /// running it, and one restored as Active would sit there forever holding the line.
+    /// Whatever was unfinished is on the disk instead, and `adopt` is what finds it.
+    pub fn restore(&self, history: Vec<DownloadJob>) {
+        let mut jobs = self.jobs.lock().expect("downloads lock");
+        for view in history.into_iter().filter(|view| view.state.finished()) {
+            self.reserve(&view.id);
+            jobs.push(Tracked {
+                view,
+                control: Arc::new(Control::default()),
+                discarding: false,
+            });
+        }
+    }
+
+    /// Takes in the partials left in the models directory, so bytes fetched by a run that
+    /// kept no history of them are still reachable. Untracked ones only — a `.part` being
+    /// written right now already has a row pointing at it.
+    pub fn adopt(&self, models_dir: &Path) -> Vec<DownloadJob> {
+        let found = partials_in(models_dir);
+        let added = {
+            let mut jobs = self.jobs.lock().expect("downloads lock");
+            let mut added = 0;
+            for (dest, partial) in found {
+                let path = dest.to_string_lossy();
+                if jobs.iter().any(|job| job.view.path == path) {
+                    continue;
+                }
+                let id = self.next_id();
+                jobs.push(Tracked {
+                    view: DownloadJob::adopted(&id, &dest, &partial),
+                    control: Arc::new(Control::default()),
+                    discarding: false,
+                });
+                added += 1;
+            }
+            added
+        };
+        if added > 0 {
+            self.announce();
+        }
+        self.snapshot()
+    }
+
+    fn next_id(&self) -> String {
+        format!("dl-{}", self.next.fetch_add(1, Ordering::Relaxed))
+    }
+
+    /// Keeps the counter ahead of an id that came back from disk, so a new transfer cannot
+    /// be handed one the restored history is already using.
+    fn reserve(&self, id: &str) {
+        let Some(used) = id.strip_prefix("dl-").and_then(|n| n.parse::<u64>().ok()) else {
+            return;
+        };
+        self.next.fetch_max(used + 1, Ordering::Relaxed);
     }
 
     pub fn start(
@@ -268,39 +458,89 @@ impl Downloads {
             jobs.push(Tracked {
                 view: DownloadJob::begin(&id, url, &dest),
                 control: control.clone(),
+                discarding: false,
             });
             (dest, views(&jobs))
         };
-        emit_state(&self.events, &self.jobs);
-
-        let spec = spec_for(url, &dest, options);
-        let jobs = self.jobs.clone();
-        let events = self.events.clone();
-        let landed = self.landed.clone();
-        let engine = self.engine.clone();
-        let sink = Sink {
-            id: id.clone(),
-            jobs: jobs.clone(),
-            events: events.clone(),
-        };
-
-        // The transfer blocks for as long as it takes, which is hours.
-        thread::spawn(move || {
-            let outcome = engine(&spec, &control, &sink);
-            let complete = outcome.is_ok();
-            finish(&jobs, &id, outcome);
-            // Ahead of the state event, so a screen that answers a finished transfer by
-            // reading the catalog finds the file already in it.
-            if complete {
-                landed();
-            }
-            emit_state(&events, &jobs);
-        });
+        self.announce();
+        self.run(id, url, dest, control, options);
 
         Ok(snapshot)
     }
 
-    pub fn cancel(&self, id: &str) -> Result<Vec<DownloadJob>, String> {
+    /// Puts a paused transfer back on the engine under its own id.
+    ///
+    /// The same job rather than a new one: the `.part` it stopped on is the same file, and
+    /// two rows for one download read as a bug rather than as history.
+    pub fn resume(
+        &self,
+        id: &str,
+        models_dir: &Path,
+        options: &Options,
+    ) -> Result<Vec<DownloadJob>, String> {
+        let control = Arc::new(Control::default());
+        control.set_rate_limit(normalized_rate(options.rate_limit));
+
+        let (url, dest, snapshot) = {
+            let mut jobs = self.jobs.lock().expect("downloads lock");
+            resumable(&views(&jobs), id)?;
+            std::fs::create_dir_all(models_dir).map_err(|e| e.to_string())?;
+
+            let job = jobs
+                .iter_mut()
+                .find(|job| job.view.id == id)
+                .ok_or_else(|| format!("no download {id}"))?;
+
+            // `completed` and `total` are left where they were, so the row opens on the
+            // bytes it stopped at rather than at zero until the first report lands.
+            job.view.state = DownloadState::Active;
+            job.view.error = None;
+            job.view.phase = None;
+            job.view.bytes_per_second = None;
+            job.view.finished_secs = None;
+            job.control = control.clone();
+            job.discarding = false;
+
+            let url = job.view.url.clone();
+            let dest = PathBuf::from(&job.view.path);
+            (url, dest, views(&jobs))
+        };
+        self.announce();
+        self.run(id.to_string(), &url, dest, control, options);
+
+        Ok(snapshot)
+    }
+
+    /// Throws the transfer away along with the bytes it fetched.
+    ///
+    /// A running transfer is marked and signalled; the files go on the settle path, once
+    /// the engine has returned and stopped writing to them. One that has already stopped
+    /// has no writer to wait for, so it goes now.
+    pub fn discard(&self, id: &str) -> Result<Vec<DownloadJob>, String> {
+        let snapshot = {
+            let mut jobs = self.jobs.lock().expect("downloads lock");
+            let job = jobs
+                .iter_mut()
+                .find(|job| job.view.id == id)
+                .ok_or_else(|| format!("no download {id}"))?;
+
+            if job.view.state == DownloadState::Active {
+                job.discarding = true;
+                job.control.cancel();
+                return Ok(views(&jobs));
+            }
+
+            discard_files(&PathBuf::from(&job.view.path));
+            jobs.retain(|job| job.view.id != id);
+            views(&jobs)
+        };
+        (self.persist)(&finished(&self.jobs));
+        self.announce();
+        Ok(snapshot)
+    }
+
+    /// Stops the transfer and keeps every byte it has fetched.
+    pub fn pause(&self, id: &str) -> Result<Vec<DownloadJob>, String> {
         let jobs = self.jobs.lock().expect("downloads lock");
         let snapshot = views(&jobs);
         if cancellable(&snapshot, id)? {
@@ -309,6 +549,39 @@ impl Downloads {
             }
         }
         Ok(snapshot)
+    }
+
+    /// Hands a job to the engine on a thread of its own. The transfer blocks for as long
+    /// as it takes, which is hours.
+    fn run(&self, id: String, url: &str, dest: PathBuf, control: Arc<Control>, options: &Options) {
+        let spec = spec_for(url, &dest, options);
+        let jobs = self.jobs.clone();
+        let events = self.events.clone();
+        let landed = self.landed.clone();
+        let engine = self.engine.clone();
+        let persist = self.persist.clone();
+        let sink = Sink {
+            id: id.clone(),
+            jobs: jobs.clone(),
+            events: events.clone(),
+        };
+
+        thread::spawn(move || {
+            let outcome = engine(&spec, &control, &sink);
+            let complete = outcome.is_ok();
+            finish(&jobs, &id, outcome, &dest);
+            // Ahead of the state event, so a screen that answers a finished transfer by
+            // reading the catalog finds the file already in it.
+            if complete {
+                landed();
+            }
+            persist(&finished(&jobs));
+            emit_state(&events, &jobs);
+        });
+    }
+
+    fn announce(&self) {
+        emit_state(&self.events, &self.jobs);
     }
 
     /// Applies a limit to whatever is running now as well as remembering it for what runs
@@ -325,25 +598,37 @@ impl Downloads {
         views(&jobs)
     }
 
-    /// Drops everything that has settled. The `.part` of a cancelled or failed transfer
-    /// stays on disk, so starting the same URL again resumes rather than restarts.
+    /// Drops the history. A paused transfer is not history — its bytes are on disk waiting
+    /// to be continued, and clearing the finished rows must not throw that away.
     pub fn clear(&self) -> Vec<DownloadJob> {
         let snapshot = {
             let mut jobs = self.jobs.lock().expect("downloads lock");
-            jobs.retain(|job| job.view.state == DownloadState::Active);
+            jobs.retain(|job| !job.view.state.finished());
             views(&jobs)
         };
+        (self.persist)(&[]);
         emit_state(&self.events, &self.jobs);
         snapshot
     }
 }
 
-fn finish(jobs: &Mutex<Vec<Tracked>>, id: &str, outcome: Result<(), String>) {
+/// Records how a transfer ended, and throws away a discarded one entirely.
+///
+/// The deletion happens here rather than where the discard was asked for: `Control::cancel`
+/// returns while the engine is still writing, and removing the `.part` from under a live
+/// writer would race it. By the time this runs the engine has returned.
+fn finish(jobs: &Mutex<Vec<Tracked>>, id: &str, outcome: Result<(), String>, dest: &Path) {
     let (state, error) = settle(outcome);
     let mut jobs = jobs.lock().expect("downloads lock");
     let Some(job) = jobs.iter_mut().find(|job| job.view.id == id) else {
         return;
     };
+
+    if job.discarding {
+        discard_files(dest);
+        jobs.retain(|job| job.view.id != id);
+        return;
+    }
 
     job.view.state = state;
     job.view.error = error;

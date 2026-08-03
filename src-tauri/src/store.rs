@@ -7,7 +7,7 @@ use serde_json::{Map, Value};
 
 use std::collections::BTreeMap;
 
-use crate::downloads::Options;
+use crate::downloads::{DownloadJob, Options};
 use crate::profile::Profile;
 
 /// Bumped whenever the shape changes. Absence means the original shape, which had no
@@ -51,6 +51,28 @@ pub fn config_dir() -> PathBuf {
 
 pub fn config_path() -> PathBuf {
     config_dir().join("config.json")
+}
+
+/// A file of its own rather than a section of the config.
+///
+/// A transfer settles often and the config holds the models directory, the llama-server
+/// path and every remembered launch. Keeping the churn out of it means a history that
+/// cannot be read costs the user nothing but their history.
+pub fn history_path() -> PathBuf {
+    config_dir().join("downloads.json")
+}
+
+/// What previous runs finished. Unreadable or malformed is an empty history rather than a
+/// failure: it is a record of what already happened, and nothing depends on it.
+pub fn load_history(path: &Path) -> Vec<DownloadJob> {
+    let Ok(raw) = fs::read_to_string(path) else {
+        return Vec::new();
+    };
+    serde_json::from_str(&raw).unwrap_or_default()
+}
+
+pub fn save_history(path: &Path, jobs: &[DownloadJob]) -> io::Result<()> {
+    write_atomic(path, &serde_json::to_string_pretty(jobs)?)
 }
 
 /// Takes over a directory left under an older name, once.

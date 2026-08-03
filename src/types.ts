@@ -129,7 +129,7 @@ export interface Telemetry {
 }
 
 export type DownloadPhase = "resolving" | "transferring" | "verifying";
-export type DownloadState = "active" | "complete" | "cancelled" | "failed";
+export type DownloadState = "active" | "paused" | "complete" | "failed";
 
 export interface DownloadJob {
   id: string;
@@ -144,6 +144,8 @@ export interface DownloadJob {
   error: string | null;
   startedSecs: number | null;
   finishedSecs: number | null;
+  /// False only on a paused transfer whose bytes no longer back its sidecar.
+  resumable: boolean;
 }
 
 export interface DownloadProgress {

@@ -98,8 +98,16 @@ export function downloadStart(url: string): Promise<DownloadJob[]> {
   return invoke<DownloadJob[]>("download_start", { url });
 }
 
-export function downloadCancel(id: string): Promise<DownloadJob[]> {
-  return invoke<DownloadJob[]>("download_cancel", { id });
+export function downloadPause(id: string): Promise<DownloadJob[]> {
+  return invoke<DownloadJob[]>("download_pause", { id });
+}
+
+export function downloadResume(id: string): Promise<DownloadJob[]> {
+  return invoke<DownloadJob[]>("download_resume", { id });
+}
+
+export function downloadDiscard(id: string): Promise<DownloadJob[]> {
+  return invoke<DownloadJob[]>("download_discard", { id });
 }
 
 export function downloadStatus(): Promise<DownloadJob[]> {

@@ -1,17 +1,18 @@
 # Current
 
 ```text
-Branch:   main, nothing uncommitted, two commits ahead of origin (`6795f73`, the
-          extra-arguments fix, and this note). `v0.1.0` is tagged back at
-          `05c3a21`, so the ten commits since it are on `main` but not in any
+Branch:   main, parcel 1 uncommitted, two commits ahead of origin. `v0.1.0` is
+          tagged back at `05c3a21`, so everything since is on `main` but in no
           release.
-Task:     none in progress. Extra arguments is fixed and committed.
-Mode:     Fast
-Blocker:  none. One thing is unproved rather than blocking: the README's
-          "Open Anyway" steps have never met a real Gatekeeper prompt.
-Next:     push. Then download the `.dmg` from the release page in a browser and
-          follow the README's Install section as a stranger would. Decide
-          separately whether the nine commits past the tag want a `v0.1.1`.
+Task:     Persistence phase, parcel 1 — done and confirmed in the running app,
+          uncommitted. [intent/persistence.md](../intent/persistence.md).
+Mode:     Phase, three parcels
+Blocker:  none. Two things unproved rather than blocking: the README's "Open
+          Anyway" steps have never met a real Gatekeeper prompt, and whether
+          the Finder Automation dialog on Trash is tolerable (parcel 2).
+Next:     commit parcel 1, then start parcel 2 — Library favourites and delete.
+          Discard and the History pages have still not been looked at. Push is
+          outstanding and unrelated.
 ```
 
 Run and verify commands: [knowledge/technical.md](../knowledge/technical.md).
@@ -24,6 +25,11 @@ from Hugging Face in four ranged segments, survives a kill, resumes from its
 sidecar, verifies sha256 and lands the file in the models directory. Its speed
 limit and its time-remaining estimate are both reachable from the Downloads
 screen, and a limit changed there reaches the transfer already running.
+
+Downloads now outlive the app. A transfer is paused or discarded rather than
+cancelled, an interrupted one comes back from the `.part` on disk and resumes,
+and finished ones are kept in `downloads.json` and paged on the screen
+([intent/persistence.md](../intent/persistence.md)).
 
 The app is now Llamaport, identifier `com.mkamran.llamaport`, config under
 `Application Support/llamaport` ([intent/rename.md](../intent/rename.md)).
@@ -48,7 +54,40 @@ Apart from the two files named above, `git log` is the record.
 The four commands were last run green over the working tree, uncommitted changes
 included: `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`,
 `cargo test`, `bun run build` — all exit 0, statuses captured directly rather
-than through a pipe. 145 tests.
+than through a pipe. 153 tests, up 8.
+
+Download persistence (parcel 1), 2026-08-03:
+
+- **Proved against the real CDN, not only the stand-in.** 676 MB from Hugging
+  Face, stopped at 135,397,705 bytes, and then a `Downloads` built from scratch —
+  holding nothing from the first, which is what the app is on a restart — found
+  the partial on disk at 135,496,009 bytes, resumed it and delivered the file at
+  the expected sha256. The adopted figure being ahead of the reported one is the
+  sidecar being the better record, which is the reason it is read rather than
+  `downloads.json`.
+- A real Discard against a live transfer, 8.5 MB in: the row went, the `.part`
+  and the sidecar went, and the directory was left as it was found.
+- Each new test was checked against a gutted implementation and failed:
+  `partial_at`'s resumable judgement, the resume guard, `adopt`'s scan,
+  `restore`'s finished-only filter, and the settle-path delete.
+- **One test was corrected rather than trusted.** The discard test's comment
+  claimed it caught deleting the files too early; the gut check showed it did
+  not, because an eager delete is followed by the settle-path delete anyway and
+  the end state is identical. What it actually pins is that the engine's parting
+  write does not survive — that is now what it says.
+- **Confirmed by the author in the running app**, which is the proof this parcel
+  was waiting on: the unfinished download was listed and Resume worked. Screen
+  recording is denied to the agent, so this is the author looking, as it was for
+  the Web UI window and the tray.
+- **The case was real, not seeded.** The models directory already held an orphan
+  from before any of this existed: `Qwen3-Coder-30B-A3B-Instruct-UD-Q4_K_XL.gguf`,
+  16.45 GiB declared, 5.66 GiB on disk, `.part` at full preallocated length and
+  four segments tiling cleanly. Those bytes were unreachable until this parcel —
+  nothing in the app could see a `.part`, because the catalog scans for `.gguf`.
+  That is a partial written by an older binary and adopted by a newer one, which
+  was listed as unproved an hour ago and no longer is.
+- Still unlooked-at: Pause, Discard, and the History pages. Discard deletes real
+  bytes and has only been proved in Rust.
 
 Extra arguments, 2026-08-03:
 
@@ -79,41 +118,6 @@ Release, 2026-08-03:
   wall was never hit and the README's "Open Anyway" steps remain untested. That
   needs a browser download by a human.
 
-Web UI window, 2026-08-03:
-
-- Works, confirmed by the author against a running model: the window opens and
-  the conversation persists across sessions. Both the browser version it replaced
-  and this one were checked the same way — by the author looking, since screen
-  recording is denied to the agent. Four commands green: build, fmt, clippy,
-  test, 145 tests, each status captured directly.
-- How llama.cpp's UI serves and stores was measured, not assumed, and the
-  findings are in [knowledge/project.md](../knowledge/project.md) because they
-  are stable facts rather than session history.
-- Two stale UI claims were found and removed while checking the port. The
-  pre-launch notice promised a fall-forward to the next free port; `spawn_run`
-  refuses a busy port outright ([runner.rs](../../src-tauri/src/runner.rs)),
-  which is what `knowledge/project.md` already recorded. A second notice, "was
-  busy — listening on", was unreachable: `requested_port` was only ever set
-  equal to `port`. That field is now deleted from Rust and TypeScript.
-- Not covered, decided rather than missed: a **crash** leaves the window open on
-  a dead server. Closing is driven from the two explicit stops, because `start`
-  stops before it spawns and a listener on Idle would tear the window down on
-  every Reload.
-- Untested: `--no-webui` in `rawArgs` would leave the window on a 404. Left
-  unguarded — `Capabilities.flags` lists the flag whether or not the UI is
-  compiled in, so a probe would answer a different question.
-
-Tray staleness, 2026-08-03:
-
-- Found by the author using the app, not by the suite: stopping from the window
-  left the menu bar advertising a running model. `Runner::stop` changed state
-  without emitting, and the tray reads only the event stream.
-- 145 tests. The fix was checked by removal — strip the emit and
-  `reaches_ready_reports_telemetry_and_stops` fails — and confirmed in the built
-  `.app` by the author, who watched the menu return to "No model running".
-- The orphan path was checked for the same shape and does not have it: the tray
-  label reads the runner's own state, and orphans never reached it.
-
 Blockers, 2026-08-02:
 
 - 144 tests, up 7. The guard's tests fail against a gutted `check_raw_args`; the
@@ -126,37 +130,6 @@ Blockers, 2026-08-02:
   Screen recording and Apple events are both denied here, so window geometry
   could not be read. Five launches of the bundled `.app` each survived, which
   proves the process starts and nothing more.
-
-Icon, 2026-08-02:
-
-- Three marks were rendered at 256px and at a real 32px and looked at before any
-  was offered, which is why two were reworked first: the llama read as a rabbit
-  and the abstract mark read as a wifi/broadcast icon, wrong for an app that
-  binds loopback only.
-- `Llamaport.app/Contents/Resources/icon.icns` is byte-identical to
-  `src-tauri/icons/icon.icns` by sha256, `CFBundleIconFile` points at it, and
-  `Resources/` holds exactly one icon. No Tauri logo survives in the bundle.
-- Not claimed: nobody has watched the icon appear in the Dock. What is proved is
-  that the bundle carries the mark and macOS is pointed at it.
-
-Rename, 2026-08-02:
-
-- The config directory move ran for real, in the real app, on the real config.
-  A `tauri dev` from earlier in the session rebuilt on the edit and relaunched as
-  `target/debug/llamaport` at 22:57; afterwards `Application Support/llamaport`
-  held the existing schema-5 config with both `lastUsed` profiles and
-  `benchmarks.json` at its original mtime, and `llama-cpp-hub` was gone.
-  `store.rs:68` is the only rename that can move that directory and `lib.rs:526`
-  its only caller, so nothing else could have done it.
-- The adoption test was checked against a gutted `adopt_legacy_dir` and failed,
-  so it detects the absence of what it claims to prove. The two tests covering
-  the declining cases pass against the stub — they guard the clobber rule, not
-  the move.
-- UI, three screenshots of the running app. Title bar, menu bar and
-  sidebar all read Llamaport; Library lists all 9 models in the models directory;
-  Settings still resolves /opt/homebrew/bin/llama-server, version 10090, 321
-  flags. The window opened at a usable size, which the roadmap's third risk says
-  cannot be assumed.
 
 Downloader, 2026-08-02:
 

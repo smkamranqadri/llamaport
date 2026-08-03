@@ -68,6 +68,23 @@ Each is argued in the specs; this is the index, not a second copy.
 - Where a forecast cannot be avoided — time remaining — it is smoothed, withheld
   until it settles, and worded as an approximation. Same reasoning as the memory
   rule above.
+- An interrupted transfer is described by the disk, and only what finished is
+  written down. The sidecar beside a `.part` is the one account that cannot go
+  stale while a transfer runs; `downloads.json` holds complete and failed rows,
+  which have no on-disk trace to recover from. Neither store guesses at the
+  other's business.
+- Stopping keeps the bytes and says so: **Pause** is what cancel always did,
+  **Discard** is the one that deletes. A discard removes the files on the settle
+  path, after the engine has returned — `Control::cancel` returns while the
+  transfer is still writing.
+- A resume continues the job it belongs to rather than opening a second one, and
+  a paused row holds its file against a fresh start of the same URL.
+- The models directory is scanned for `.part` files, not only for models. They
+  are invisible to the catalog, so without it they accumulate unseen and their
+  bytes are unreachable — which is how 5.66 GiB of a 16.45 GiB quant sat
+  stranded until 2026-08-03.
+- History is never trimmed; the screen pages it. A cap would be a number nobody
+  has evidence for.
 - A server that will not serve ranges is refused: no ranges means no resume, and
   an unresumable 20 GB transfer is a trap rather than a convenience.
 - llama.cpp's UI is reached by a second app window, not an iframe and not a

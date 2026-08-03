@@ -252,7 +252,7 @@ fn a_transfer_that_has_not_settled_holds_the_line() {
 fn a_settled_transfer_does_not_hold_the_line() {
     let dir = scratch("settled");
     let history = [
-        job("dl-1", URL, FILE, DownloadState::Cancelled),
+        job("dl-1", URL, FILE, DownloadState::Failed),
         job(
             "dl-2",
             "https://huggingface.co/a/b/resolve/main/x.gguf",
@@ -271,7 +271,7 @@ fn a_settled_transfer_does_not_hold_the_line() {
 }
 
 #[test]
-fn cancelling_a_download_that_is_no_longer_running_is_not_an_error() {
+fn pausing_a_download_that_is_no_longer_running_is_not_an_error() {
     let jobs = [
         job("dl-1", URL, FILE, DownloadState::Complete),
         job("dl-2", URL, FILE, DownloadState::Active),
@@ -290,11 +290,11 @@ fn cancelling_a_download_that_is_no_longer_running_is_not_an_error() {
 }
 
 #[test]
-fn a_cancelled_transfer_is_not_reported_as_a_failure() {
+fn a_paused_transfer_is_not_reported_as_a_failure() {
     assert_eq!(settle(Ok(())), (DownloadState::Complete, None));
     assert_eq!(
         settle(Err(CANCELLED.to_string())),
-        (DownloadState::Cancelled, None)
+        (DownloadState::Paused, None)
     );
     assert_eq!(
         settle(Err("HTTP 404".to_string())),
@@ -397,10 +397,10 @@ fn a_rate_limit_changed_mid_transfer_reaches_the_running_one() {
         seen().is_none()
     });
 
-    manager.downloads.cancel(&running).expect("cancelled");
+    manager.downloads.pause(&running).expect("paused");
     assert_eq!(
         settled(&manager.downloads, &running).state,
-        DownloadState::Cancelled
+        DownloadState::Paused
     );
 }
 
@@ -514,10 +514,10 @@ fn a_second_transfer_is_refused_while_the_first_is_still_running() {
         "a refused request must not reach the engine"
     );
 
-    manager.downloads.cancel(&running).expect("cancelled");
+    manager.downloads.pause(&running).expect("paused");
     assert_eq!(
         settled(&manager.downloads, &running).state,
-        DownloadState::Cancelled
+        DownloadState::Paused
     );
 }
 
@@ -648,7 +648,7 @@ fn a_transfer_that_fails_takes_nothing_into_the_catalog() {
 }
 
 #[test]
-fn cancelling_reaches_the_transfer_and_settles_the_job() {
+fn pausing_reaches_the_transfer_and_settles_the_job() {
     let dir = scratch("cancel");
     let engine: Engine =
         Arc::new(|_: &Spec, control: &Control, _: &dyn ProgressSink| wait_for_cancel(control));
@@ -662,15 +662,15 @@ fn cancelling_reaches_the_transfer_and_settles_the_job() {
 
     let unknown = manager
         .downloads
-        .cancel("dl-9")
+        .pause("dl-9")
         .expect_err("an id that was never started is a mistake, not a no-op");
     assert!(unknown.contains("no download dl-9"), "{unknown}");
 
-    manager.downloads.cancel(&id).expect("cancelled");
+    manager.downloads.pause(&id).expect("paused");
 
     let job = settled(&manager.downloads, &id);
-    assert_eq!(job.state, DownloadState::Cancelled);
-    assert_eq!(job.error, None, "a cancellation is not a failure");
+    assert_eq!(job.state, DownloadState::Paused);
+    assert_eq!(job.error, None, "a pause is not a failure");
 
     eventually("the settled job was never announced", || {
         manager.events.payloads("download:state").len() == 2
@@ -679,13 +679,10 @@ fn cancelling_reaches_the_transfer_and_settles_the_job() {
 
     let again = manager
         .downloads
-        .cancel(&id)
-        .expect("cancelling a transfer that has already stopped is nothing to do");
+        .pause(&id)
+        .expect("pausing a transfer that has already stopped is nothing to do");
     assert_eq!(again.len(), 1);
-    assert_eq!(
-        manager.downloads.snapshot()[0].state,
-        DownloadState::Cancelled
-    );
+    assert_eq!(manager.downloads.snapshot()[0].state, DownloadState::Paused);
 }
 
 #[test]
@@ -745,9 +742,320 @@ fn clearing_drops_what_has_settled_and_leaves_what_is_running() {
         .collect();
     assert_eq!(told, [running.as_str()]);
 
-    manager.downloads.cancel(&running).expect("cancelled");
+    manager.downloads.pause(&running).expect("paused");
     assert_eq!(
         settled(&manager.downloads, &running).state,
-        DownloadState::Cancelled
+        DownloadState::Paused
+    );
+}
+
+/// The bytes were never the thing that was lost. A stopped transfer keeps its `.part` and
+/// its sidecar, so what a pause has to preserve is the row that points at them — and a
+/// resume has to continue that row rather than open a second one for the same file.
+#[test]
+fn pausing_settles_the_job_and_resuming_continues_the_same_one() {
+    let dir = scratch("pause");
+    let runs = Arc::new(AtomicU32::new(0));
+    let counted = Arc::clone(&runs);
+
+    let engine: Engine = Arc::new(move |_: &Spec, control: &Control, _: &dyn ProgressSink| {
+        counted.fetch_add(1, Ordering::Relaxed);
+        wait_for_cancel(control)
+    });
+    let manager = manager(engine);
+
+    let started = manager
+        .downloads
+        .start(URL, &dir, &Options::default())
+        .expect("admitted");
+    let id = started[0].id.clone();
+    eventually("the transfer never reached the engine", || {
+        runs.load(Ordering::Relaxed) == 1
+    });
+
+    manager.downloads.pause(&id).expect("paused");
+    let paused = settled(&manager.downloads, &id);
+    assert_eq!(paused.state, DownloadState::Paused);
+    assert_eq!(paused.error, None, "a pause is not a failure");
+
+    let after = manager
+        .downloads
+        .resume(&id, &dir, &Options::default())
+        .expect("resumed");
+    assert_eq!(
+        after.len(),
+        1,
+        "resuming opened a second row for a file that already had one"
+    );
+    assert_eq!(after[0].id, id, "the resumed transfer is the same job");
+    assert_eq!(after[0].state, DownloadState::Active);
+    eventually("the resume never reached the engine", || {
+        runs.load(Ordering::Relaxed) == 2
+    });
+
+    let second = manager
+        .downloads
+        .resume(&id, &dir, &Options::default())
+        .expect_err("a transfer that is already running has nothing to resume");
+    assert!(second.contains("already downloading"), "{second}");
+
+    manager.downloads.pause(&id).expect("paused");
+    settled(&manager.downloads, &id);
+}
+
+/// A paused transfer is unfinished business, not history. Starting its URL again would
+/// open a second row over the same `.part`, and clearing the finished rows would throw
+/// away bytes the user is waiting to continue.
+#[test]
+fn a_paused_transfer_holds_its_place_against_both_a_restart_and_a_clear() {
+    let dir = scratch("paused-line");
+
+    let blocked = admit(URL, &dir, &[job("dl-1", URL, FILE, DownloadState::Paused)])
+        .expect_err("the file already has a row");
+    assert!(blocked.contains("paused"), "{blocked}");
+
+    let elsewhere = admit(
+        "https://huggingface.co/a/b/resolve/main/Other-Q4_K_M.gguf",
+        &dir,
+        &[job("dl-1", URL, FILE, DownloadState::Paused)],
+    );
+    assert!(
+        elsewhere.is_ok(),
+        "a paused transfer occupies its own file, not the whole app: {elsewhere:?}"
+    );
+
+    let engine: Engine =
+        Arc::new(|_: &Spec, control: &Control, _: &dyn ProgressSink| wait_for_cancel(control));
+    let manager = manager(engine);
+
+    let started = manager
+        .downloads
+        .start(URL, &dir, &Options::default())
+        .expect("admitted");
+    let id = started[0].id.clone();
+    manager.downloads.pause(&id).expect("paused");
+    settled(&manager.downloads, &id);
+
+    let left = manager.downloads.clear();
+    assert_eq!(
+        left.iter().map(|job| job.id.as_str()).collect::<Vec<_>>(),
+        [id.as_str()],
+        "clearing the history took a paused transfer with it"
+    );
+}
+
+/// Discard has to outlive the engine's parting write.
+///
+/// `Control::cancel` returns while the transfer is still writing, and a transfer asked to
+/// stop still flushes its sidecar before it returns. A discard that only deletes where it
+/// was asked leaves both files back on disk moments later.
+///
+/// What this pins is the delete on the settle path, not the absence of an earlier one:
+/// deleting eagerly as well is wasteful rather than wrong, and this passes either way.
+#[test]
+fn discarding_takes_the_bytes_only_once_the_engine_has_let_go() {
+    let dir = scratch("discard-running");
+    let part = dir.join(format!("{FILE}.part"));
+    let sidecar = dir.join(format!("{FILE}.part.json"));
+
+    let engine: Engine = Arc::new(|spec: &Spec, control: &Control, _: &dyn ProgressSink| {
+        let part = PathBuf::from(format!("{}.part", spec.dest.display()));
+        let sidecar = PathBuf::from(format!("{}.part.json", spec.dest.display()));
+        fs::write(&part, b"bytes so far").expect("seed part");
+        fs::write(&sidecar, b"{}").expect("seed sidecar");
+
+        let outcome = wait_for_cancel(control);
+
+        // The flush on the way out, which is what the engine really does: a transfer that
+        // is asked to stop still writes its sidecar before it returns.
+        thread::sleep(Duration::from_millis(50));
+        fs::write(&part, b"one last flush").expect("flush part");
+        fs::write(&sidecar, b"{}").expect("flush sidecar");
+        outcome
+    });
+    let manager = manager(engine);
+
+    let started = manager
+        .downloads
+        .start(URL, &dir, &Options::default())
+        .expect("admitted");
+    let id = started[0].id.clone();
+    eventually("the transfer never wrote its part file", || part.exists());
+
+    manager.downloads.discard(&id).expect("discarded");
+
+    eventually("the discarded job was never dropped", || {
+        manager.downloads.snapshot().is_empty()
+    });
+    assert!(
+        !part.exists(),
+        "the engine's parting write put the part file back, so the delete ran too early"
+    );
+    assert!(!sidecar.exists(), "the sidecar outlived the transfer");
+}
+
+/// Nothing is running, so there is no writer to wait for — but the files are still there,
+/// and they are the whole reason the row exists.
+#[test]
+fn discarding_a_paused_transfer_takes_its_bytes_too() {
+    let dir = scratch("discard-paused");
+    let part = dir.join(format!("{FILE}.part"));
+    let sidecar = dir.join(format!("{FILE}.part.json"));
+
+    let engine: Engine = Arc::new(|spec: &Spec, control: &Control, _: &dyn ProgressSink| {
+        fs::write(format!("{}.part", spec.dest.display()), b"bytes").expect("seed part");
+        fs::write(format!("{}.part.json", spec.dest.display()), b"{}").expect("seed sidecar");
+        wait_for_cancel(control)
+    });
+    let manager = manager(engine);
+
+    let started = manager
+        .downloads
+        .start(URL, &dir, &Options::default())
+        .expect("admitted");
+    let id = started[0].id.clone();
+    eventually("the transfer never wrote its part file", || part.exists());
+    manager.downloads.pause(&id).expect("paused");
+    assert_eq!(
+        settled(&manager.downloads, &id).state,
+        DownloadState::Paused
+    );
+
+    let left = manager.downloads.discard(&id).expect("discarded");
+    assert!(left.is_empty(), "the discarded row is still listed");
+    assert!(!part.exists() && !sidecar.exists());
+
+    // The file is gone from the app's account of it as well as from the disk, so the URL
+    // is startable again rather than being held by a row that no longer means anything.
+    assert!(admit(URL, &dir, &manager.downloads.snapshot()).is_ok());
+}
+
+fn seed_partial(dir: &std::path::Path, file: &str, url: &str, completed: u64, part_len: u64) {
+    fs::write(
+        dir.join(format!("{file}.part")),
+        vec![0u8; part_len as usize],
+    )
+    .expect("seed part");
+    fs::write(
+        dir.join(format!("{file}.part.json")),
+        format!(
+            r#"{{"sourceUrl":"{url}","total":64000,"etag":null,"segments":[
+                {{"start":0,"end":31999,"completed":{completed}}},
+                {{"start":32000,"end":63999,"completed":0}}]}}"#
+        ),
+    )
+    .expect("seed sidecar");
+}
+
+/// The app restarts knowing nothing, and the bytes are still on the disk where the last
+/// run left them. Nothing else recovers a partial fetched by a build that had no history
+/// file at all — which on the first run of this feature is every partial there is.
+#[test]
+fn partials_left_on_disk_are_adopted_as_paused_transfers() {
+    let dir = scratch("adopt");
+    seed_partial(&dir, FILE, URL, 12_000, 64_000);
+
+    let engine: Engine = Arc::new(|_: &Spec, _: &Control, _: &dyn ProgressSink| Ok(()));
+    let manager = manager(engine);
+
+    let adopted = manager.downloads.adopt(&dir);
+    assert_eq!(adopted.len(), 1, "the partial on disk was not found");
+
+    let job = &adopted[0];
+    assert_eq!(job.state, DownloadState::Paused);
+    assert_eq!(
+        job.url, URL,
+        "the sidecar is the only record of where it came from"
+    );
+    assert_eq!(job.file_name, FILE);
+    assert_eq!(job.path, dir.join(FILE).to_string_lossy());
+    assert_eq!(job.completed, 12_000);
+    assert_eq!(job.total, Some(64_000));
+    assert!(job.resumable);
+
+    assert_eq!(
+        manager.downloads.adopt(&dir).len(),
+        1,
+        "adopting twice listed the same file twice"
+    );
+
+    // The row is a real one, not a placeholder: it holds the line and it can be discarded.
+    let blocked = admit(URL, &dir, &manager.downloads.snapshot()).expect_err("held");
+    assert!(blocked.contains("paused"), "{blocked}");
+
+    manager
+        .downloads
+        .discard(&job.id.clone())
+        .expect("discarded");
+    assert!(!dir.join(format!("{FILE}.part")).exists());
+    assert!(!dir.join(format!("{FILE}.part.json")).exists());
+}
+
+/// A sidecar whose `.part` is gone describes bytes that are not there. It is listed
+/// anyway, because it is junk occupying the models directory and hiding it is how it got
+/// to be a problem — but it must not offer a resume it cannot honour.
+#[test]
+fn an_unresumable_partial_is_listed_without_pretending_it_can_continue() {
+    let dir = scratch("adopt-orphan");
+    seed_partial(&dir, FILE, URL, 12_000, 64_000);
+    fs::remove_file(dir.join(format!("{FILE}.part"))).expect("remove part");
+
+    let engine: Engine = Arc::new(|_: &Spec, _: &Control, _: &dyn ProgressSink| Ok(()));
+    let manager = manager(engine);
+
+    let adopted = manager.downloads.adopt(&dir);
+    assert_eq!(adopted.len(), 1);
+    assert_eq!(adopted[0].state, DownloadState::Paused);
+    assert!(
+        !adopted[0].resumable,
+        "there are no bytes beside this sidecar to continue from"
+    );
+}
+
+/// The history file is the only account of what finished, and a restored row has to be
+/// indistinguishable from one this process settled itself.
+#[test]
+fn restoring_seeds_the_history_without_colliding_with_new_ids() {
+    let dir = scratch("restore");
+    let engine: Engine = Arc::new(|_: &Spec, _: &Control, _: &dyn ProgressSink| Ok(()));
+    let manager = manager(engine);
+
+    manager.downloads.restore(vec![
+        job("dl-1", URL, FILE, DownloadState::Complete),
+        job(
+            "dl-7",
+            "https://huggingface.co/a/b/resolve/main/x.gguf",
+            "x.gguf",
+            DownloadState::Failed,
+        ),
+        job(
+            "dl-9",
+            "https://huggingface.co/a/b/resolve/main/y.gguf",
+            "y.gguf",
+            DownloadState::Active,
+        ),
+    ]);
+
+    let restored = manager.downloads.snapshot();
+    assert_eq!(
+        restored.iter().map(|j| j.id.as_str()).collect::<Vec<_>>(),
+        ["dl-1", "dl-7"],
+        "only what finished belongs in the history; a transfer cannot survive the process \
+         that was running it"
+    );
+
+    let started = manager
+        .downloads
+        .start(
+            "https://huggingface.co/a/b/resolve/main/z.gguf",
+            &dir,
+            &Options::default(),
+        )
+        .expect("admitted");
+    let fresh = started.last().expect("the job just started");
+    assert!(
+        !["dl-1", "dl-7"].contains(&fresh.id.as_str()),
+        "a new transfer took an id the restored history already uses: {}",
+        fresh.id
     );
 }
