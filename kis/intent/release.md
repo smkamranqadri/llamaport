@@ -1,5 +1,29 @@
 # Releases
 
+## v0.2.1 — built 2026-08-04, not published
+
+`Llamaport_0.2.1_aarch64.dmg`, 4.0 MB, sha256
+`e8d5f70988b2db16007d39ebe468dab7cf9432c539363de25e03d7f89e792e95`. Built with
+`CI=true`, verified, and installed over the 0.2.0 in `/Applications`. Not pushed,
+not tagged, not published — so `main`, the `v0.2.0` tag and the published build
+are currently three different things.
+
+**It is owed rather than optional.** v0.2.0 carries a path traversal: `restore`
+rebuilds a row's path as `models_dir.join(file_name)` without checking the name,
+so `../` in `downloads.json` reaches out of the models directory and a resume
+writes there. Found while building the queue, by reading the file the app wrote.
+
+The artefact was checked rather than assumed. It carries `Llamaport.app` at 0.2.1
+with the right identifier; the binary contains `is already in the queue`, and no
+longer contains `this app downloads one file at a time` — the refusal the queue
+replaced is gone from the shipped build, not just from the tree. The 451
+occurrences of the account name are cargo and source paths compiled in for panic
+messages; v0.2.0 has 452 of the same, so it is not a regression, and nothing
+outside build paths leaks.
+
+Installing by local copy sets no quarantine attribute, so this **does not** settle
+the Gatekeeper question — that still needs a download through a browser.
+
 ## v0.2.0 — shipped 2026-08-03
 
 https://github.com/smkamranqadri/llamaport/releases/tag/v0.2.0 — pre-release,

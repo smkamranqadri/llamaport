@@ -1,21 +1,20 @@
 # Current
 
 ```text
-Branch:   `feat/download-queue`, one commit ahead of `main` and unpushed. `main`
-          is still where `v0.2.0` was cut from plus two KIS commits. This project
-          has always worked on `main`; the branch exists only because the commit
-          was made under a rule against committing straight to the default one,
-          and a fast-forward puts it back where the history expects it.
+Branch:   `main`, clean, **two commits ahead of `origin/main` and unpushed**.
+          `v0.2.0` is the last tag; 0.2.1 is built and installed but neither
+          tagged nor published, so the tree, the tag and the published build are
+          three different things until that is resolved.
 Task:     none in progress. The download queue is done and committed.
 Mode:     —
 Blocker:  none. Two things owed rather than blocking: the README's "Open Anyway"
           steps have never met a real Gatekeeper prompt, and a queued row with
           nothing on disk behind it has never been seen coming back from a
           restart — every relaunch so far recovered rows that had a `.part`.
-Next:     nothing planned. **v0.2.1 is owed**, not optional: the path traversal
-          in `restore` is live in the published build. It is a one-line class of
-          fix that is already in `main`, so the next release is a decision about
-          timing rather than about work.
+Next:     **finish the 0.2.1 release.** The `.dmg` is built, verified and
+          installed locally; what is left is push, tag, and publish. The reason
+          it is owed rather than optional is that the path traversal it fixes is
+          live in the published v0.2.0.
 Status:   working in the app, uncommitted. Pre-flight added three things the plan
           missed — queue order once Resume can enqueue, which Options a queued
           job starts under, and `clear` wiping queued rows out of
