@@ -157,3 +157,10 @@ speed limit either:
 
 Each new test checked against a gutted implementation. The UI half is covered by
 `tsc` and by looking at the screen; there is still no frontend test framework.
+
+What P1 actually recovered, kept because it is the evidence the recovery was
+found rather than seeded: a 16.45 GiB partial already in the models directory
+with 5.66 GiB on disk, left by an earlier build that recorded nothing — adopted
+and resumed. And a 676 MB transfer stopped at 135,397,705 bytes, which a manager
+built from scratch, holding nothing, found at 135,496,009 and carried to the
+expected sha256.

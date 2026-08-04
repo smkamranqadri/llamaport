@@ -93,6 +93,14 @@ cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
   non-obvious why only.
 - Capture a command's exit status directly. `cmd | tail -3; echo $?` reports
   `tail`'s status, which reported a failing clippy as clean twice in one session.
+- **A new test is not trusted until the code it covers has been gutted and the
+  test watched to fail.** Used on every phase since the downloader, and it has
+  paid twice: two tests that passed for the wrong reason, and a guard nothing
+  would have noticed the loss of. A green suite is not the claim; a suite that
+  fails when the code is wrong is.
+- **Read the file the app actually wrote.** Four defects in this project were
+  found by looking — at the screen, or at `downloads.json` between runs — and
+  none of them by the suite. Anything that persists state earns this check.
 - macOS substitutes an em dash for `--` inside the webview's text fields, so a
   flag typed into any field is corrupted before it reaches Rust and
   `llama-server` rejects it. A field that takes flags undoes the substitution on
