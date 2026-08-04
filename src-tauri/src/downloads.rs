@@ -51,10 +51,16 @@ impl Default for Options {
 /// is what lets the row survive a restart and offer a button rather than an apology.
 ///
 /// There is no `Discarded`: discarding removes the row along with the bytes.
+///
+/// `Queued` is waiting for the pipe. One invariant governs it: nothing `Active` and
+/// something `Queued` means the head of the queue starts, and every path a transfer can
+/// settle on goes through it. So pausing the running file starts the next one — there is
+/// no way to stop the app short of emptying the queue.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum DownloadState {
     Active,
+    Queued,
     Paused,
     Complete,
     Failed,
@@ -161,40 +167,52 @@ pub fn file_name_for(url: &str) -> Result<String, String> {
     Ok(name.to_string())
 }
 
-/// Whether a request may start, and where it would land.
+/// Whether a name that came off disk is a file name and nothing else.
 ///
-/// One transfer at a time: parallel large files compete for the same pipe and multiply
-/// the failure surface, and refusing says so rather than quietly queueing behind a
-/// transfer that has hours left.
+/// Every destination the app writes, renames or deletes is a file name joined onto the
+/// models directory, and `join("../evil")` lands outside it. The history file is where such
+/// a name can be planted, so it is checked there rather than trusted for having been ours.
+fn plain_file_name(name: &str) -> bool {
+    Path::new(name).file_name().and_then(|only| only.to_str()) == Some(name)
+}
+
+/// Why an unfinished row already holding this file turns a request away. Only ever called
+/// with a row that is Active, Queued or Paused, which is what makes the last arm honest.
+fn held_by(job: &DownloadJob, url: &str) -> String {
+    let same_url = job.url == url;
+    match job.state {
+        DownloadState::Paused => format!(
+            "{} is paused — resume it from the list below rather than starting it again",
+            job.file_name
+        ),
+        DownloadState::Queued if same_url => format!("{} is already in the queue", job.file_name),
+        DownloadState::Queued => format!(
+            "{} is already in the queue under another URL",
+            job.file_name
+        ),
+        _ if same_url => format!("{} is already downloading", job.file_name),
+        _ => format!(
+            "{} is already being downloaded from another URL",
+            job.file_name
+        ),
+    }
+}
+
+/// Whether a request may be taken on at all, and where it would land.
+///
+/// It no longer decides whether the transfer starts now: a second request queues behind the
+/// first rather than being refused. What is still refused is a second row over one file —
+/// whether the row holding it is running, waiting or paused, the two would fight over the
+/// same `.part`.
 pub fn admit(url: &str, models_dir: &Path, jobs: &[DownloadJob]) -> Result<PathBuf, String> {
     let file_name = file_name_for(url)?;
 
-    // A paused row already points at this file's `.part`. Starting again would open a
-    // second row over the same bytes, and the two would fight over them.
     if let Some(job) = jobs
         .iter()
-        .filter(|j| j.state == DownloadState::Paused)
+        .filter(|j| !j.state.finished())
         .find(|j| j.url == url || j.file_name == file_name)
     {
-        return Err(format!(
-            "{} is paused — resume it from the list below rather than starting it again",
-            job.file_name
-        ));
-    }
-
-    if let Some(job) = jobs.iter().find(|j| j.state == DownloadState::Active) {
-        if job.url == url {
-            return Err(format!("{file_name} is already downloading"));
-        }
-        if job.file_name == file_name {
-            return Err(format!(
-                "{file_name} is already being downloaded from another URL"
-            ));
-        }
-        return Err(format!(
-            "{} is still downloading — this app downloads one file at a time",
-            job.file_name
-        ));
+        return Err(held_by(job, url));
     }
 
     let dest = models_dir.join(&file_name);
@@ -215,9 +233,9 @@ pub fn cancellable(jobs: &[DownloadJob], id: &str) -> Result<bool, String> {
     Ok(job.state == DownloadState::Active)
 }
 
-/// Whether a job may be put back on the engine. The one-at-a-time rule is the same one
-/// `admit` enforces and is enforced here too: a resume is a transfer starting, and it
-/// competes for the same pipe as any other.
+/// Whether a job may be put back on the engine. A resume is a transfer starting, so it
+/// takes its turn the same way a pasted URL does — it runs now if the pipe is free and
+/// queues if it is not. What is refused is only a row with nothing to resume.
 pub fn resumable(jobs: &[DownloadJob], id: &str) -> Result<(), String> {
     let job = jobs
         .iter()
@@ -227,14 +245,11 @@ pub fn resumable(jobs: &[DownloadJob], id: &str) -> Result<(), String> {
     if job.state == DownloadState::Active {
         return Err(format!("{} is already downloading", job.file_name));
     }
+    if job.state == DownloadState::Queued {
+        return Err(format!("{} is already in the queue", job.file_name));
+    }
     if job.state == DownloadState::Complete {
         return Err(format!("{} has already been downloaded", job.file_name));
-    }
-    if let Some(running) = jobs.iter().find(|job| job.state == DownloadState::Active) {
-        return Err(format!(
-            "{} is still downloading — this app downloads one file at a time",
-            running.file_name
-        ));
     }
     Ok(())
 }
@@ -285,18 +300,41 @@ struct Tracked {
     /// Set before the cancel that stops a discarded transfer, and read on the settle path
     /// where the engine has already let the `.part` go.
     discarding: bool,
+    /// The terms this job was taken on. A queued transfer starts on a thread that has no
+    /// caller to ask, so what it runs under has to have been kept when it was admitted.
+    options: Options,
 }
 
 fn views(jobs: &[Tracked]) -> Vec<DownloadJob> {
     jobs.iter().map(|job| job.view.clone()).collect()
 }
 
-fn finished(jobs: &Mutex<Vec<Tracked>>) -> Vec<DownloadJob> {
+/// Whether `downloads.json` is the only thing that remembers this row.
+///
+/// A transfer that moved bytes is described by the sidecar beside its `.part`, which cannot
+/// go stale while it runs, and that account is left to own it. What has no `.part` and no
+/// sidecar has nothing else at all: a queued row, and the Paused row a queued one comes
+/// back as. Writing only the queued state is what made the queue survive one restart and
+/// not the next.
+fn only_record_of(view: &DownloadJob) -> bool {
+    match view.state {
+        DownloadState::Active => false,
+        DownloadState::Queued => true,
+        DownloadState::Paused => {
+            let dest = Path::new(&view.path);
+            !download::part_path(dest).exists() && !download::sidecar_path(dest).exists()
+        }
+        _ => view.state.finished(),
+    }
+}
+
+/// What `downloads.json` is given: the history, and whatever it is the only account of.
+fn persistable(jobs: &Mutex<Vec<Tracked>>) -> Vec<DownloadJob> {
     jobs.lock()
         .expect("downloads lock")
         .iter()
         .map(|job| job.view.clone())
-        .filter(|view| view.state.finished())
+        .filter(only_record_of)
         .collect()
 }
 
@@ -351,6 +389,20 @@ pub type Engine =
 /// `.part`, which is the only account of it that cannot go stale while it runs.
 pub type Persist = Arc<dyn Fn(&[DownloadJob]) + Send + Sync>;
 
+/// Everything a running transfer needs, in a form a thread can own.
+///
+/// A settled transfer starts the next one in the queue, and it does that from its own
+/// thread long after the caller that admitted it has gone. It cannot borrow the manager,
+/// so what it needs is cloned into this instead.
+#[derive(Clone)]
+struct Runtime {
+    jobs: Arc<Mutex<Vec<Tracked>>>,
+    events: Events,
+    landed: Landed,
+    engine: Engine,
+    persist: Persist,
+}
+
 pub struct Downloads {
     jobs: Arc<Mutex<Vec<Tracked>>>,
     events: Events,
@@ -381,22 +433,60 @@ impl Downloads {
         self
     }
 
+    fn runtime(&self) -> Runtime {
+        Runtime {
+            jobs: self.jobs.clone(),
+            events: self.events.clone(),
+            landed: self.landed.clone(),
+            engine: self.engine.clone(),
+            persist: self.persist.clone(),
+        }
+    }
+
     pub fn snapshot(&self) -> Vec<DownloadJob> {
         views(&self.jobs.lock().expect("downloads lock"))
     }
 
-    /// Seeds the history a previous run wrote down.
+    /// Seeds what a previous run wrote down: the history, and the queue it never got to.
     ///
-    /// Only finished rows are taken: a transfer cannot survive the process that was
-    /// running it, and one restored as Active would sit there forever holding the line.
-    /// Whatever was unfinished is on the disk instead, and `adopt` is what finds it.
+    /// Nothing comes back Active. A transfer cannot survive the process that was running
+    /// it, and one restored as Active would sit there forever holding the line. Whatever
+    /// was mid-flight is on the disk instead, and `adopt` is what finds it.
     ///
-    /// The path is rebuilt from the models directory rather than believed. It decides what
-    /// a resume writes and what a discard deletes, and this file sits on disk where
-    /// anything that can write to it could aim both.
+    /// A queued row returns Paused rather than queued, and waits for a click: starting the
+    /// app is not consent to fetch a URL that was read off disk.
+    ///
+    /// What it says about its progress is left alone. A row that never started has none to
+    /// report, but one that was resumed into the queue is waiting over a `.part` — and
+    /// since it holds that file's path, `adopt` takes it as already tracked and leaves it
+    /// be. Zeroing it here is not a fresh start, it is the only account of those bytes
+    /// claiming they are not there.
+    ///
+    /// Both the file name and the path are the app's to decide rather than the file's.
+    /// Together they choose what a resume writes and what a discard deletes, and this
+    /// file sits in a directory anything with write access can aim.
     pub fn restore(&self, history: Vec<DownloadJob>, models_dir: &Path) {
         let mut jobs = self.jobs.lock().expect("downloads lock");
-        for mut view in history.into_iter().filter(|view| view.state.finished()) {
+        for mut view in history {
+            if !plain_file_name(&view.file_name) {
+                continue;
+            }
+            if view.state == DownloadState::Active {
+                continue;
+            }
+            // Queued, or the Paused row a queued one came back as last time. Both are here
+            // because nothing on disk describes them, and both wait for a click.
+            if !view.state.finished() {
+                if file_name_for(&view.url).is_err() {
+                    continue;
+                }
+                view.state = DownloadState::Paused;
+                view.resumable = true;
+                view.phase = None;
+                view.bytes_per_second = None;
+                view.finished_secs = None;
+            }
+
             self.reserve(&view.id);
             view.path = models_dir
                 .join(&view.file_name)
@@ -406,6 +496,7 @@ impl Downloads {
                 view,
                 control: Arc::new(Control::default()),
                 discarding: false,
+                options: Options::default(),
             });
         }
     }
@@ -428,6 +519,7 @@ impl Downloads {
                     view: DownloadJob::adopted(&id, &dest, &partial),
                     control: Arc::new(Control::default()),
                     discarding: false,
+                    options: Options::default(),
                 });
                 added += 1;
             }
@@ -452,34 +544,58 @@ impl Downloads {
         self.next.fetch_max(used + 1, Ordering::Relaxed);
     }
 
+    /// Takes a URL on. It runs now if the pipe is free and waits its turn if it is not.
     pub fn start(
         &self,
         url: &str,
         models_dir: &Path,
         options: &Options,
     ) -> Result<Vec<DownloadJob>, String> {
-        let id = format!("dl-{}", self.next.fetch_add(1, Ordering::Relaxed));
+        let id = self.next_id();
         let control = Arc::new(Control::default());
         control.set_rate_limit(normalized_rate(options.rate_limit));
 
-        let (dest, snapshot) = {
+        let (dest, waiting, snapshot) = {
             let mut jobs = self.jobs.lock().expect("downloads lock");
             let dest = admit(url, models_dir, &views(&jobs))?;
             std::fs::create_dir_all(models_dir).map_err(|e| e.to_string())?;
+
+            let waiting = jobs
+                .iter()
+                .any(|job| job.view.state == DownloadState::Active);
+            let mut view = DownloadJob::begin(&id, url, &dest);
+            if waiting {
+                view.state = DownloadState::Queued;
+                view.started_secs = None;
+            }
             jobs.push(Tracked {
-                view: DownloadJob::begin(&id, url, &dest),
+                view,
                 control: control.clone(),
                 discarding: false,
+                options: options.clone(),
             });
-            (dest, views(&jobs))
+            (dest, waiting, views(&jobs))
         };
+        if waiting {
+            (self.persist)(&persistable(&self.jobs));
+        }
         self.announce();
-        self.run(id, url, dest, control, options);
+        if !waiting {
+            spawn(
+                self.runtime(),
+                id,
+                url.to_string(),
+                dest,
+                control,
+                options.clone(),
+            );
+        }
 
         Ok(snapshot)
     }
 
-    /// Puts a paused transfer back on the engine under its own id.
+    /// Puts a paused transfer back in line under its own id. It runs now if the pipe is
+    /// free and waits its turn if it is not.
     ///
     /// The same job rather than a new one: the `.part` it stopped on is the same file, and
     /// two rows for one download read as a bug rather than as history.
@@ -492,41 +608,64 @@ impl Downloads {
         let control = Arc::new(Control::default());
         control.set_rate_limit(normalized_rate(options.rate_limit));
 
-        let (url, dest, snapshot) = {
+        let (url, dest, waiting, snapshot) = {
             let mut jobs = self.jobs.lock().expect("downloads lock");
             resumable(&views(&jobs), id)?;
             // `admit` is where a URL is checked, and a resume does not pass through it.
             // For an adopted row the URL came out of a sidecar on disk, so this is the
             // only thing between a planted file and a fetch from anywhere.
-            let checked = jobs
+            let at = jobs
                 .iter()
-                .find(|job| job.view.id == id)
-                .map(|job| job.view.url.clone())
+                .position(|job| job.view.id == id)
                 .ok_or_else(|| format!("no download {id}"))?;
-            file_name_for(&checked)?;
+            file_name_for(&jobs[at].view.url)?;
             std::fs::create_dir_all(models_dir).map_err(|e| e.to_string())?;
 
-            let job = jobs
-                .iter_mut()
-                .find(|job| job.view.id == id)
-                .ok_or_else(|| format!("no download {id}"))?;
+            let waiting = jobs
+                .iter()
+                .any(|job| job.view.state == DownloadState::Active);
+
+            // Joining the queue means joining the back of it. The list is the queue's
+            // order, and a row resumed hours after it was first started would otherwise
+            // sit at its old index and be served ahead of everything added since.
+            let mut job = jobs.remove(at);
 
             // `completed` and `total` are left where they were, so the row opens on the
             // bytes it stopped at rather than at zero until the first report lands.
-            job.view.state = DownloadState::Active;
             job.view.error = None;
             job.view.phase = None;
             job.view.bytes_per_second = None;
             job.view.finished_secs = None;
             job.control = control.clone();
             job.discarding = false;
+            job.options = options.clone();
 
             let url = job.view.url.clone();
             let dest = PathBuf::from(&job.view.path);
-            (url, dest, views(&jobs))
+
+            if waiting {
+                job.view.state = DownloadState::Queued;
+                jobs.push(job);
+            } else {
+                job.view.state = DownloadState::Active;
+                jobs.insert(at, job);
+            }
+            (url, dest, waiting, views(&jobs))
         };
+        if waiting {
+            (self.persist)(&persistable(&self.jobs));
+        }
         self.announce();
-        self.run(id.to_string(), &url, dest, control, options);
+        if !waiting {
+            spawn(
+                self.runtime(),
+                id.to_string(),
+                url,
+                dest,
+                control,
+                options.clone(),
+            );
+        }
 
         Ok(snapshot)
     }
@@ -554,7 +693,7 @@ impl Downloads {
             jobs.retain(|job| job.view.id != id);
             views(&jobs)
         };
-        (self.persist)(&finished(&self.jobs));
+        (self.persist)(&persistable(&self.jobs));
         self.announce();
         Ok(snapshot)
     }
@@ -571,64 +710,136 @@ impl Downloads {
         Ok(snapshot)
     }
 
-    /// Hands a job to the engine on a thread of its own. The transfer blocks for as long
-    /// as it takes, which is hours.
-    fn run(&self, id: String, url: &str, dest: PathBuf, control: Arc<Control>, options: &Options) {
-        let spec = spec_for(url, &dest, options);
-        let jobs = self.jobs.clone();
-        let events = self.events.clone();
-        let landed = self.landed.clone();
-        let engine = self.engine.clone();
-        let persist = self.persist.clone();
-        let sink = Sink {
-            id: id.clone(),
-            jobs: jobs.clone(),
-            events: events.clone(),
-        };
-
-        thread::spawn(move || {
-            let outcome = engine(&spec, &control, &sink);
-            let complete = outcome.is_ok();
-            finish(&jobs, &id, outcome, &dest);
-            // Ahead of the state event, so a screen that answers a finished transfer by
-            // reading the catalog finds the file already in it.
-            if complete {
-                landed();
-            }
-            persist(&finished(&jobs));
-            emit_state(&events, &jobs);
-        });
-    }
-
     fn announce(&self) {
         emit_state(&self.events, &self.jobs);
     }
 
     /// Applies a limit to whatever is running now as well as remembering it for what runs
     /// next. A limit only the next download honours is not the one the user was watching
-    /// when they set it.
+    /// when they set it — and one that skipped the queue would be honoured by nothing the
+    /// user can see, since a queued job carries the terms it was admitted on.
     pub fn set_rate_limit(&self, rate: Option<u64>) -> Vec<DownloadJob> {
-        let jobs = self.jobs.lock().expect("downloads lock");
-        for job in jobs
-            .iter()
-            .filter(|job| job.view.state == DownloadState::Active)
-        {
-            job.control.set_rate_limit(normalized_rate(rate));
+        let mut jobs = self.jobs.lock().expect("downloads lock");
+        for job in jobs.iter_mut() {
+            match job.view.state {
+                DownloadState::Active => job.control.set_rate_limit(normalized_rate(rate)),
+                DownloadState::Queued => job.options.rate_limit = rate,
+                _ => {}
+            }
         }
         views(&jobs)
     }
 
-    /// Drops the history. A paused transfer is not history — its bytes are on disk waiting
-    /// to be continued, and clearing the finished rows must not throw that away.
+    /// Drops the history. A paused or queued transfer is not history — one has bytes on
+    /// disk waiting to be continued and the other has a place in a line, and clearing the
+    /// finished rows must not throw either away.
     pub fn clear(&self) -> Vec<DownloadJob> {
         let snapshot = {
             let mut jobs = self.jobs.lock().expect("downloads lock");
             jobs.retain(|job| !job.view.state.finished());
             views(&jobs)
         };
-        (self.persist)(&[]);
+        (self.persist)(&persistable(&self.jobs));
         emit_state(&self.events, &self.jobs);
         snapshot
+    }
+}
+
+/// Hands a job to the engine on a thread of its own. The transfer blocks for as long as it
+/// takes, which is hours, and hands the pipe to the queue when it is done.
+fn spawn(
+    rt: Runtime,
+    id: String,
+    url: String,
+    dest: PathBuf,
+    control: Arc<Control>,
+    options: Options,
+) {
+    let spec = spec_for(&url, &dest, &options);
+    let sink = Sink {
+        id: id.clone(),
+        jobs: rt.jobs.clone(),
+        events: rt.events.clone(),
+    };
+
+    thread::spawn(move || {
+        let outcome = (rt.engine)(&spec, &control, &sink);
+        let complete = outcome.is_ok();
+        finish(&rt.jobs, &id, outcome, &dest);
+        // Ahead of the state event, so a screen that answers a finished transfer by
+        // reading the catalog finds the file already in it.
+        if complete {
+            (rt.landed)();
+        }
+        (rt.persist)(&persistable(&rt.jobs));
+        emit_state(&rt.events, &rt.jobs);
+        advance(&rt);
+    });
+}
+
+/// Starts the head of the queue, if there is one and the pipe is free.
+///
+/// Runs after `finish` has released the lock rather than inside it: starting a transfer
+/// takes the same mutex, and a queue that promoted its next job from within the settle
+/// path would deadlock on the first file that finished.
+///
+/// The loop is for the jobs it cannot start. A row admitted hours ago was checked against
+/// a models directory that has changed since, and one whose file has landed in the meantime
+/// is failed rather than allowed to overwrite it — then the next in line is considered.
+fn advance(rt: &Runtime) {
+    loop {
+        let starting = {
+            let mut jobs = rt.jobs.lock().expect("downloads lock");
+            if jobs
+                .iter()
+                .any(|job| job.view.state == DownloadState::Active)
+            {
+                return;
+            }
+            let Some(at) = jobs
+                .iter()
+                .position(|job| job.view.state == DownloadState::Queued)
+            else {
+                return;
+            };
+
+            let dest = PathBuf::from(&jobs[at].view.path);
+            let job = &mut jobs[at];
+            if dest.exists() {
+                job.view.state = DownloadState::Failed;
+                job.view.error = Some(format!(
+                    "{} is already in the models directory",
+                    job.view.file_name
+                ));
+                job.view.finished_secs = now_secs();
+                None
+            } else {
+                job.view.state = DownloadState::Active;
+                job.view.started_secs = now_secs();
+                job.control = Arc::new(Control::default());
+                job.control
+                    .set_rate_limit(normalized_rate(job.options.rate_limit));
+                Some((
+                    job.view.id.clone(),
+                    job.view.url.clone(),
+                    dest,
+                    job.control.clone(),
+                    job.options.clone(),
+                ))
+            }
+        };
+
+        (rt.persist)(&persistable(&rt.jobs));
+        emit_state(&rt.events, &rt.jobs);
+
+        let Some((id, url, dest, control, options)) = starting else {
+            continue;
+        };
+        if let Some(models_dir) = dest.parent() {
+            let _ = std::fs::create_dir_all(models_dir);
+        }
+        spawn(rt.clone(), id, url, dest, control, options);
+        return;
     }
 }
 

@@ -131,13 +131,29 @@ function badgeFor(job: DownloadJob): { text: string; className: string } {
     return { text: PHASE_LABEL[job.phase], className: "badge badge-moe" };
   }
   if (job.state === "complete") return { text: "complete", className: "badge" };
+  if (job.state === "queued") {
+    return { text: "queued", className: "badge badge-quiet" };
+  }
   if (job.state === "paused") {
     return { text: "paused", className: "badge badge-quiet" };
   }
   return { text: "failed", className: "badge badge-warn" };
 }
 
-function detail(job: DownloadJob, smoothed: Smoothed | undefined): string {
+/// `place` is where this job sits in the queue, counting from one, and zero for a job that
+/// is not in it.
+function detail(
+  job: DownloadJob,
+  smoothed: Smoothed | undefined,
+  place: number,
+): string {
+  if (job.state === "queued") {
+    if (place <= 1) {
+      return "Next in line — it starts when the transfer above it stops.";
+    }
+    const ahead = place - 1;
+    return `Waiting its turn — ${ahead} download${ahead === 1 ? "" : "s"} ahead of it.`;
+  }
   if (job.state === "complete") {
     return `In the models directory · ${formatBytes(job.completed)}`;
   }
@@ -188,8 +204,8 @@ function detail(job: DownloadJob, smoothed: Smoothed | undefined): string {
 function Row({
   job,
   smoothed,
+  place,
   busy,
-  blocked,
   onPause,
   onResume,
   onDiscard,
@@ -198,8 +214,8 @@ function Row({
 }: {
   job: DownloadJob;
   smoothed: Smoothed | undefined;
+  place: number;
   busy: boolean;
-  blocked: boolean;
   onPause: (id: string) => void;
   onResume: (id: string) => void;
   onDiscard: (id: string) => void;
@@ -214,6 +230,9 @@ function Row({
     job.phase != null &&
     job.phase !== "resolving" &&
     done != null;
+
+  let discardHint = "Stop this transfer and delete the bytes it has fetched";
+  if (job.state === "queued") discardHint = "Take this out of the queue";
 
   return (
     <li className="download-row">
@@ -238,7 +257,7 @@ function Row({
           {job.state === "paused" && job.resumable && (
             <button
               className="button button-primary"
-              disabled={busy || blocked}
+              disabled={busy}
               onClick={() => onResume(job.id)}
             >
               Resume
@@ -247,7 +266,7 @@ function Row({
           {job.state !== "complete" && (
             <button
               className="button button-danger"
-              title="Stop this transfer and delete the bytes it has fetched"
+              title={discardHint}
               onClick={() => onDiscard(job.id)}
             >
               Discard
@@ -256,7 +275,7 @@ function Row({
           {mode !== "none" && (
             <button
               className="button"
-              disabled={busy || blocked}
+              disabled={busy}
               onClick={() => onRetry(job.url)}
             >
               {RETRY_LABEL[mode]}
@@ -282,7 +301,7 @@ function Row({
       )}
 
       {job.error && <p className="model-error">{job.error}</p>}
-      <p className="field-hint">{detail(job, smoothed)}</p>
+      <p className="field-hint">{detail(job, smoothed, place)}</p>
     </li>
   );
 }
@@ -436,8 +455,14 @@ export default function Downloads({
 
   const active = jobs.find((job) => job.state === "active");
   const unfinished = jobs.filter(
-    (job) => job.state === "active" || job.state === "paused",
+    (job) =>
+      job.state === "active" ||
+      job.state === "queued" ||
+      job.state === "paused",
   );
+  // The list is the queue's order, so a job's place in it is where it appears among the
+  // rows waiting. `indexOf` answers -1 for everything else, which reads as no place.
+  const queue = unfinished.filter((job) => job.state === "queued");
   // Newest first, and never trimmed — only ever shown a page at a time.
   const history = jobs.filter((job) => !unfinished.includes(job)).reverse();
   const shown = history.slice(0, page);
@@ -474,17 +499,14 @@ export default function Downloads({
             placeholder="https://huggingface.co/{repo}/resolve/main/{file}.gguf"
             onChange={(e) => setUrl(e.currentTarget.value)}
           />
-          <button
-            className="button button-primary"
-            type="submit"
-            disabled={busy || active != null}
-          >
+          <button className="button button-primary" type="submit" disabled={busy}>
             Download
           </button>
         </form>
         {active && (
           <p className="field-hint">
-            One file at a time — {active.fileName} is still downloading.
+            One file at a time — {active.fileName} is downloading, and anything
+            you add now waits its turn.
           </p>
         )}
       </section>
@@ -525,8 +547,8 @@ export default function Downloads({
               key={job.id}
               job={job}
               smoothed={rates[job.id]}
+              place={queue.indexOf(job) + 1}
               busy={busy}
-              blocked={active != null}
               onPause={pause}
               onResume={resume}
               onDiscard={discard}
@@ -549,8 +571,8 @@ export default function Downloads({
                 key={job.id}
                 job={job}
                 smoothed={rates[job.id]}
+                place={0}
                 busy={busy}
-                blocked={active != null}
                 onPause={pause}
                 onResume={resume}
                 onDiscard={discard}

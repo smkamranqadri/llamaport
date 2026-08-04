@@ -10,7 +10,7 @@
 
 use std::fs;
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -39,6 +39,10 @@ fn scratch(name: &str) -> PathBuf {
 
 const URL: &str = "https://huggingface.co/unsloth/Qwen3.6-35B-A3B-GGUF/resolve/main/Qwen3.6-35B-A3B-UD-Q3_K_XL.gguf";
 const FILE: &str = "Qwen3.6-35B-A3B-UD-Q3_K_XL.gguf";
+
+const OTHER: &str = "https://huggingface.co/a/b/resolve/main/Other-Q4_K_M.gguf";
+const OTHER_FILE: &str = "Other-Q4_K_M.gguf";
+const THIRD: &str = "https://huggingface.co/a/b/resolve/main/Third-Q4_K_M.gguf";
 
 #[derive(Default)]
 struct Recorder {
@@ -79,23 +83,67 @@ struct Manager {
     downloads: Downloads,
     events: Arc<Recorder>,
     landings: Arc<AtomicU32>,
+    /// The last thing written to `downloads.json`, which is what the next launch reads.
+    history: Arc<Mutex<Vec<DownloadJob>>>,
+}
+
+impl Manager {
+    fn history(&self) -> Vec<DownloadJob> {
+        self.history.lock().expect("history lock").clone()
+    }
+
+    fn held(&self, id: &str) -> DownloadJob {
+        self.downloads
+            .snapshot()
+            .into_iter()
+            .find(|job| job.id == id)
+            .expect("the job must stay tracked")
+    }
+
+    fn queue(&self) -> Vec<String> {
+        self.downloads
+            .snapshot()
+            .into_iter()
+            .filter(|job| job.state == DownloadState::Queued)
+            .map(|job| job.id)
+            .collect()
+    }
 }
 
 fn manager(engine: Engine) -> Manager {
     let events = Arc::new(Recorder::default());
     let landings = Arc::new(AtomicU32::new(0));
     let counted = Arc::clone(&landings);
+    let history = Arc::new(Mutex::new(Vec::new()));
+    let written = Arc::clone(&history);
     let downloads = Downloads::with_engine(
         events.clone(),
         Arc::new(move || {
             counted.fetch_add(1, Ordering::Relaxed);
         }),
         engine,
-    );
+    )
+    .persisting_with(Arc::new(move |jobs| {
+        *written.lock().expect("history lock") = jobs.to_vec();
+    }));
     Manager {
         downloads,
         events,
         landings,
+        history,
+    }
+}
+
+/// Stands in for a transfer the test decides the length of, so a second request is made
+/// while the first is provably still running rather than whenever the thread gets there.
+fn wait_for(flag: &AtomicBool) {
+    let deadline = Instant::now() + Duration::from_secs(5);
+    while !flag.load(Ordering::Relaxed) {
+        assert!(
+            Instant::now() < deadline,
+            "the test never released the transfer"
+        );
+        thread::sleep(Duration::from_millis(5));
     }
 }
 
@@ -213,8 +261,10 @@ fn a_file_already_in_the_models_directory_is_not_downloaded_again() {
     assert!(error.contains("already in the models directory"), "{error}");
 }
 
+/// A transfer holds its own file against a second row over the same `.part`. What it no
+/// longer holds is the app: another file is taken on and waits its turn.
 #[test]
-fn a_transfer_that_has_not_settled_holds_the_line() {
+fn a_running_transfer_holds_its_own_file_and_not_the_whole_app() {
     let dir = scratch("one-at-a-time");
 
     let same =
@@ -237,15 +287,41 @@ fn a_transfer_that_has_not_settled_holds_the_line() {
     let other = admit(
         URL,
         &dir,
-        &[job(
-            "dl-1",
-            "https://huggingface.co/other/repo/resolve/main/Other-Q4_K_M.gguf",
-            "Other-Q4_K_M.gguf",
-            DownloadState::Active,
-        )],
+        &[job("dl-1", OTHER, OTHER_FILE, DownloadState::Active)],
+    );
+    assert_eq!(
+        other,
+        Ok(dir.join(FILE)),
+        "a different file waits behind this one rather than being turned away"
+    );
+}
+
+/// The same rule from the other side: a row already waiting owns its file too, and the
+/// message has to say which line it is in or Resume is offered for something that is not
+/// paused.
+#[test]
+fn a_file_already_in_the_queue_cannot_be_queued_again() {
+    let dir = scratch("queue-dupe");
+    let jobs = [
+        job("dl-1", URL, FILE, DownloadState::Active),
+        job("dl-2", OTHER, OTHER_FILE, DownloadState::Queued),
+    ];
+
+    let same = admit(OTHER, &dir, &jobs).expect_err("refused");
+    assert!(same.contains("already in the queue"), "{same}");
+
+    let renamed = admit(
+        "https://huggingface.co/z/z/resolve/main/Other-Q4_K_M.gguf",
+        &dir,
+        &jobs,
     )
     .expect_err("refused");
-    assert!(other.contains("one file at a time"), "{other}");
+    assert!(renamed.contains("under another URL"), "{renamed}");
+
+    assert!(
+        admit(THIRD, &dir, &jobs).is_ok(),
+        "a third file is another place in the line, not a collision"
+    );
 }
 
 #[test]
@@ -473,15 +549,311 @@ fn the_stored_options_reach_the_engine() {
 
 /// The rule the manager exists to enforce, taken against a transfer that is actually
 /// running rather than against a list handed to `admit` by hand.
+///
+/// One at a time is unchanged. What changed is the answer to the second request: it is
+/// taken on, it is kept away from the engine, and it goes the moment the pipe is free.
 #[test]
-fn a_second_transfer_is_refused_while_the_first_is_still_running() {
+fn a_second_url_waits_its_turn_and_starts_when_the_first_stops() {
     let dir = scratch("live-line");
-    let engines = Arc::new(AtomicU32::new(0));
-    let counted = Arc::clone(&engines);
+    let reached = Arc::new(Mutex::new(Vec::new()));
+    let seen = Arc::clone(&reached);
 
-    let engine: Engine = Arc::new(move |_: &Spec, control: &Control, _: &dyn ProgressSink| {
-        counted.fetch_add(1, Ordering::Relaxed);
-        wait_for_cancel(control)
+    let engine: Engine = Arc::new(
+        move |spec: &Spec, control: &Control, _: &dyn ProgressSink| {
+            seen.lock().expect("engine lock").push(spec.url.clone());
+            wait_for_cancel(control)
+        },
+    );
+    let manager = manager(engine);
+
+    let started = manager
+        .downloads
+        .start(URL, &dir, &Options::default())
+        .expect("admitted");
+    let running = started[0].id.clone();
+    let urls = || reached.lock().expect("engine lock").clone();
+    eventually("the transfer never reached the engine", || {
+        urls().len() == 1
+    });
+
+    let queued = manager
+        .downloads
+        .start(OTHER, &dir, &Options::default())
+        .expect("taken on rather than refused");
+    assert_eq!(queued.len(), 2, "the waiting transfer has to be tracked");
+    assert_eq!(queued[1].state, DownloadState::Queued);
+    assert_eq!(
+        queued[1].started_secs, None,
+        "a job that has not started has no start time"
+    );
+    let waiting = queued[1].id.clone();
+
+    assert_eq!(
+        urls(),
+        [URL],
+        "a queued transfer must not reach the engine while another is running"
+    );
+
+    manager.downloads.pause(&running).expect("paused");
+    assert_eq!(
+        settled(&manager.downloads, &running).state,
+        DownloadState::Paused
+    );
+
+    eventually("the queue never handed the pipe on", || urls().len() == 2);
+    assert_eq!(urls()[1], OTHER);
+
+    let promoted = manager.held(&waiting);
+    assert_eq!(promoted.state, DownloadState::Active);
+    assert!(
+        promoted.started_secs.is_some(),
+        "a transfer that is running started at some point"
+    );
+
+    manager.downloads.pause(&waiting).expect("paused");
+    settled(&manager.downloads, &waiting);
+}
+
+/// Whatever ends the transfer at the head of the line hands the pipe on: it finished, it
+/// failed, and a pause is covered where the queue is first proved. There is no outcome
+/// that leaves the queue holding.
+#[test]
+fn a_transfer_that_ends_on_its_own_hands_the_pipe_to_the_queue() {
+    for (label, outcome) in [
+        ("complete", Ok(())),
+        ("failed", Err("HTTP 404".to_string())),
+    ] {
+        let dir = scratch(&format!("queue-{label}"));
+        let release = Arc::new(AtomicBool::new(false));
+        let held = Arc::clone(&release);
+        let reached = Arc::new(Mutex::new(Vec::new()));
+        let seen = Arc::clone(&reached);
+
+        let engine: Engine = Arc::new(
+            move |spec: &Spec, control: &Control, _: &dyn ProgressSink| {
+                seen.lock().expect("engine lock").push(spec.url.clone());
+                if spec.url == URL {
+                    wait_for(&held);
+                    return outcome.clone();
+                }
+                wait_for_cancel(control)
+            },
+        );
+        let manager = manager(engine);
+
+        let started = manager
+            .downloads
+            .start(URL, &dir, &Options::default())
+            .expect("admitted");
+        let first = started[0].id.clone();
+        let urls = || reached.lock().expect("engine lock").clone();
+        eventually("the transfer never reached the engine", || {
+            urls().len() == 1
+        });
+
+        let queued = manager
+            .downloads
+            .start(OTHER, &dir, &Options::default())
+            .expect("taken on");
+        let waiting = queued[1].id.clone();
+        assert_eq!(queued[1].state, DownloadState::Queued, "{label}");
+
+        release.store(true, Ordering::Relaxed);
+        settled(&manager.downloads, &first);
+
+        eventually(
+            &format!("a {label} transfer never released the queue"),
+            || urls().len() == 2,
+        );
+        assert_eq!(
+            manager.held(&waiting).state,
+            DownloadState::Active,
+            "{label}"
+        );
+
+        manager.downloads.pause(&waiting).expect("paused");
+        settled(&manager.downloads, &waiting);
+    }
+}
+
+/// Discard is the other user-initiated stop, and it takes the same path as a pause: the
+/// engine is signalled, the row goes on the settle path, and the queue moves up.
+#[test]
+fn discarding_the_running_transfer_hands_the_pipe_to_the_queue() {
+    let dir = scratch("queue-discard");
+    let reached = Arc::new(Mutex::new(Vec::new()));
+    let seen = Arc::clone(&reached);
+
+    let engine: Engine = Arc::new(
+        move |spec: &Spec, control: &Control, _: &dyn ProgressSink| {
+            seen.lock().expect("engine lock").push(spec.url.clone());
+            wait_for_cancel(control)
+        },
+    );
+    let manager = manager(engine);
+
+    let started = manager
+        .downloads
+        .start(URL, &dir, &Options::default())
+        .expect("admitted");
+    let running = started[0].id.clone();
+    let urls = || reached.lock().expect("engine lock").clone();
+    eventually("the transfer never reached the engine", || {
+        urls().len() == 1
+    });
+
+    let queued = manager
+        .downloads
+        .start(OTHER, &dir, &Options::default())
+        .expect("taken on");
+    let waiting = queued[1].id.clone();
+
+    manager.downloads.discard(&running).expect("discarded");
+    eventually("the discarded row was never dropped", || {
+        manager.downloads.snapshot().len() == 1
+    });
+    eventually("a discard never released the queue", || urls().len() == 2);
+    assert_eq!(manager.held(&waiting).state, DownloadState::Active);
+
+    manager.downloads.pause(&waiting).expect("paused");
+    settled(&manager.downloads, &waiting);
+}
+
+/// A resume is a transfer starting, so it takes its turn like any other — at the back.
+/// The list is the queue's order, and a row paused hours ago sits at an old index: served
+/// from there it would jump ahead of everything added since.
+#[test]
+fn resuming_while_something_runs_joins_the_back_of_the_queue() {
+    let dir = scratch("queue-resume");
+    let engine: Engine =
+        Arc::new(|_: &Spec, control: &Control, _: &dyn ProgressSink| wait_for_cancel(control));
+    let manager = manager(engine);
+
+    let first = manager
+        .downloads
+        .start(OTHER, &dir, &Options::default())
+        .expect("admitted");
+    let old = first[0].id.clone();
+    manager.downloads.pause(&old).expect("paused");
+    assert_eq!(
+        settled(&manager.downloads, &old).state,
+        DownloadState::Paused
+    );
+
+    let running = manager
+        .downloads
+        .start(URL, &dir, &Options::default())
+        .expect("admitted");
+    let running = running
+        .iter()
+        .find(|job| job.url == URL)
+        .expect("the job just started")
+        .id
+        .clone();
+
+    let queued = manager
+        .downloads
+        .start(THIRD, &dir, &Options::default())
+        .expect("taken on");
+    let third = queued
+        .iter()
+        .find(|job| job.url == THIRD)
+        .expect("just queued")
+        .id
+        .clone();
+
+    let after = manager
+        .downloads
+        .resume(&old, &dir, &Options::default())
+        .expect("a resume waits its turn rather than being refused");
+    assert_eq!(
+        after.iter().find(|job| job.id == old).map(|job| job.state),
+        Some(DownloadState::Queued)
+    );
+    assert_eq!(
+        manager.queue(),
+        [third.as_str(), old.as_str()],
+        "the resumed row was served ahead of one queued before it"
+    );
+
+    let again = manager
+        .downloads
+        .resume(&old, &dir, &Options::default())
+        .expect_err("a row already in the line has nothing to resume");
+    assert!(again.contains("already in the queue"), "{again}");
+
+    manager.downloads.pause(&running).expect("paused");
+    eventually("the queue never started the row behind it", || {
+        manager.held(&third).state == DownloadState::Active
+    });
+    assert_eq!(manager.held(&old).state, DownloadState::Queued);
+
+    manager.downloads.pause(&third).expect("paused");
+    eventually("the last of the queue never started", || {
+        manager.held(&old).state == DownloadState::Active
+    });
+    manager.downloads.pause(&old).expect("paused");
+    settled(&manager.downloads, &old);
+}
+
+/// A queued job carries the terms it was admitted on, because it starts on a thread with
+/// no caller to ask. The rate limit is the one term that is live, and a limit set while
+/// three files wait has to be the one they start under — otherwise it is honoured by
+/// nothing the user can see.
+#[test]
+fn a_limit_set_while_a_job_waits_is_the_one_it_starts_under() {
+    let dir = scratch("queue-rate");
+    let observed = Arc::new(Mutex::new(None));
+    let watched = Arc::clone(&observed);
+
+    let engine: Engine = Arc::new(
+        move |spec: &Spec, control: &Control, _: &dyn ProgressSink| {
+            if spec.url == OTHER {
+                *watched.lock().expect("rate lock") = Some(control.rate_limit());
+            }
+            wait_for_cancel(control)
+        },
+    );
+    let manager = manager(engine);
+
+    let started = manager
+        .downloads
+        .start(URL, &dir, &Options::default())
+        .expect("admitted");
+    let running = started[0].id.clone();
+    manager
+        .downloads
+        .start(OTHER, &dir, &Options::default())
+        .expect("taken on");
+
+    manager.downloads.set_rate_limit(Some(2_000_000));
+    manager.downloads.pause(&running).expect("paused");
+
+    eventually("the queued transfer never started", || {
+        observed.lock().expect("rate lock").is_some()
+    });
+    assert_eq!(
+        *observed.lock().expect("rate lock"),
+        Some(Some(2_000_000)),
+        "the waiting transfer started under the limit it was admitted with"
+    );
+}
+
+/// The check that admitted a job ran against a models directory that has had hours to
+/// change. A file that landed in the meantime is not something to write over.
+#[test]
+fn a_file_that_landed_while_a_job_waited_is_not_overwritten() {
+    let dir = scratch("queue-landed");
+    let release = Arc::new(AtomicBool::new(false));
+    let held = Arc::clone(&release);
+
+    let engine: Engine = Arc::new(move |spec: &Spec, _: &Control, _: &dyn ProgressSink| {
+        assert_eq!(
+            spec.url, URL,
+            "a job whose file is already there must never reach the engine"
+        );
+        wait_for(&held);
+        Ok(())
     });
     let manager = manager(engine);
 
@@ -490,35 +862,102 @@ fn a_second_transfer_is_refused_while_the_first_is_still_running() {
         .start(URL, &dir, &Options::default())
         .expect("admitted");
     let running = started[0].id.clone();
-    eventually("the transfer never reached the engine", || {
-        engines.load(Ordering::Relaxed) == 1
-    });
 
-    let refused = manager
+    let queued = manager
         .downloads
-        .start(
-            "https://huggingface.co/a/b/resolve/main/Other-Q4_K_M.gguf",
-            &dir,
-            &Options::default(),
-        )
-        .expect_err("one file at a time");
-    assert!(refused.contains("one file at a time"), "{refused}");
-    assert_eq!(
-        manager.downloads.snapshot().len(),
-        1,
-        "a refused request must not be tracked"
+        .start(OTHER, &dir, &Options::default())
+        .expect("taken on");
+    let waiting = queued[1].id.clone();
+
+    fs::write(dir.join(OTHER_FILE), b"landed some other way").expect("seed");
+    release.store(true, Ordering::Relaxed);
+    settled(&manager.downloads, &running);
+
+    eventually("the waiting job was never resolved either way", || {
+        manager.held(&waiting).state.finished()
+    });
+    let blocked = manager.held(&waiting);
+    assert_eq!(blocked.state, DownloadState::Failed);
+    assert!(
+        blocked
+            .error
+            .as_deref()
+            .unwrap_or_default()
+            .contains("already in the models directory"),
+        "{:?}",
+        blocked.error
     );
     assert_eq!(
-        engines.load(Ordering::Relaxed),
-        1,
-        "a refused request must not reach the engine"
+        fs::read(dir.join(OTHER_FILE)).expect("read"),
+        b"landed some other way",
+        "the queued transfer wrote over a file that was already there"
+    );
+}
+
+/// Clearing drops the history. A queued row is not history — it is a place in a line, and
+/// it has to survive both the list and the file the list is written to.
+#[test]
+fn clearing_leaves_the_queue_alone() {
+    let dir = scratch("queue-clear");
+    let engine: Engine = Arc::new(|spec: &Spec, control: &Control, _: &dyn ProgressSink| {
+        if spec.url == THIRD {
+            return Err("HTTP 500".to_string());
+        }
+        wait_for_cancel(control)
+    });
+    let manager = manager(engine);
+
+    let done = manager
+        .downloads
+        .start(THIRD, &dir, &Options::default())
+        .expect("admitted");
+    let done = done[0].id.clone();
+    assert_eq!(
+        settled(&manager.downloads, &done).state,
+        DownloadState::Failed
+    );
+
+    let started = manager
+        .downloads
+        .start(URL, &dir, &Options::default())
+        .expect("admitted");
+    let running = started
+        .iter()
+        .find(|job| job.url == URL)
+        .expect("just started")
+        .id
+        .clone();
+    let queued = manager
+        .downloads
+        .start(OTHER, &dir, &Options::default())
+        .expect("taken on");
+    let waiting = queued
+        .iter()
+        .find(|job| job.url == OTHER)
+        .expect("just queued")
+        .id
+        .clone();
+
+    let left = manager.downloads.clear();
+    assert_eq!(
+        left.iter().map(|job| job.id.as_str()).collect::<Vec<_>>(),
+        [running.as_str(), waiting.as_str()],
+        "clearing the history took the queue with it"
+    );
+    let kept = manager.history();
+    assert_eq!(
+        kept.iter().map(|job| job.id.as_str()).collect::<Vec<_>>(),
+        [waiting.as_str()],
+        "the queue was cleared out of the file the next launch reads"
     );
 
     manager.downloads.pause(&running).expect("paused");
-    assert_eq!(
-        settled(&manager.downloads, &running).state,
-        DownloadState::Paused
-    );
+    settled(&manager.downloads, &running);
+    eventually("the queue never started", || {
+        manager.held(&waiting).state == DownloadState::Active
+    });
+    manager.downloads.pause(&waiting).expect("paused");
+    settled(&manager.downloads, &waiting);
 }
 
 /// On a fresh install the configured models directory does not exist yet, and the engine
@@ -1104,6 +1543,223 @@ fn a_partial_naming_somewhere_other_than_hugging_face_cannot_be_resumed() {
         refused.contains("Hugging Face") || refused.contains("huggingface"),
         "{refused}"
     );
+}
+
+/// A queued row is the only unfinished work with nothing on disk describing it — no
+/// `.part`, no sidecar — so the history file is the only thing that can carry it across a
+/// restart. It comes back Paused: it has no bytes to prove it was ever this app's doing,
+/// and launching the app is not consent to fetch a URL that was read off disk.
+#[test]
+fn a_queued_row_comes_back_as_a_paused_row_after_a_restart() {
+    let dir = scratch("queue-restart");
+    let engine: Engine =
+        Arc::new(|_: &Spec, control: &Control, _: &dyn ProgressSink| wait_for_cancel(control));
+    let first = manager(engine);
+
+    let started = first
+        .downloads
+        .start(URL, &dir, &Options::default())
+        .expect("admitted");
+    let running = started[0].id.clone();
+    let queued = first
+        .downloads
+        .start(OTHER, &dir, &Options::default())
+        .expect("taken on");
+    let waiting = queued[1].id.clone();
+
+    let written = first.history();
+    assert_eq!(
+        written
+            .iter()
+            .map(|job| job.id.as_str())
+            .collect::<Vec<_>>(),
+        [waiting.as_str()],
+        "the running transfer belongs to its `.part`, not to the history file"
+    );
+
+    first.downloads.pause(&running).expect("paused");
+    settled(&first.downloads, &running);
+
+    // The next launch, which knows only what is on disk.
+    let runs = Arc::new(AtomicU32::new(0));
+    let counted = Arc::clone(&runs);
+    let engine: Engine = Arc::new(move |_: &Spec, control: &Control, _: &dyn ProgressSink| {
+        counted.fetch_add(1, Ordering::Relaxed);
+        wait_for_cancel(control)
+    });
+    let next = manager(engine);
+    next.downloads.restore(written, &dir);
+
+    let restored = next.downloads.snapshot();
+    assert_eq!(restored.len(), 1, "the queue did not survive the restart");
+    assert_eq!(restored[0].id, waiting);
+    assert_eq!(restored[0].state, DownloadState::Paused);
+    assert_eq!(restored[0].url, OTHER);
+    assert_eq!(restored[0].file_name, OTHER_FILE);
+    assert_eq!(restored[0].path, dir.join(OTHER_FILE).to_string_lossy());
+    assert_eq!(restored[0].completed, 0);
+    assert_eq!(restored[0].total, None);
+    assert!(
+        restored[0].resumable,
+        "the screen draws Resume from this, and there is nothing wrong with the row"
+    );
+    assert_eq!(
+        runs.load(Ordering::Relaxed),
+        0,
+        "restoring must not fetch anything on its own"
+    );
+
+    next.downloads
+        .resume(&waiting, &dir, &Options::default())
+        .expect("resumed");
+    eventually("the restored row could not be continued", || {
+        runs.load(Ordering::Relaxed) == 1
+    });
+    next.downloads.pause(&waiting).expect("paused");
+    settled(&next.downloads, &waiting);
+}
+
+/// A queued row is not always a row that never started. Resuming into the queue carries a
+/// `.part` and its bytes along, and the restored row holds that file's path — which is
+/// exactly what `adopt` treats as already tracked, so it leaves the partial alone. Nothing
+/// else will correct the figure, which makes zeroing it the only account of those bytes
+/// saying they are not there.
+#[test]
+fn a_queued_row_waiting_over_a_partial_comes_back_reporting_it() {
+    let dir = scratch("queue-restart-bytes");
+    seed_partial(&dir, FILE, URL, 12_000, 64_000);
+
+    let engine: Engine = Arc::new(|_: &Spec, _: &Control, _: &dyn ProgressSink| Ok(()));
+    let manager = manager(engine);
+
+    let mut waiting = job("dl-1", URL, FILE, DownloadState::Queued);
+    waiting.completed = 12_000;
+    waiting.total = Some(64_000);
+    manager.downloads.restore(vec![waiting], &dir);
+    manager.downloads.adopt(&dir);
+
+    let restored = manager.downloads.snapshot();
+    assert_eq!(
+        restored.len(),
+        1,
+        "the restored row and the partial are the same download, not two"
+    );
+    assert_eq!(restored[0].state, DownloadState::Paused);
+    assert_eq!(
+        restored[0].completed, 12_000,
+        "the screen was told the bytes on disk are not there"
+    );
+    assert_eq!(restored[0].total, Some(64_000));
+}
+
+/// A queued row comes back Paused, and Paused was not something the history file kept — so
+/// the queue survived one restart and the next write to that file dropped it. There is no
+/// `.part` and no sidecar behind a row that never started, so nothing else remembers it.
+#[test]
+fn a_queue_that_came_back_once_is_still_there_the_next_time() {
+    let dir = scratch("queue-restart-twice");
+    let engine: Engine = Arc::new(|_: &Spec, _: &Control, _: &dyn ProgressSink| Ok(()));
+
+    let first = manager(engine.clone());
+    first
+        .downloads
+        .restore(vec![job("dl-1", URL, FILE, DownloadState::Queued)], &dir);
+    assert_eq!(first.downloads.snapshot()[0].state, DownloadState::Paused);
+
+    // Anything at all that rewrites the history file.
+    first.downloads.clear();
+    let written = first.history();
+    assert_eq!(
+        written.len(),
+        1,
+        "the restored queue was dropped by the only file that remembers it"
+    );
+
+    let next = manager(engine);
+    next.downloads.restore(written, &dir);
+    assert_eq!(
+        next.downloads.snapshot().len(),
+        1,
+        "the queue survived one restart and not two"
+    );
+}
+
+/// The other half of that rule, which is what keeps it from swallowing everything. A
+/// transfer with bytes on disk is described by the sidecar beside them, and a sidecar whose
+/// `.part` is gone still owns its row — taking either into the history file would shadow
+/// `adopt`, which is the only thing that reads what is actually there.
+#[test]
+fn a_transfer_the_disk_describes_is_left_to_the_disk() {
+    let dir = scratch("paused-not-persisted");
+    let engine: Engine = Arc::new(|_: &Spec, _: &Control, _: &dyn ProgressSink| Ok(()));
+    let manager = manager(engine);
+
+    seed_partial(&dir, FILE, URL, 12_000, 64_000);
+    seed_partial(&dir, OTHER_FILE, OTHER, 5_000, 64_000);
+    fs::remove_file(dir.join(format!("{OTHER_FILE}.part"))).expect("remove part");
+
+    let adopted = manager.downloads.adopt(&dir);
+    assert_eq!(adopted.len(), 2);
+    assert!(adopted.iter().all(|job| job.state == DownloadState::Paused));
+
+    manager.downloads.clear();
+    assert!(
+        manager.history().is_empty(),
+        "a transfer the disk already accounts for was copied into the history file too"
+    );
+}
+
+/// The history file sits in a directory anything with write access can plant a row in, and
+/// a queued row is a URL and nothing else — there are no bytes on disk to contradict it.
+/// It is dropped rather than kept for discarding: an adopted partial is listed because its
+/// bytes are occupying the models directory, and this one is occupying nothing.
+#[test]
+fn a_queued_row_naming_somewhere_other_than_hugging_face_is_not_restored() {
+    let dir = scratch("queue-hostile");
+    let engine: Engine = Arc::new(|_: &Spec, _: &Control, _: &dyn ProgressSink| {
+        panic!("the engine must never be reached for an unvalidated URL")
+    });
+    let manager = manager(engine);
+
+    manager.downloads.restore(
+        vec![job(
+            "dl-1",
+            "https://attacker.example/collect?u=victim",
+            FILE,
+            DownloadState::Queued,
+        )],
+        &dir,
+    );
+
+    assert!(
+        manager.downloads.snapshot().is_empty(),
+        "a planted queue entry became a row with a Resume button"
+    );
+}
+
+/// `path` is rebuilt from the models directory so a stored one cannot aim a write — but it
+/// is rebuilt by joining `file_name`, which came off the same untrusted file. A name that
+/// is not a name reaches back out of the directory the join was meant to confine it to.
+#[test]
+fn a_restored_row_cannot_name_a_file_outside_the_models_directory() {
+    let dir = scratch("hostile-name");
+    let engine: Engine = Arc::new(|_: &Spec, _: &Control, _: &dyn ProgressSink| Ok(()));
+    let manager = manager(engine);
+
+    for name in [
+        "../../../../Users/victim/Library/LaunchAgents/com.evil.plist",
+        "nested/Model-Q4_K_M.gguf",
+        "..",
+        "",
+    ] {
+        let mut hostile = job("dl-1", URL, FILE, DownloadState::Failed);
+        hostile.file_name = name.to_string();
+        manager.downloads.restore(vec![hostile], &dir);
+        assert!(
+            manager.downloads.snapshot().is_empty(),
+            "{name} was taken back in and joined onto the models directory"
+        );
+    }
 }
 
 /// The history file is on disk beside the config, and `path` in it decides what a resume

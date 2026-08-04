@@ -28,9 +28,17 @@ Two, each with its own spec, module and screen:
 4. ~~**v0.2.0**~~ — shipped 2026-08-03 with three security fixes the release
    review turned up. [release.md](release.md).
 
-5. **Nothing planned.** Two things are owed rather than planned: the README's
-   "Open Anyway" steps have still never met a real Gatekeeper prompt, and Discard
-   and the Downloads History pages have never been looked at.
+5. ~~**Download queue**~~ — done 2026-08-04. [downloader.md](downloader.md),
+   phase 2. A second request waits instead of being refused. One transfer at a
+   time is unchanged; what changed is that the app stopped saying no. Like every
+   item in step 3, this came from the author using the built app rather than
+   from a feature list. Proved by a four-deep queue draining ~48 GB unattended,
+   and it turned up a path traversal that is live in v0.2.0.
+
+6. **Nothing planned.** Still owed rather than planned: the README's "Open
+   Anyway" steps have never met a real Gatekeeper prompt, and a queued row with
+   nothing on disk behind it has never been seen coming back from a restart.
+   Discard is no longer owed — it was used in the running app on 2026-08-04.
 
 ## Decided against
 
@@ -62,5 +70,5 @@ unplanned.
   `show_main_window` asserts a usable frame and does not reliably achieve it.
   Predates the downloader, and is a release blocker of its own. Never reproduced
   on demand, so the fix will be structural rather than a repair.
-- The runner spec has no "known gaps" section, but `README.md:50` sends readers
-  to one. Fix the reference or write the section.
+- ~~The runner spec has no "known gaps" section, but `README.md:50` sends readers
+  to one.~~ Resolved by the phase 3 README rewrite; no such reference remains.

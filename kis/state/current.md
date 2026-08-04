@@ -1,17 +1,32 @@
 # Current
 
 ```text
-Branch:   main, clean and pushed, tagged `v0.2.0`. The tag and `main` are the
-          same commit, so the published build and the tree agree for the first
-          time since v0.1.0.
-Task:     none in progress. The Persistence phase is finished and shipped.
+Branch:   `feat/download-queue`, one commit ahead of `main` and unpushed. `main`
+          is still where `v0.2.0` was cut from plus two KIS commits. This project
+          has always worked on `main`; the branch exists only because the commit
+          was made under a rule against committing straight to the default one,
+          and a fast-forward puts it back where the history expects it.
+Task:     none in progress. The download queue is done and committed.
 Mode:     —
 Blocker:  none. Two things owed rather than blocking: the README's "Open Anyway"
-          steps have never met a real Gatekeeper prompt, and Discard and the
-          Downloads History pages have never been looked at in the running app.
-Next:     nothing planned. The next move is whatever v0.2.0 says — install
-          friction, bug reports, or silence. Do not plan features against
-          silence. A browser download of the `.dmg` would settle Gatekeeper.
+          steps have never met a real Gatekeeper prompt, and a queued row with
+          nothing on disk behind it has never been seen coming back from a
+          restart — every relaunch so far recovered rows that had a `.part`.
+Next:     nothing planned. **v0.2.1 is owed**, not optional: the path traversal
+          in `restore` is live in the published build. It is a one-line class of
+          fix that is already in `main`, so the next release is a decision about
+          timing rather than about work.
+Status:   working in the app, uncommitted. Pre-flight added three things the plan
+          missed — queue order once Resume can enqueue, which Options a queued
+          job starts under, and `clear` wiping queued rows out of
+          `downloads.json`. Three defects were then found by reading disk rather
+          than by any test: `restore` rebuilt `path` from an unvalidated
+          `file_name`, so `../` escaped the models directory; a restored queued
+          row zeroed its byte count while its `.part` sat on disk, and shadowed
+          the `adopt` row that knew better; and the queue survived exactly one
+          restart, because a row restored as Paused stopped being written to the
+          only file that remembered it. All three fixed, each with a test that
+          fails without the fix.
 ```
 
 Run and verify commands: [knowledge/technical.md](../knowledge/technical.md).
@@ -48,7 +63,33 @@ Apart from the files named above, `git log` is the record.
 The four commands were last run green over the working tree: `cargo fmt
 --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test`,
 `bun run build` — all exit 0, each status captured on its own line rather than
-after a pipe. 164 tests.
+after a pipe. 174 tests, up from 164.
+
+Queue, 2026-08-04:
+
+- **A four-deep queue drained itself in the running app**, unattended, one file
+  at a time and in the order it was given: Ternary-Bonsai 27B, then 8B, then 4B,
+  then 1.7B, alongside North-Mini-Code resuming from a 19 GB `.part` and
+  finishing. Around 48 GB through four consecutive hand-offs without a click.
+  That is the invariant, proved by the app rather than by the suite.
+- Queueing, the advance on a pause, and Discard were each confirmed on screen by
+  the author. Discard had never been looked at in the running app before this.
+- **Resume takes its turn**, seen rather than reasoned about: two paused rows
+  recovered after a restart, both clicked, one started and the other waited.
+- Every closing condition has a test, and **each new guard was gutted in turn to
+  see which test caught it.** All were caught by the test meant for them, both
+  halves of the persistence rule included. A green suite is not the claim; a
+  suite that fails when the code is wrong is.
+- **Two defects were found by reading the disk, not by the suite**, and both were
+  in the restart path — see below. Neither would have been caught by any test
+  written before them.
+- Still unproved on screen: **a row with nothing on disk behind it surviving a
+  restart.** Its write half is proved — a queued row was read out of
+  `downloads.json` with the app shut. The read half has not been: every relaunch
+  so far recovered rows that had a real `.part`, which is `adopt`, the path that
+  predates this work. The fix that makes such a row survive a second restart
+  landed after the last relaunch, so it has never run in the app at all.
+  Conditions 6 and 7 are suite-only by nature.
 
 The published `.dmg` was downloaded back from GitHub and is byte-identical to
 what was built. Mounted, it carries `Llamaport.app` at 0.2.0 with the right

@@ -130,7 +130,12 @@ export interface Telemetry {
 }
 
 export type DownloadPhase = "resolving" | "transferring" | "verifying";
-export type DownloadState = "active" | "paused" | "complete" | "failed";
+export type DownloadState =
+  | "active"
+  | "queued"
+  | "paused"
+  | "complete"
+  | "failed";
 
 export interface DownloadJob {
   id: string;

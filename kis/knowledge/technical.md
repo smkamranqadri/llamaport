@@ -48,6 +48,14 @@ transfer settles often and the config holds the models directory, the
 llama-server path and every remembered launch — an unreadable history should cost
 the user their history and nothing else.
 
+It holds more than the history: **whatever nothing else on disk remembers.** A
+transfer that moved bytes is described by the sidecar beside its `.part`, which
+cannot go stale while it runs, and that account is left to own it. A queued row
+has no `.part` and no sidecar, and neither does the Paused row a queued one comes
+back as — so both are written here, and `only_record_of` is where that is
+decided. Writing only the queued state made the queue survive one restart and not
+the next.
+
 Everything the app keeps lives in `~/Library/Application Support/llamaport`:
 that config, `downloads.json`, the runner pidfile, the last run log.
 `store::adopt_legacy_dir`
@@ -110,6 +118,21 @@ cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
 - `admit` is not the only gate a transfer passes. Anything that starts one —
   today `start` and `resume` — validates the URL itself. Resume once did not, and
   that asymmetry was the whole vulnerability.
+- A restored row's **file name** is validated too, not only its path. `path` is
+  rebuilt as `models_dir.join(file_name)`, and `join("../evil")` lands outside
+  the directory the rebuild was meant to confine it to. Rebuilding a path from an
+  untrusted name is not a check.
+- One transfer at a time is enforced by **queueing**, not by refusing. The
+  invariant is one line — nothing `Active` and something `Queued` means the head
+  of the queue starts — and every path a transfer can settle on runs it, on the
+  finishing transfer's own thread after the jobs lock is released. Promoting from
+  inside the settle path takes the same mutex and deadlocks.
+- A queued job carries the `Options` it was admitted on, because it starts on a
+  thread with no caller to ask. The rate limit is the one term that stays live:
+  `set_rate_limit` rewrites it on waiting rows as well as on the running one.
+- What `admit` checked can be hours stale by the time a queued job starts. The
+  destination is re-checked at the moment of promotion, and a file that landed
+  meanwhile fails that row rather than being written over.
 - There is no frontend test framework. Every test is Rust, in `src-tauri/tests/`
   or an inline `#[cfg(test)]` module; TypeScript is covered by `tsc` and by
   looking at the screen. Logic worth testing belongs in Rust until that changes.
