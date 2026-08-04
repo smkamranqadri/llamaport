@@ -1,20 +1,17 @@
 # Current
 
 ```text
-Branch:   `main`, clean, **two commits ahead of `origin/main` and unpushed**.
-          `v0.2.0` is the last tag; 0.2.1 is built and installed but neither
-          tagged nor published, so the tree, the tag and the published build are
-          three different things until that is resolved.
+Branch:   `main`, clean, pushed, tagged `v0.2.1`. The tag, the tree and the
+          published build agree again.
 Task:     none in progress. The download queue is done and committed.
 Mode:     —
 Blocker:  none. Two things owed rather than blocking: the README's "Open Anyway"
           steps have never met a real Gatekeeper prompt, and a queued row with
           nothing on disk behind it has never been seen coming back from a
           restart — every relaunch so far recovered rows that had a `.part`.
-Next:     **finish the 0.2.1 release.** The `.dmg` is built, verified and
-          installed locally; what is left is push, tag, and publish. The reason
-          it is owed rather than optional is that the path traversal it fixes is
-          live in the published v0.2.0.
+Next:     nothing planned. Same rule as after v0.2.0: the next move is whatever
+          the release says — install friction, bug reports, or silence. Do not
+          plan features against silence.
 Status:   working in the app, uncommitted. Pre-flight added three things the plan
           missed — queue order once Resume can enqueue, which Options a queued
           job starts under, and `clear` wiping queued rows out of

@@ -1,12 +1,15 @@
 # Releases
 
-## v0.2.1 — built 2026-08-04, not published
+## v0.2.1 — shipped 2026-08-04
+
+https://github.com/smkamranqadri/llamaport/releases/tag/v0.2.1 — pre-release,
+unsigned, the download queue plus a path traversal fix.
 
 `Llamaport_0.2.1_aarch64.dmg`, 4.0 MB, sha256
 `e8d5f70988b2db16007d39ebe468dab7cf9432c539363de25e03d7f89e792e95`. Built with
-`CI=true`, verified, and installed over the 0.2.0 in `/Applications`. Not pushed,
-not tagged, not published — so `main`, the `v0.2.0` tag and the published build
-are currently three different things.
+`CI=true`, installed over the 0.2.0 in `/Applications`, and the published asset
+downloaded back and compared byte for byte — identical, as with both previous
+releases. The process from v0.2.0 worked unchanged.
 
 **It is owed rather than optional.** v0.2.0 carries a path traversal: `restore`
 rebuilds a row's path as `models_dir.join(file_name)` without checking the name,
