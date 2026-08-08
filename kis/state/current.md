@@ -1,9 +1,10 @@
 # Current
 
 ```text
-Branch:   `main`, clean and pushed. `v0.3.0` is tagged behind the docs commits
-          that followed it; the code at the tag and the code at HEAD are still
-          identical — everything since it is documentation.
+Branch:   `main`, clean. **The code at HEAD and the code at `v0.3.0` are no
+          longer identical** — the Dock reopen fix is the first behaviour change
+          since the tag, so a build of HEAD can no longer be attached to that
+          release. Everything else since the tag is documentation.
 Task:     none in progress. Distribution is done: description, topics and an
           uploaded social preview, the release is no longer a pre-release, the
           front page leads with a clip, a Show and tell post is live in
@@ -14,18 +15,15 @@ Mode:     —
 Blocker:  none. Three standing items, none touched by any of this: the README's
           "Open Anyway" steps have never met a real Gatekeeper prompt, a queued
           row with nothing on disk behind it has never been seen coming back
-          from a restart, and no Intel Mac has run the universal build. One new
-          bug, and unlike the old window one it reproduces on demand: closing
-          the window leaves the app running and the Dock icon will not bring it
-          back — only the tray's Show window does. Filed as issue 1.
-Next:     two things, either order. Show HN is drafted and unposted, and is the
-          one launch channel open today — r/LocalLLaMA needs karma this account
-          does not have. And issue 1 is worth fixing before more people arrive,
-          because a closed window makes the app look dead to someone who has had
-          it for a minute. After that the same rule as after every release: the
-          next move is whatever the audience says. Do not plan features against
-          silence. A browser download of a `.dmg` would still settle Gatekeeper
-          in five minutes whenever it is wanted.
+          from a restart, and no Intel Mac has run the universal build.
+Next:     Show HN, drafted and unposted, is the one launch channel open today —
+          r/LocalLLaMA needs karma this account does not have. Weigh a v0.3.1
+          against it: issue 1 is fixed on `main` and every public build still
+          has it, so anyone arriving from a post gets the version that looks
+          dead when its window is closed. After that the same rule as after
+          every release: the next move is whatever the audience says. Do not
+          plan features against silence. A browser download of a `.dmg` would
+          still settle Gatekeeper in five minutes whenever it is wanted.
 ```
 
 Run and verify commands: [knowledge/technical.md](../knowledge/technical.md).
@@ -89,7 +87,9 @@ Apart from the files named above, `git log` is the record.
 The four commands were last run green over the working tree: `cargo fmt
 --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test`,
 `bun run build` — all exit 0, each status captured on its own line rather than
-after a pipe. 180 tests, up from 177 before Last used.
+after a pipe. 180 tests, up from 177 before Last used, and unchanged by the Dock
+fix, which carries none and is proved by the running app instead
+([intent/release.md](../intent/release.md)).
 
 **v0.3.0 shipped 2026-08-08.** Every build's artefact proof lives with its
 release in [intent/release.md](../intent/release.md) — both assets downloaded

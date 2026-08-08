@@ -402,3 +402,21 @@ icon reopens, so this is a missing reopen handler: the run loop matches only
 already exists and the tray already calls it. Filed as
 https://github.com/smkamranqadri/llamaport/issues/1, the repository's first.
 Unlike the window bug under "Carried, not met", it is reproducible.
+
+**Fixed the same day**, by the one missing arm. It carries no test: the run loop
+closure has no seam the harness reaches, and a test that cannot fail when the arm
+is removed would be worse than none — so the proof is the app, in the pattern
+this project already uses for what tests cannot reach. A dev build was run, its
+window closed, the window count confirmed at zero, and the Dock icon clicked; the
+window came back.
+
+**The verification method mattered here.** A synthesized accessibility press on
+the Dock tile restores the window only when another app holds focus, and does
+nothing while llamaport is already frontmost — which is the scenario the bug
+describes. That looked like a half fix and was not: the author clicked the Dock
+icon by hand in that exact state and the window returned. A synthetic press
+appears to reach only "activate", which is a no-op for an already-active app, so
+it never reaches the delegate. Anything about Dock or reopen behaviour needs a
+real click; do not conclude from a scripted one.
+
+It is live in v0.3.0 and unreleased, so every public build still has the bug.

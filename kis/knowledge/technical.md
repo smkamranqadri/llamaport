@@ -89,6 +89,11 @@ cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
 cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
 ```
 
+`cargo` is not on the PATH of a non-interactive shell here — it lives in
+`~/.cargo/bin`, which only a login shell picks up. Without it all three cargo
+commands exit **127**, which is "command not found" wearing the shape of a
+failing check. Export it first: `export PATH="$HOME/.cargo/bin:$PATH"`.
+
 ## Constraints
 
 - HTTP is `ureq` with `default-features = false, features = ["tls"]`, which is

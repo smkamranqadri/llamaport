@@ -90,10 +90,11 @@ unplanned.
   `show_main_window` asserts a usable frame and does not reliably achieve it.
   Predates the downloader, and is a release blocker of its own. Never reproduced
   on demand, so the fix will be structural rather than a repair.
-- The Dock icon does not reopen the main window once it has been closed. Closing
-  hides it by design ([knowledge/project.md](../knowledge/project.md)), and the
-  run loop never matches `RunEvent::Reopen`, so the only way back is the tray's
-  Show window. Filed as issue 1, and unlike the risk above it reproduces on
-  demand.
+- ~~The Dock icon does not reopen the main window once it has been closed.~~
+  Fixed 2026-08-08, issue 1: the run loop matched only `ExitRequested` and `Exit`,
+  so the hide-on-close decision ([knowledge/project.md](../knowledge/project.md))
+  had no way back but the tray. One `RunEvent::Reopen` arm calling the
+  `show_main_window` the tray already used. **Live in v0.3.0 and not yet
+  released** — every public build still has it.
 - ~~The runner spec has no "known gaps" section, but `README.md:50` sends readers
   to one.~~ Resolved by the phase 3 README rewrite; no such reference remains.
