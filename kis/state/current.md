@@ -1,9 +1,9 @@
 # Current
 
 ```text
-Branch:   `main`, clean, two docs commits ahead of `origin` and unpushed.
-          `v0.3.0` is tagged behind them; the code at the tag and the code at
-          HEAD are still identical — everything since it is documentation.
+Branch:   `main`, clean and pushed. `v0.3.0` is tagged behind the docs commits
+          that followed it; the code at the tag and the code at HEAD are still
+          identical — everything since it is documentation.
 Task:     none in progress. Distribution is done bar one upload: the repository
           has a description, topics and a committed social preview card, the
           release is no longer a pre-release, the front page leads with a clip,
