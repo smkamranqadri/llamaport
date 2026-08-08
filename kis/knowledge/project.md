@@ -4,9 +4,9 @@
 and downloading them from Hugging Face with working resume. Named 2026-08-02,
 before packaging: models arrive at a port, and `llama-server` binds one.
 
-**For:** the author first, other local-LLM users on Apple Silicon second. Stage
-is MVP heading for release, so packaging and other people's machines are real
-scope, not hypothetical.
+**For:** the author first, other local-LLM users on macOS second. Stage is MVP
+heading for release, so packaging and other people's machines are real scope, not
+hypothetical.
 
 **Problem:** the `llama-server` launch command is stable except for three values
 yet gets retyped or hunted out of shell history every time; nothing records what

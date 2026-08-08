@@ -1,18 +1,21 @@
 # Current
 
 ```text
-Branch:   `main`, clean and pushed. `v0.3.0` is tagged two commits back, at the
-          build record — the same shape as every release here; the code at the
-          tag and the code at HEAD are identical.
-Task:     none in progress. Last used is done, shipped and installed.
+Branch:   `main`, clean and pushed. `v0.3.0` is tagged behind the docs commits
+          that followed it; the code at the tag and the code at HEAD are still
+          identical, which is why a universal build of HEAD could be attached to
+          that release rather than needing a new tag.
+Task:     none in progress. Last used is done, shipped and installed; the
+          universal build is added to the same release.
 Mode:     —
-Blocker:  none. Two standing items, both unchanged by this release: the README's
+Blocker:  none. Two standing items, neither touched by any of this: the README's
           "Open Anyway" steps have never met a real Gatekeeper prompt, and a
           queued row with nothing on disk behind it has never been seen coming
-          back from a restart.
+          back from a restart. A third is now on record rather than blocking —
+          no Intel Mac has run the universal build.
 Next:     nothing planned. Same rule as after v0.2.0 and v0.2.1: the next move is
           whatever the release says — install friction, bug reports, or silence.
-          Do not plan features against silence. A browser download of the `.dmg`
+          Do not plan features against silence. A browser download of a `.dmg`
           would settle Gatekeeper in five minutes whenever it is wanted.
 ```
 
@@ -45,9 +48,12 @@ A ready model offers **Web UI**, which opens `llama-server`'s own interface in a
 second app window. The app has no chat of its own and is not getting one
 ([knowledge/project.md](../knowledge/project.md)).
 
-**v0.3.0 is published**, unsigned, as a GitHub pre-release with the `.dmg`
-attached: https://github.com/smkamranqadri/llamaport/releases/tag/v0.3.0, and
-installed in `/Applications`. Anyone still on v0.2.0 should upgrade for the path
+**v0.3.0 is published**, unsigned, as a GitHub pre-release with **two `.dmg`s**
+attached — `aarch64` and `universal`, the same build widened rather than a second
+one: https://github.com/smkamranqadri/llamaport/releases/tag/v0.3.0. The aarch64
+one is installed in `/Applications`. The app is macOS-only for reasons that are
+Darwin's rather than ARM's ([knowledge/technical.md](../knowledge/technical.md)),
+and no Intel Mac has run it. Anyone still on v0.2.0 should upgrade for the path
 traversal v0.2.1 fixed, which is live in that build; v0.1.0 is unaffected by that
 one — it has no history file at all. Every release so far
 ([intent/release.md](../intent/release.md)).
@@ -63,8 +69,11 @@ The four commands were last run green over the working tree: `cargo fmt
 `bun run build` — all exit 0, each status captured on its own line rather than
 after a pipe. 180 tests, up from 177 before Last used.
 
-**v0.3.0 shipped 2026-08-08** and the published asset was downloaded back
-byte-identical to what was built, as with all three releases before it. Every
+**v0.3.0 shipped 2026-08-08** and both published assets were downloaded back
+byte-identical to what was built, as with all three releases before it. The
+universal one carries both slices and its x86_64 half was launched under Rosetta
+and seen registering as a foreground app — which says the slice is real, and says
+nothing about an Intel Mac ([intent/release.md](../intent/release.md)). Every
 build's artefact proof lives with its release in
 [intent/release.md](../intent/release.md), including how a frontend-heavy change
 had to be proved present when grepping the binary no longer could. Installing by

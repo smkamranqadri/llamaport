@@ -152,10 +152,10 @@ the desktop. It shows `/Users/mkamran/models` in the subtitle, which is the
 account name otherwise scrubbed from the repo; raised before capture and shipped
 anyway, so it is a decision rather than an oversight.
 
-**A retake is due**: Last used changed the Library's last column, its order and
-the running row ([last-used.md](last-used.md)), so the shipped image shows a
-screen the app no longer has. The denial held again on 2026-08-08 — neither
-`screencapture` nor the accessibility tooling could capture the window.
+**Retaken 2026-08-08**, by the author, from the built 0.3.0 — along with two
+screens the README had never shown, running and Downloads. The denial held again
+that day: neither `screencapture` nor the accessibility tooling could reach the
+window, so every image here is the author's.
 
 The version display was added here after the app turned out to expose its
 version nowhere — no About item, nothing in the UI. Counted as release
@@ -256,6 +256,32 @@ that is frontend-heavy.
 The account name appears 452 times in the binary, all cargo and source paths, the
 same count as v0.2.0. Installing by local copy sets no quarantine attribute, so
 Gatekeeper is still untested — as for every release so far.
+
+### A universal build, added to the same release 2026-08-08
+
+`Llamaport_0.3.0_universal.dmg`, 8,469,810 bytes, sha256
+`bf0ce9392bc9bb9b122cb042556744f209acd8394a13a378185adc0515725051`, attached
+alongside the `aarch64` one rather than replacing it. Same commit, same code, and
+the same frontend digests are embedded — `index-R_7rLVpB.js` and
+`index-BaiJagCa.css`, exactly the two the `aarch64` build carries — so this is
+the shipped build widened, not a rebuild of something else. Downloaded back and
+byte-identical, as with every release here.
+
+**"Apple Silicon only" was never true of the code**, only of the artefact. The
+platform coupling is Darwin's, itemised in
+[knowledge/technical.md](../knowledge/technical.md); no `cfg(target_arch)` exists
+anywhere in the source. Two lines of build recipe closed the gap:
+`rustup target add x86_64-apple-darwin`, then `--target universal-apple-darwin`.
+
+Both slices are present (`lipo -archs` on the mounted app: `x86_64 arm64`), and
+the account name count doubles to 912 from 453 for exactly that reason — same
+cargo and source paths, twice. Nothing names the account outside build paths.
+
+**The x86_64 half was run, not merely inspected.** Launched under Rosetta against
+a throwaway `HOME`, it registered with LaunchServices from the mounted volume as
+`com.mkamran.llamaport`, `type="Foreground"`, `Arch=x86_64` — a real GUI app, so
+the slice is not a stub. Rosetta is not Intel hardware and the README says so.
+An actual Intel Mac remains untested and nobody here has one.
 
 **The screenshots were the author's, and they closed the last of the UI proof.**
 Orca, the accessibility tooling this session had used all day, was uninstalled

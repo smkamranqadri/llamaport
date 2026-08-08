@@ -1,7 +1,14 @@
 # Technical
 
 Tauri 2 desktop app. Rust backend, React 19 + TypeScript frontend built by Vite,
-bun as the package manager. macOS on Apple Silicon only.
+bun as the package manager. macOS only, either architecture.
+
+**Nothing in the source is ARM-only** — there is no `cfg(target_arch)` anywhere,
+and the shipped `.dmg` being `aarch64` was a fact about the build machine rather
+than about the code. What is Darwin-bound is `sysmem.rs` entire (`sysctl` names,
+`proc_pid_rusage`), the Trash through `NSFileManager`, `probe.rs`'s Homebrew
+fallbacks, `~/Library/Application Support` and `open -R`. That list is what a
+Linux port would cost, and it is why the answer is no rather than not yet.
 
 ## Layout
 
