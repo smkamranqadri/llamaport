@@ -152,6 +152,11 @@ the desktop. It shows `/Users/mkamran/models` in the subtitle, which is the
 account name otherwise scrubbed from the repo; raised before capture and shipped
 anyway, so it is a decision rather than an oversight.
 
+**A retake is due**: Last used changed the Library's last column, its order and
+the running row ([last-used.md](last-used.md)), so the shipped image shows a
+screen the app no longer has. The denial held again on 2026-08-08 — neither
+`screencapture` nor the accessibility tooling could capture the window.
+
 The version display was added here after the app turned out to expose its
 version nowhere — no About item, nothing in the UI. Counted as release
 infrastructure rather than a feature: a beta whose bug reports cannot be tied to

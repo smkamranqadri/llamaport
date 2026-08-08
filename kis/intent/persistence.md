@@ -89,6 +89,11 @@ leading bytes)`, stable across renames and directory moves
 Schema goes to 6. A star in the row; favourites sort above everything, then
 alphabetical as now. Delete moves to Trash.
 
+The second half of that ordering is **SUPERSEDED — see
+[last-used.md](last-used.md)**: within each group the list now sorts by most
+recent activity, not alphabetically, and the schema has moved on to 7. Favourites
+above everything is unchanged.
+
 **Trash is settled, 2026-08-03, and by neither option the plan weighed.** The
 choice looked like Finder-via-`osascript` (no dependency, but a one-time
 Automation prompt that on an unsigned app looks alarming) against the `trash`

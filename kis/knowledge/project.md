@@ -92,6 +92,22 @@ Each is argued in the specs; this is the index, not a second copy.
   checked against the same rule a pasted one meets.
 - History is never trimmed; the screen pages it. A cap would be a number nobody
   has evidence for.
+- The Library orders on **recency** — the last launch when there has been one, the
+  file's mtime otherwise — favourites partitioned above, undated models last. A
+  list may reorder only for a reason the reader can see, so this holds exactly as
+  long as the row shows the value it sorts on. The two meanings share one cell and
+  are told apart by weight, a launch in normal text against a muted mtime; the
+  cell has no header to label it, and "today" otherwise means two things.
+- A model is dated by a run that reached **Ready**, never by one that merely
+  spawned. `runner.start` returns while the process may still fail to load its
+  weights, and a model that never served was not used.
+- A Library row is a star, a row button and a trailing button in a flex line, and
+  **what dresses the row belongs to the row, not to the middle child**. Its
+  border, its hover and its running tint are all on `.model-item`; putting any of
+  them on `.model-row` paints the middle and leaves both ends bare. The trailing
+  button is Stop while that model runs and Delete otherwise, at one fixed width —
+  the row button is `flex: 1`, so a shorter word there drags that row's figures
+  out of line with every other row.
 - A server that will not serve ranges is refused: no ranges means no resume, and
   an unresumable 20 GB transfer is a trap rather than a convenience.
 - llama.cpp's UI is reached by a second app window, not an iframe and not a

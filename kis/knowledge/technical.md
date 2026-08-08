@@ -37,7 +37,7 @@ the event stream, so a state change that only returns leaves the menu bar stale.
 Assert on what was emitted, not only on the snapshot: the snapshot is right in
 exactly the case this gets wrong.
 
-Config is one JSON file at schema 6, every field `#[serde(default)]`, with
+Config is one JSON file at schema 7, every field `#[serde(default)]`, with
 unknown keys preserved through a load/save round-trip. `migrate` strips keys the
 app deliberately retired, so a new field must never reuse a retired name — serde
 would claim it first and adopt settings from a build several schemas old.
@@ -141,6 +141,19 @@ cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
 - What `admit` checked can be hours stale by the time a queued job starts. The
   destination is re-checked at the moment of promotion, and a file that landed
   meanwhile fails that row rather than being written over.
+- `AppState::save_config` takes the config lock itself, and a `std::sync::Mutex` is
+  not reentrant. Anything that edits the config must drop its guard — a scoped
+  block — before saving. Calling it while holding the guard deadlocks that path
+  outright, and the paths that edit the config are launching and settling.
+- **`Ready` is announced on every telemetry tick, not once.** The `runner:state`
+  stream carries the current state, so a listener that acts on Ready acts dozens
+  of times per run. Anything it does must be idempotent or guarded against the
+  repeat; `store::stamp_if_newer` is the guard, keyed on `started_secs`, which
+  moves only when a process is spawned.
+- A retired key must be checked for *shape*, not only for name. `lastRun` on real
+  v1 configs is a map of model id to timestamp — the shape a launch-time field
+  wants — so naming that field `lastRun` would have serde adopt five-year-old
+  values as this build's. Proved by naming it that and watching the test fail.
 - There is no frontend test framework. Every test is Rust, in `src-tauri/tests/`
   or an inline `#[cfg(test)]` module; TypeScript is covered by `tsc` and by
   looking at the screen. Logic worth testing belongs in Rust until that changes.

@@ -35,10 +35,21 @@ Two, each with its own spec, module and screen:
    from a feature list. Proved by a four-deep queue draining ~48 GB unattended,
    and it turned up a path traversal that is live in v0.2.0.
 
-6. **Nothing planned.** Still owed rather than planned: the README's "Open
-   Anyway" steps have never met a real Gatekeeper prompt, and a queued row with
-   nothing on disk behind it has never been seen coming back from a restart.
-   Discard is no longer owed — it was used in the running app on 2026-08-04.
+6. ~~**Last used**~~ — done 2026-08-08. [last-used.md](last-used.md). The Library
+   said when a file landed on disk and nothing about when it was last run. That
+   cell became a recency cell and the list now sorts on it, which took the config
+   to schema 7. Like steps 3 and 5 it came from the author using the built app,
+   and looking at the reordered list turned up four more things about the row —
+   the running highlight, its hover, its alignment, and a Stop button where a
+   running model used to offer a Delete it would have refused.
+
+7. **Nothing planned.** Still owed rather than planned: `docs/library.png` on the
+   README front page now shows a Library that no longer exists and must be
+   retaken by the author before this ships; the README's "Open Anyway" steps have
+   never met a real Gatekeeper prompt; a queued row with nothing on disk behind
+   it has never been seen coming back from a restart; and the last two row fixes
+   of step 6 have not been looked at on screen. Discard is no longer owed — it
+   was used in the running app on 2026-08-04.
 
 ## Decided against
 
