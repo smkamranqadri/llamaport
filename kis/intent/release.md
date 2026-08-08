@@ -304,3 +304,63 @@ partway through, so nothing could read or capture the running app. Three capture
 from the built 0.3.0 settled what was owed: the weight distinction in the recency
 cell, the running row tinted end to end, its hover staying one colour, and its
 figures still flush with the rows above.
+
+## Distribution — from 2026-08-08
+
+Everything here is about being found. None of it changes the app.
+
+**`v0.3.0` is no longer a pre-release.** It is the Latest release, both `.dmg`s
+and their download counts intact, nothing rebuilt — the tag's code and HEAD's are
+identical. The badge was the only thing standing between a drive-by reader and a
+build that works, and a `github_latest` livecheck skips a pre-release entirely.
+
+**The repository had no description, no topics and no social preview** six days
+after being made public, which is where every announcement was going to land. All
+three are now set. The description leads with "llama.cpp" rather than
+"llama-server" because that is the term people search.
+`docs/social-preview.png` is committed as the source; the upload itself is
+browser-only and lives on GitHub, not in the repo.
+
+**A Show and tell post is live in llama.cpp's own Discussions:**
+https://github.com/ggml-org/llama.cpp/discussions/26772
+
+That category is what replaced the third-party UI list llama.cpp's README used to
+carry. The list is gone from the README, the wiki and `docs/`, so there is no
+longer a PR to send — checked 2026-08-08, and worth re-checking before assuming
+otherwise.
+
+**The post is a standing obligation, not a one-off.** It claims what the app
+does, that it has no chat of its own, that it is an unsigned beta, and that no
+Intel Mac has run the universal build. Every one of those can go stale. Edit it
+whenever a release changes what it claims, and treat that as part of shipping
+rather than as publicity.
+
+**Homebrew was considered and deferred.** `homebrew/cask` requires notability —
+75 stars, 30 forks or 30 watchers — and this repository has none of them. An own
+tap works today and needs nobody's permission, but Homebrew quarantines every
+cask download and a cask cannot opt out, so an unsigned build would install and
+then refuse to open unless the user passes `--no-quarantine`. Not worth
+publishing until either the stars or the signature exist. Staying unsigned was
+reaffirmed the same day, now with the price named rather than assumed: the
+Gatekeeper wall is the largest single drop-off between a visitor and a star.
+
+### The agent could capture the app this time
+
+Screen recording and accessibility were granted on 2026-08-08, and the agent
+drove the running app directly — `screencapture -v` over the window rect, System
+Events `click at` for every click. The webview answers `click at` by naming the
+button it hit, but exposes nothing to `entire contents`, and neither Page Down
+nor a scroll bar will move the page, so anything below the fold stays out of
+reach. This is the first UI artefact here that is not the author's.
+
+`docs/launch.gif` replaces `docs/library.png` on the front page: eleven seconds,
+391 KB, two cuts out of a twenty-second take, ending on Test model reporting
+every check passed. `docs/launch.mp4` is the same cut for platforms that render
+video better than a GIF. The still is kept — phase 3's retake command still names
+it and the social preview card was built from it.
+
+**A window bug turned up while recording, and this one reproduces on demand.**
+Closing the window leaves the process running, and the Dock icon does not bring
+it back; only the Window menu does. macOS convention is that the Dock icon
+reopens, so this is a missing reopen handler. Unlike the window bug under
+"Carried, not met", it is reproducible.

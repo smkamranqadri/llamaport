@@ -1,22 +1,29 @@
 # Current
 
 ```text
-Branch:   `main`, clean and pushed. `v0.3.0` is tagged behind the docs commits
-          that followed it; the code at the tag and the code at HEAD are still
-          identical, which is why a universal build of HEAD could be attached to
-          that release rather than needing a new tag.
-Task:     none in progress. Last used is done, shipped and installed; the
-          universal build is added to the same release.
+Branch:   `main`, clean, two docs commits ahead of `origin` and unpushed.
+          `v0.3.0` is tagged behind them; the code at the tag and the code at
+          HEAD are still identical — everything since it is documentation.
+Task:     none in progress. Distribution is done bar one upload: the repository
+          has a description, topics and a committed social preview card, the
+          release is no longer a pre-release, the front page leads with a clip,
+          and a Show and tell post is live in llama.cpp's own Discussions
+          ([intent/release.md](../intent/release.md)).
 Mode:     —
-Blocker:  none. Two standing items, neither touched by any of this: the README's
-          "Open Anyway" steps have never met a real Gatekeeper prompt, and a
-          queued row with nothing on disk behind it has never been seen coming
-          back from a restart. A third is now on record rather than blocking —
-          no Intel Mac has run the universal build.
-Next:     nothing planned. Same rule as after v0.2.0 and v0.2.1: the next move is
-          whatever the release says — install friction, bug reports, or silence.
-          Do not plan features against silence. A browser download of a `.dmg`
-          would settle Gatekeeper in five minutes whenever it is wanted.
+Blocker:  none. Three standing items, none touched by any of this: the README's
+          "Open Anyway" steps have never met a real Gatekeeper prompt, a queued
+          row with nothing on disk behind it has never been seen coming back
+          from a restart, and no Intel Mac has run the universal build. One new
+          bug, and unlike the old window one it reproduces on demand: closing
+          the window leaves the app running and the Dock icon will not bring it
+          back, only the Window menu will.
+Next:     upload `docs/social-preview.png` in the repository settings. It is
+          browser-only, nothing else can do it, and Reddit and Hacker News wait
+          on it — both render the card, and neither gives a second first post.
+          After that the same rule as after every release: the next move is
+          whatever the audience says. Do not plan features against silence. A
+          browser download of a `.dmg` would still settle Gatekeeper in five
+          minutes whenever it is wanted.
 ```
 
 Run and verify commands: [knowledge/technical.md](../knowledge/technical.md).
@@ -48,15 +55,24 @@ A ready model offers **Web UI**, which opens `llama-server`'s own interface in a
 second app window. The app has no chat of its own and is not getting one
 ([knowledge/project.md](../knowledge/project.md)).
 
-**v0.3.0 is published**, unsigned, as a GitHub pre-release with **two `.dmg`s**
-attached — `aarch64` and `universal`, the same build widened rather than a second
-one: https://github.com/smkamranqadri/llamaport/releases/tag/v0.3.0. The aarch64
+**v0.3.0 is published**, unsigned, as the Latest GitHub release with **two
+`.dmg`s** attached — `aarch64` and `universal`, the same build widened rather than
+a second one: https://github.com/smkamranqadri/llamaport/releases/tag/v0.3.0. It
+was a pre-release until 2026-08-08, when the badge was dropped without rebuilding
+anything ([intent/release.md](../intent/release.md)). The aarch64
 one is installed in `/Applications`. The app is macOS-only for reasons that are
 Darwin's rather than ARM's ([knowledge/technical.md](../knowledge/technical.md)),
 and no Intel Mac has run it. Anyone still on v0.2.0 should upgrade for the path
 traversal v0.2.1 fixed, which is live in that build; v0.1.0 is unaffected by that
 one — it has no history file at all. Every release so far
 ([intent/release.md](../intent/release.md)).
+
+**The front page leads with a clip rather than a still.** `docs/launch.gif` runs
+from the Library to Test model reporting every check passed, and is the first UI
+artefact here the agent captured rather than the author. The Show and tell post
+in llama.cpp's Discussions is the one outward-facing thing that goes stale on its
+own: https://github.com/ggml-org/llama.cpp/discussions/26772 — edit it whenever a
+release changes what it claims, as part of shipping rather than after it.
 
 Discover was planned and then dropped ([intent/roadmap.md](../intent/roadmap.md)).
 
