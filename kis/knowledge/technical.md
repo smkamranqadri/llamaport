@@ -91,6 +91,10 @@ cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
   `ureq`, `libc`).
 - No comments that narrate what code does; the codebase keeps them for
   non-obvious why only.
+- The shell here is **zsh**, so `$PIPESTATUS` is not the array you want —
+  bash's name for it. It expands to nothing, `echo "x: ${PIPESTATUS[0]}"` prints
+  an empty status, and the command reads as though it reported success. zsh's own
+  is `$pipestatus` (lowercase). The rule below is the reliable answer either way.
 - Capture a command's exit status directly. `cmd | tail -3; echo $?` reports
   `tail`'s status, which reported a failing clippy as clean twice in one session.
 - **A new test is not trusted until the code it covers has been gutted and the

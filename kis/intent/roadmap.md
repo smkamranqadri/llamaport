@@ -43,13 +43,11 @@ Two, each with its own spec, module and screen:
    the running highlight, its hover, its alignment, and a Stop button where a
    running model used to offer a Delete it would have refused.
 
-7. **Nothing planned.** Still owed rather than planned: `docs/library.png` on the
-   README front page now shows a Library that no longer exists and must be
-   retaken by the author before this ships; the README's "Open Anyway" steps have
-   never met a real Gatekeeper prompt; a queued row with nothing on disk behind
-   it has never been seen coming back from a restart; and the last two row fixes
-   of step 6 have not been looked at on screen. Discard is no longer owed — it
-   was used in the running app on 2026-08-04.
+7. **Nothing planned.** Two things owed rather than planned, both older than this
+   release and unchanged by it: the README's "Open Anyway" steps have never met a
+   real Gatekeeper prompt, and a queued row with nothing on disk behind it has
+   never been seen coming back from a restart. Now that v0.3.0 is public, the
+   first is five minutes of downloading the `.dmg` through a browser.
 
 ## Decided against
 

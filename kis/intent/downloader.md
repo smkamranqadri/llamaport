@@ -186,3 +186,22 @@ They are facts about the engine and outlive that plan.
   than its name claims: it pins that *some* timeout bounds resolution, not which
   one — removing either the read timeout or the overall timeout alone still
   passes. Tighten it if that code is touched.
+
+## Proof of the queue, 2026-08-04
+
+Moved here from State once v0.3.0 shipped: this is phase 2's evidence, and it
+belongs with the work rather than with whatever is current.
+
+- **A four-deep queue drained itself in the running app**, unattended, one file
+  at a time and in the order it was given: Ternary-Bonsai 27B, then 8B, then 4B,
+  then 1.7B, alongside North-Mini-Code resuming from a 19 GB `.part` and
+  finishing. Around 48 GB through four consecutive hand-offs without a click.
+  That is the invariant, proved by the app rather than by the suite.
+- Queueing, the advance on a pause, and Discard were each confirmed on screen.
+  Discard had never been looked at in the running app before this.
+- **Resume takes its turn**: two paused rows recovered after a restart, both
+  clicked, one started and the other waited.
+- Three defects, none found by the suite. One by reading the code — a path
+  traversal live in v0.2.0 — and two by reading `downloads.json` between runs:
+  a restored row that zeroed a byte count its `.part` contradicted, and a queue
+  that survived exactly one restart. Each has a test that fails without its fix.

@@ -115,3 +115,50 @@ implementation. Then the app itself, because tests have never been enough to
 close work here: launch a real model and watch it move, read `config.json`
 between runs, and force a pre-Ready exit with a `rawArgs` flag `llama-server`
 rejects to confirm nothing moves.
+
+## Proof — 2026-08-08
+
+Gathered in the dev app against the real models directory and the author's own
+live config, then closed against the built 0.3.0. Moved here from State once the
+release shipped.
+
+- **The list reordered itself around two real launches.** Before: the starred
+  Q3_K_XL on top at 14 days, then 2 / 4 / 4 / 4 / 5 days. qwen2.5-0.5b was last.
+  After launching it, it sat second at "today"; after Bonsai-27B it sat second
+  and the 0.5b third — both reading "today" and still ordered correctly against
+  each other, 17:43:34 above 17:35:40. The favourite never moved off the top
+  despite being the oldest thing in the list.
+- **The sort runs on real seconds, not on the rendered words.** The three Bonsai
+  files all read "4 days ago" and ordered 1.7B, 8B, 27B — their mtimes are 04:16,
+  04:02, 03:41.
+- **A launch that never reached Ready left no mark.** Ternary-1.7B was tried and
+  did not come up; its id is absent from `lastLaunched`, and its row still reads
+  its own mtime. This is the acceptance check that was expected to need staging,
+  and it arrived by accident instead.
+- **One write per run, proved by the file rather than the test.** `config.json`
+  was stamped at 17:35:41 and its mtime had not moved three minutes later with
+  the server still Ready and telemetry ticking throughout. Same again for the
+  second run: written 17:43:39, unchanged two minutes on.
+- The live config went 6 -> 7 in place with `favourites`, `lastUsed` (12 models)
+  and `launchDefaults` all intact, and `lastLaunched` holding only the models
+  that actually served.
+- Each of the three new tests was watched to fail against a gutted
+  implementation: the guard removed (`the same run was written twice`), the field
+  renamed to `lastRun` (`a retired key was adopted as the new one` — the trap is
+  real, a v1 config's 2026 timestamp was adopted), and the mtime fallback dropped
+  from `recency` (the order collapsed).
+- **A later run replaces the earlier one rather than adding a row.** The 27B was
+  launched again at 17:58:10 and its 17:43:34 stamp was overwritten in place. Two
+  models launched, three successful runs, two entries.
+- **Stop was clicked in the Library and the server went away**: one
+  `llama-server` before, none after, the sidebar back to "No model running", the
+  row back to Delete. The row kept its "today" and its position, because stopping
+  is not un-launching. Exactly one Stop appeared in the list, on the running row.
+- **Everything visual was closed by the author's screenshots of the built 0.3.0**,
+  after the accessibility tooling was uninstalled mid-session and neither it nor
+  `screencapture` could reach the window. In one frame: the running Bonsai-27B
+  row tinted from the star at one end to its Stop button at the other, the row
+  below it hovered and uniformly one colour, "today" bright against a muted "14
+  days ago", and every recency value flush right including the two rows carrying
+  buttons. That settles the weight distinction, the tint, the hover and the
+  alignment — the four things no test could reach.
