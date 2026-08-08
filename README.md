@@ -7,9 +7,10 @@ Hugging Face with resume that survives a kill.
 
 Apple Silicon only. This is an unsigned beta — see [Install](#install).
 
-![The Library screen, listing local GGUF models with quantisation, context length,
-size and modification date, and marking mixture-of-experts
-files](docs/library.png)
+![The Library screen, listing local GGUF models with quantisation, context length
+and size, ordered by what was run most recently. A favourite is starred at the
+top; the running model's row is highlighted and ends in a Stop
+button](docs/library.png)
 
 ## Who it is for
 
@@ -23,7 +24,19 @@ do not need this.
 **Runs one model at a time.** Reads GGUF headers directly, so the list shows real
 quant, context length and MoE structure rather than guesses from the filename.
 The launch command is shown in full before you press start, and a model's form
-opens with whatever it was last launched with successfully.
+opens with whatever it was last launched with successfully. The Library orders
+itself by what you have run most recently, so the models you actually use stay at
+the top.
+
+![A running model, showing live KV cache, generation and prompt-eval rates, system
+memory and swap, the model's own metadata, the launch settings that produced it,
+and the full llama-server command](docs/running.png)
+
+**Tells you whether it actually works.** **Test model** runs an ordered set of
+checks against the running server — process, port, health endpoint, model list,
+alias, and a real chat completion — and reports what passed, what only warned,
+and how long the first token took. A ready model also opens llama.cpp's own Web
+UI in a second window; that chat interface is llama.cpp's, not Llamaport's.
 
 **Reports memory, never forecasts it.** Exact weights and KV-cache arithmetic
 before launch; live system memory and swap while running; no verdict in between.
@@ -34,7 +47,12 @@ transfers over four ranged connections, re-resolves the CDN redirect on every
 resume — which is exactly where `curl -C -` fails — verifies sha256, and only
 then moves the file into your models folder. Kill it, reboot, come back: it picks
 up where it stopped. A server that will not serve ranges is refused outright,
-because an unresumable 20 GB transfer is a trap, not a convenience.
+because an unresumable 20 GB transfer is a trap, not a convenience. A second URL
+queues behind the first rather than being refused.
+
+![The Downloads screen, with a speed limit applied to the transfer already
+running, several paused transfers each offering Resume or Discard, and a history
+of completed downloads](docs/download.png)
 
 ## Requirements
 
