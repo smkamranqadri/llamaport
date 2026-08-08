@@ -12,7 +12,7 @@ use crate::profile::Profile;
 
 /// Bumped whenever the shape changes. Absence means the original shape, which had no
 /// version field at all.
-pub const CURRENT_SCHEMA: u32 = 6;
+pub const CURRENT_SCHEMA: u32 = 7;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
@@ -24,6 +24,11 @@ pub struct Config {
     /// left rather than at a generic default. Not a profile system: there is one entry
     /// per model, it is written by launching, and nothing merges.
     pub last_used: BTreeMap<String, Profile>,
+    /// When each model was last launched, by the same identity `last_used` is keyed on.
+    /// Deliberately *not* named `lastRun`: that key is retired below, and on real v1
+    /// configs it held a map of exactly this shape, so serde would claim it and show a
+    /// timestamp from a build several schemas old as if it were this one's.
+    pub last_launched: BTreeMap<String, u64>,
     pub downloads: Options,
     /// Models the user has starred, by the same identity `last_used` is keyed on —
     /// `(size, hash of the leading bytes)`, which survives a rename or a directory move.
@@ -165,6 +170,30 @@ pub fn load() -> Config {
 
 pub fn save(config: &Config) -> io::Result<()> {
     save_to(&config_path(), config)
+}
+
+/// Records that a model ran, once per run, and says whether anything changed.
+///
+/// The caller is a listener on a state stream that re-announces Ready on every telemetry
+/// tick, so it sees one run many times and cannot tell the repeats apart. `started_secs`
+/// can: it moves only when a process is spawned. A stamp already at or past it therefore
+/// belongs to the run being announced, and there is nothing left to write.
+///
+/// That same value is what gets stored, rather than the moment Ready arrived — a few
+/// seconds earlier, and it makes the guard exactly the comparison it writes.
+pub fn stamp_if_newer(
+    stamps: &mut BTreeMap<String, u64>,
+    model_id: &str,
+    started_secs: u64,
+) -> bool {
+    if stamps
+        .get(model_id)
+        .is_some_and(|stamped| *stamped >= started_secs)
+    {
+        return false;
+    }
+    stamps.insert(model_id.to_string(), started_secs);
+    true
 }
 
 pub fn models_dir(config: &Config) -> PathBuf {
@@ -463,6 +492,78 @@ mod tests {
         );
         assert!(!migrated.extra.contains_key("defaultProfile"));
         assert_eq!(migrated.models_dir.as_deref(), Some("/models"));
+    }
+
+    /// Ready is announced on every telemetry tick, so a listener acting on it acts dozens
+    /// of times per run. Without the guard that is a config write per tick, and a launch
+    /// time that creeps forward while the model sits there doing nothing.
+    #[test]
+    fn a_run_is_stamped_once_however_often_ready_is_announced() {
+        let mut stamps = BTreeMap::new();
+
+        assert!(stamp_if_newer(&mut stamps, "abc", 1000));
+        for _ in 0..20 {
+            assert!(
+                !stamp_if_newer(&mut stamps, "abc", 1000),
+                "the same run was written twice"
+            );
+        }
+        assert_eq!(stamps.get("abc"), Some(&1000));
+
+        assert!(
+            stamp_if_newer(&mut stamps, "abc", 2000),
+            "a later run is a new fact"
+        );
+        assert_eq!(stamps.get("abc"), Some(&2000));
+
+        assert!(
+            !stamp_if_newer(&mut stamps, "abc", 1500),
+            "a stale announcement must not drag the time backwards"
+        );
+        assert_eq!(stamps.get("abc"), Some(&2000));
+
+        assert!(stamp_if_newer(&mut stamps, "def", 500));
+        assert_eq!(stamps.get("abc"), Some(&2000), "one model, one entry");
+    }
+
+    #[test]
+    fn launch_times_round_trip_and_never_come_from_the_retired_key() {
+        let path = scratch("last-launched");
+        let mut config = Config::default();
+        config.last_launched.insert("abc".into(), 1785592595);
+
+        save_to(&path, &config).expect("save");
+        let loaded = load_from(&path);
+        assert_eq!(loaded.last_launched.get("abc"), Some(&1785592595));
+
+        // The trap. `lastRun` on a real v1 config is a map of model id to timestamp —
+        // the same shape as this field — so serde would take it without complaint and
+        // date every row from a build several schemas old.
+        fs::write(
+            &path,
+            r#"{
+              "lastRun": { "3ec121be0-2395d7127ff460da": 1785592595 },
+              "modelsDir": "/models"
+            }"#,
+        )
+        .expect("seed");
+
+        let migrated = load_from(&path);
+        assert!(
+            migrated.last_launched.is_empty(),
+            "a retired key was adopted as the new one"
+        );
+        assert!(!migrated.extra.contains_key("lastRun"));
+        assert_eq!(migrated.models_dir.as_deref(), Some("/models"));
+
+        fs::write(&path, r#"{ "schemaVersion": 6, "modelsDir": "/models" }"#).expect("seed");
+        let older = load_from(&path);
+        assert_eq!(older.schema_version, CURRENT_SCHEMA);
+        assert!(
+            older.last_launched.is_empty(),
+            "a config written before launch times existed simply has none"
+        );
+        assert_eq!(older.models_dir.as_deref(), Some("/models"));
     }
 
     #[test]

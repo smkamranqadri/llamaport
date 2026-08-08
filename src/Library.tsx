@@ -21,6 +21,30 @@ function Badges({ model }: { model: ModelEntry }) {
   );
 }
 
+/// One cell for two facts: when the model last ran, or when its file arrived if it never
+/// has. Told apart by weight rather than by a label, because the list has no header row
+/// and "today" for a download reads exactly like "today" for a launch.
+function Recency({ model }: { model: ModelEntry }) {
+  if (model.lastLaunchedSecs) {
+    return (
+      <span className="model-stat" title="Last launched">
+        {formatRelative(model.lastLaunchedSecs)}
+      </span>
+    );
+  }
+  if (model.modifiedSecs) {
+    return (
+      <span
+        className="model-stat model-muted"
+        title="Added to the models directory — never launched"
+      >
+        {formatRelative(model.modifiedSecs)}
+      </span>
+    );
+  }
+  return <span className="model-stat model-muted">—</span>;
+}
+
 /// What a delete is about to take. A shard set is several files and one model, and the
 /// count is the part worth showing before the question is answered.
 function deleteScope(model: ModelEntry): string {
@@ -29,18 +53,55 @@ function deleteScope(model: ModelEntry): string {
   return `${files} · ${formatBytes(model.sizeBytes)}`;
 }
 
+/// A running model offers Stop where every other row offers Delete. Deleting it is refused
+/// anyway, so the slot was spent on a disabled button explaining that; this spends it on
+/// the thing you would have gone looking for instead.
+function RowAction({
+  isRunning,
+  onStop,
+  onConfirmDelete,
+}: {
+  isRunning: boolean;
+  onStop: () => void;
+  onConfirmDelete: () => void;
+}) {
+  if (isRunning) {
+    return (
+      <button
+        className="button row-action"
+        title="Stop this model"
+        onClick={onStop}
+      >
+        Stop
+      </button>
+    );
+  }
+
+  return (
+    <button
+      className="button button-danger button-quiet row-action"
+      title="Move this model to the Trash"
+      onClick={onConfirmDelete}
+    >
+      Delete
+    </button>
+  );
+}
+
 function ModelRow({
   model,
   runner,
   onSelect,
   onFavourite,
   onDelete,
+  onStop,
 }: {
   model: ModelEntry;
   runner: RunnerSnapshot;
   onSelect: (model: ModelEntry) => void;
   onFavourite: (model: ModelEntry) => void;
   onDelete: (model: ModelEntry) => void;
+  onStop: () => void;
 }) {
   const md = model.metadata;
   const incomplete = model.shards && model.shards.missing.length > 0;
@@ -81,7 +142,7 @@ function ModelRow({
   }
 
   return (
-    <li className="model-item">
+    <li className={`model-item${isRunning ? " is-running" : ""}`}>
       <button
         className={`star${model.favourite ? " is-on" : ""}`}
         title={model.favourite ? "Remove from favourites" : "Add to favourites"}
@@ -92,7 +153,7 @@ function ModelRow({
       </button>
 
       <button
-        className={`model-row${model.error ? " is-broken" : ""}${isRunning ? " is-running" : ""}`}
+        className={`model-row${model.error ? " is-broken" : ""}`}
         onClick={() => onSelect(model)}
       >
         <span className="model-identity">
@@ -119,23 +180,14 @@ function ModelRow({
         <span className="model-stat">
           {md?.contextLength ? formatContext(md.contextLength) : "—"}
         </span>
-        <span className="model-stat model-muted">
-          {model.modifiedSecs ? formatRelative(model.modifiedSecs) : ""}
-        </span>
+        <Recency model={model} />
       </button>
 
-      <button
-        className="button button-danger button-quiet"
-        title={
-          isRunning
-            ? "Stop this model before deleting it"
-            : "Move this model to the Trash"
-        }
-        disabled={isRunning}
-        onClick={() => setConfirming(true)}
-      >
-        Delete
-      </button>
+      <RowAction
+        isRunning={isRunning}
+        onStop={onStop}
+        onConfirmDelete={() => setConfirming(true)}
+      />
     </li>
   );
 }
@@ -143,9 +195,11 @@ function ModelRow({
 export default function Library({
   runner,
   onSelect,
+  onStop,
 }: {
   runner: RunnerSnapshot;
   onSelect: (model: ModelEntry) => void;
+  onStop: () => void;
 }) {
   const [models, setModels] = useState<ModelEntry[]>([]);
   const [dir, setDir] = useState<DirInfo | null>(null);
@@ -230,6 +284,7 @@ export default function Library({
               onSelect={onSelect}
               onFavourite={favourite}
               onDelete={remove}
+              onStop={onStop}
             />
           ))}
         </ul>

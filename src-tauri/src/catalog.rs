@@ -37,6 +37,9 @@ pub struct ModelEntry {
     /// Set by `arrange`, which is the only thing that knows the config. False on a raw
     /// scan rather than absent, so the screen never has to reason about a missing field.
     pub favourite: bool,
+    /// Also set by `arrange`. `None` for a model that has never been launched, which is
+    /// what sends the row back to `modified_secs` for something to show.
+    pub last_launched_secs: Option<u64>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -194,6 +197,7 @@ fn build_entry(
         metadata,
         error,
         favourite: false,
+        last_launched_secs: None,
     }
 }
 
@@ -242,18 +246,43 @@ pub fn scan(dir: &Path) -> Vec<ModelEntry> {
     entries
 }
 
-/// Favourites to the top, and nothing else touched.
+/// Favourites to the top, and within each group the most recent activity first.
 ///
-/// A stable partition rather than a re-sort: `scan` has already ordered the entries, and
-/// a list that reshuffles for reasons the user cannot see is worse than an unsorted one.
+/// A re-sort, which the alphabetical order this replaced was written to avoid. The
+/// condition on that is `recency`: the list may reorder because the value it reorders on
+/// is on the row, so the movement has a visible reason. If that cell ever goes, this
+/// sorting goes with it.
+///
 /// A starred id that names no model here is kept, not dropped — the file may be on a disk
 /// that is not mounted, and forgetting the star would be losing it for good.
-pub fn arrange(entries: Vec<ModelEntry>, favourites: &BTreeSet<String>) -> Vec<ModelEntry> {
-    let (mut starred, rest): (Vec<_>, Vec<_>) = entries
+pub fn arrange(
+    entries: Vec<ModelEntry>,
+    favourites: &BTreeSet<String>,
+    last_launched: &BTreeMap<String, u64>,
+) -> Vec<ModelEntry> {
+    let (mut starred, mut rest): (Vec<_>, Vec<_>) = entries
         .into_iter()
-        .partition(|entry| favourites.contains(&entry.id));
-    starred.iter_mut().for_each(|entry| entry.favourite = true);
+        .map(|mut entry| {
+            entry.favourite = favourites.contains(&entry.id);
+            entry.last_launched_secs = last_launched.get(&entry.id).copied();
+            entry
+        })
+        .partition(|entry| entry.favourite);
+
+    by_recency(&mut starred);
+    by_recency(&mut rest);
     [starred, rest].concat()
+}
+
+/// What the row shows in its last cell, and so the only thing it may be sorted on.
+fn recency(entry: &ModelEntry) -> Option<u64> {
+    entry.last_launched_secs.or(entry.modified_secs)
+}
+
+/// Newest first, a model with no date at all last, and a stable sort so that models
+/// sharing a date keep the alphabetical order the scan gave them.
+fn by_recency(entries: &mut [ModelEntry]) {
+    entries.sort_by_key(|entry| std::cmp::Reverse(recency(entry)));
 }
 
 /// Whether the file may be taken out from under whatever is using it. A running server
@@ -421,7 +450,22 @@ mod tests {
             metadata: None,
             error: None,
             favourite: false,
+            last_launched_secs: None,
         }
+    }
+
+    fn dated(name: &str, modified_secs: Option<u64>) -> ModelEntry {
+        ModelEntry {
+            modified_secs,
+            ..stub(name)
+        }
+    }
+
+    fn launches(pairs: &[(&str, u64)]) -> BTreeMap<String, u64> {
+        pairs
+            .iter()
+            .map(|(name, secs)| (format!("id-{name}"), *secs))
+            .collect()
     }
 
     fn named(entries: &[ModelEntry]) -> Vec<String> {
@@ -502,28 +546,27 @@ mod tests {
     }
 
     /// Favourites are how a library of thirty models stays usable, so they go to the top
-    /// — but only that. Within each group the existing alphabetical order stands, or the
-    /// list would reshuffle for reasons the user cannot see.
+    /// — and only that. Nothing here has a date of any kind, so the sort has nothing to
+    /// say and the alphabetical order the scan produced has to survive it.
     #[test]
-    fn favourites_sort_above_everything_and_change_nothing_else() {
-        // As `scan` hands them over: already alphabetical. `arrange` partitions and must
-        // not re-sort, so what it is given is what each group keeps.
+    fn favourites_sort_above_everything_and_undated_models_do_not_move() {
         let entries: Vec<ModelEntry> = ["alpha", "bravo", "charlie", "delta"]
             .iter()
             .map(|name| stub(name))
             .collect();
 
         let none = BTreeSet::new();
+        let never = BTreeMap::new();
         assert_eq!(
-            named(&arrange(entries.clone(), &none)),
+            named(&arrange(entries.clone(), &none, &never)),
             ["alpha", "bravo", "charlie", "delta"],
-            "with no favourites the order is the one the scan produced"
+            "with no favourites and no dates the order is the one the scan produced"
         );
 
         let starred: BTreeSet<String> = ["id-delta".to_string(), "id-bravo".to_string()]
             .into_iter()
             .collect();
-        let ordered = arrange(entries.clone(), &starred);
+        let ordered = arrange(entries.clone(), &starred, &never);
         assert_eq!(
             named(&ordered),
             ["bravo", "delta", "alpha", "charlie"],
@@ -540,8 +583,56 @@ mod tests {
         // lose it for good.
         let stale: BTreeSet<String> = ["id-gone".to_string()].into_iter().collect();
         assert_eq!(
-            named(&arrange(entries, &stale)),
+            named(&arrange(entries, &stale, &never)),
             ["alpha", "bravo", "charlie", "delta"]
+        );
+    }
+
+    /// The whole point of the column: what you have been running is at the top. A model
+    /// that has never been launched falls back to when its file arrived, so a fresh
+    /// download is near the top too — it is still the most recent thing that happened to
+    /// it — and a model with no date at all goes last rather than first.
+    #[test]
+    fn the_list_orders_on_the_same_value_the_row_shows() {
+        let entries = vec![
+            dated("alpha", Some(100)),
+            dated("bravo", Some(900)),
+            dated("charlie", Some(200)),
+            stub("delta"),
+        ];
+
+        let none = BTreeSet::new();
+        assert_eq!(
+            named(&arrange(
+                entries.clone(),
+                &none,
+                &launches(&[("alpha", 500)])
+            )),
+            ["bravo", "alpha", "charlie", "delta"],
+            "bravo's file is newer than alpha's launch; delta has neither date"
+        );
+
+        let ordered = arrange(entries.clone(), &none, &launches(&[("alpha", 1000)]));
+        assert_eq!(
+            named(&ordered),
+            ["alpha", "bravo", "charlie", "delta"],
+            "launching alpha moves it above a file newer than it"
+        );
+        assert_eq!(
+            ordered[0].last_launched_secs,
+            Some(1000),
+            "the row cannot show what it was not given"
+        );
+        assert_eq!(
+            ordered[1].last_launched_secs, None,
+            "and a model never launched has to be distinguishable from one that was"
+        );
+
+        let starred: BTreeSet<String> = ["id-charlie".to_string()].into_iter().collect();
+        assert_eq!(
+            named(&arrange(entries, &starred, &launches(&[("alpha", 1000)]))),
+            ["charlie", "alpha", "bravo", "delta"],
+            "a favourite stays above a model launched more recently"
         );
     }
 

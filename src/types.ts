@@ -34,6 +34,8 @@ export interface ModelEntry {
   metadata: GgufMetadata | null;
   error: string | null;
   favourite: boolean;
+  /// Null until the model has been launched to Ready at least once.
+  lastLaunchedSecs: number | null;
 }
 
 export interface DirInfo {

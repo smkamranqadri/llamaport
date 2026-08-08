@@ -228,7 +228,7 @@ async fn catalog_list(state: State<'_, AppState>) -> Result<Vec<ModelEntry>, Str
 /// to renumber it.
 fn arranged(state: &AppState, entries: Vec<ModelEntry>) -> Vec<ModelEntry> {
     let config = state.config.lock().expect("config lock");
-    catalog::arrange(entries, &config.favourites)
+    catalog::arrange(entries, &config.favourites, &config.last_launched)
 }
 
 #[tauri::command]
@@ -617,6 +617,33 @@ fn refresh_catalog(app: &AppHandle) {
     let _ = app.emit("catalog:changed", entries);
 }
 
+/// Dates a model from the run that actually served, for the Library to sort and show.
+///
+/// Not written where `last_used` is, beside the launch: `runner.start` returns as soon as
+/// the process exists, so a model that dies loading its weights would be dated as though
+/// it had run. Ready is the first moment that claim is true. It also arrives on every
+/// telemetry tick, which is what `stamp_if_newer` is for.
+fn record_launch(app: &AppHandle, snapshot: &RunnerSnapshot) {
+    if snapshot.state != RunState::Ready {
+        return;
+    }
+    let (Some(model_id), Some(started)) = (snapshot.model_id.as_deref(), snapshot.started_secs)
+    else {
+        return;
+    };
+
+    let state = app.state::<AppState>();
+    let stamped = {
+        let mut config = state.config.lock().expect("config lock");
+        store::stamp_if_newer(&mut config.last_launched, model_id, started)
+    };
+    // Outside the block on purpose: `save_config` takes the same lock, and it is not
+    // reentrant, so saving while holding it deadlocks every launch.
+    if stamped {
+        let _ = state.save_config();
+    }
+}
+
 fn update_tray(app: &AppHandle, snapshot: &RunnerSnapshot) {
     let state = app.state::<AppState>();
     let tray = state.tray.lock().expect("tray lock");
@@ -769,6 +796,7 @@ pub fn run() {
             handle.listen("runner:state", move |event| {
                 if let Ok(snapshot) = serde_json::from_str::<RunnerSnapshot>(event.payload()) {
                     update_tray(&listener_handle, &snapshot);
+                    record_launch(&listener_handle, &snapshot);
                 }
             });
 

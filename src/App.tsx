@@ -154,7 +154,12 @@ export default function App() {
       );
     }
     return (
-      <Library key={catalogVersion} runner={runner} onSelect={setSelected} />
+      <Library
+        key={catalogVersion}
+        runner={runner}
+        onSelect={setSelected}
+        onStop={stop}
+      />
     );
   };
 

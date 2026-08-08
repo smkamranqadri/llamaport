@@ -211,14 +211,6 @@ body,
   border-bottom: none;
 }
 
-.model-row.is-running {
-  background: color-mix(in srgb, var(--accent) 8%, transparent);
-}
-
-.model-row:hover {
-  background: var(--bg-hover);
-}
-
 .model-row.is-broken {
   opacity: 0.6;
 }
@@ -1034,6 +1026,13 @@ input[type="range"] {
   background: var(--bg-hover);
 }
 
+/* On the item, not the row button: the star and the delete are its siblings, so tinting
+   the button alone leaves the running model highlighted across the middle of its row and
+   plain at both ends. Last, so hovering a running row does not take the tint away. */
+.model-item.is-running {
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
 .star {
   flex: none;
   padding: 8px 4px 8px 12px;
@@ -1053,10 +1052,18 @@ input[type="range"] {
   color: var(--accent);
 }
 
+/* One width for whichever button the row ends on. The row button beside it is `flex: 1`,
+   so a narrower word here widens the grid and pushes that row's right-aligned figures out
+   of line with every other row — which is what swapping Delete for Stop did. */
+.row-action {
+  flex: none;
+  min-width: 72px;
+  margin-right: 10px;
+}
+
 /* Present but not shouting: deleting is rare, and a row of loud red buttons reads as a
    list of things to delete. */
 .button-quiet {
-  margin-right: 10px;
   opacity: 0;
   transition: opacity 120ms;
 }
@@ -1070,6 +1077,7 @@ input[type="range"] {
 .button-quiet:disabled {
   color: var(--text-muted);
 }
+
 
 .model-item.is-confirming {
   gap: 16px;
