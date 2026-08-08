@@ -230,3 +230,31 @@ The window bug has never been reproduced on demand — it was seen twice in one
 session and not since. The fix is structural rather than a repair of a known
 cause, and the proof is repeated launches, which is weaker than this project
 normally accepts. The release notes should say so rather than claim it fixed.
+
+## v0.3.0 — built 2026-08-08
+
+`Llamaport_0.3.0_aarch64.dmg`, 4,221,465 bytes, sha256
+`7bbb75f7479291031b3b86ad5c9122a71d8530c8ec554cf94ac29c81272babba`. Built with
+`CI=true`, mounted and checked, and installed over the 0.2.1 in `/Applications`.
+A minor rather than a patch because the config schema moves 6 -> 7.
+
+**The v0.2.1 way of proving a feature is in the artefact did not work here.**
+That release grepped the binary for a new string and for the string it replaced;
+this change is mostly frontend, and Tauri compresses the embedded assets, so
+`strings` finds neither. The replacement is better: Vite content-hashes its
+filenames, so the name is a digest of the contents. `index-R_7rLVpB.js` carries
+"Last launched" and no longer carries "before deleting it", `index-BaiJagCa.css`
+carries `row-action` and `.model-item.is-running`, and the shipped binary embeds
+exactly those two names and none from any earlier build. Use this for any release
+that is frontend-heavy.
+
+The account name appears 452 times in the binary, all cargo and source paths, the
+same count as v0.2.0. Installing by local copy sets no quarantine attribute, so
+Gatekeeper is still untested — as for every release so far.
+
+**The screenshots were the author's, and they closed the last of the UI proof.**
+Orca, the accessibility tooling this session had used all day, was uninstalled
+partway through, so nothing could read or capture the running app. Three captures
+from the built 0.3.0 settled what was owed: the weight distinction in the recency
+cell, the running row tinted end to end, its hover staying one colour, and its
+figures still flush with the rows above.
