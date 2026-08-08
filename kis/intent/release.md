@@ -231,7 +231,12 @@ session and not since. The fix is structural rather than a repair of a known
 cause, and the proof is repeated launches, which is weaker than this project
 normally accepts. The release notes should say so rather than claim it fixed.
 
-## v0.3.0 — built 2026-08-08
+## v0.3.0 — shipped 2026-08-08
+
+https://github.com/smkamranqadri/llamaport/releases/tag/v0.3.0 — pre-release,
+unsigned, Last used plus the row fixes it turned up. The published asset was
+downloaded back and is byte-identical to what was built, as with all three
+previous releases. The process from v0.2.0 worked unchanged.
 
 `Llamaport_0.3.0_aarch64.dmg`, 4,221,465 bytes, sha256
 `7bbb75f7479291031b3b86ad5c9122a71d8530c8ec554cf94ac29c81272babba`. Built with

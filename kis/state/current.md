@@ -1,26 +1,19 @@
 # Current
 
 ```text
-Branch:   `main`, tagged `v0.2.1` at the last commit. Working tree carries the
-          Last used work, uncommitted and unreleased.
-Task:     **Last used** — done 2026-08-08, verified in the running app.
-          [intent/last-used.md](../intent/last-used.md).
-Mode:     — (it was Standard; the work is closed).
-Blocker:  none. Owed rather than blocking: `docs/library.png` is now stale — it
-          is on the README's front page and shows the old last column, the old
-          within-group order and no Stop button. Only the author can retake it
-          (`screencapture -o -w docs/library.png`), the same denial
-          [intent/release.md](../intent/release.md) already records. Then two CSS
-          fixes made last and not yet looked at — the hover no longer splitting
-          into two colours on a running row, and that row's figures lining up
-          with the others. Plus the two standing ones: the README's "Open Anyway"
-          steps have never met a real Gatekeeper prompt, and a queued row with
-          nothing on disk behind it has never been seen coming back from a
-          restart.
-Next:     commit, and decide whether this rides alone or waits for company. It
-          is a schema bump, so a build carrying it cannot be downgraded without
-          the older build ignoring `lastLaunched` — additive, but worth saying in
-          release notes. Nothing else planned.
+Branch:   `main`, clean and pushed. `v0.3.0` is tagged two commits back, at the
+          build record — the same shape as every release here; the code at the
+          tag and the code at HEAD are identical.
+Task:     none in progress. Last used is done, shipped and installed.
+Mode:     —
+Blocker:  none. Two standing items, both unchanged by this release: the README's
+          "Open Anyway" steps have never met a real Gatekeeper prompt, and a
+          queued row with nothing on disk behind it has never been seen coming
+          back from a restart.
+Next:     nothing planned. Same rule as after v0.2.0 and v0.2.1: the next move is
+          whatever the release says — install friction, bug reports, or silence.
+          Do not plan features against silence. A browser download of the `.dmg`
+          would settle Gatekeeper in five minutes whenever it is wanted.
 ```
 
 Run and verify commands: [knowledge/technical.md](../knowledge/technical.md).
@@ -131,12 +124,19 @@ author's own live config:
   `llama-server` before, none after, the sidebar back to "No model running", the
   row back to Delete. The row kept its "today" and its position, because stopping
   is not un-launching. Exactly one Stop appeared in the list, on the running row.
-- Not proven by me: that the launched cell reads differently from the muted one
-  (the author confirmed that on screen — the accessibility tree carries no
-  styling and screenshots were blocked at both Orca and `screencapture`), and
-  the last two CSS fixes — the hover no longer splitting into two colours, and
-  the running row's figures lining up with the rest. Those two build clean and
-  their causes were read off the stylesheet, but nobody has looked at them.
+- **Everything visual was closed by the author's screenshots of the built 0.3.0**,
+  after the accessibility tooling was uninstalled mid-session and neither it nor
+  `screencapture` could reach the window. In one frame: the running Bonsai-27B
+  row tinted from the star at one end to its Stop button at the other, the row
+  below it hovered and uniformly one colour, "today" bright against a muted "14
+  days ago", and every recency value flush right including the two rows carrying
+  buttons. That settles the weight distinction, the tint, the hover and the
+  alignment — the four things no test could reach.
+
+Shipped 2026-08-08 as a GitHub pre-release with the `.dmg` attached. The
+published asset was downloaded back and is byte-identical to what was built
+(`7bbb75f7...`), as with all three previous releases
+([intent/release.md](../intent/release.md)).
 
 Older proof is with the work it belongs to: the Persistence phase in
 [intent/persistence.md](../intent/persistence.md), the v0.2.0 release review in
