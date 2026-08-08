@@ -45,11 +45,11 @@ A ready model offers **Web UI**, which opens `llama-server`'s own interface in a
 second app window. The app has no chat of its own and is not getting one
 ([knowledge/project.md](../knowledge/project.md)).
 
-**v0.2.1 is published**, unsigned, as a GitHub pre-release with the `.dmg`
-attached: https://github.com/smkamranqadri/llamaport/releases/tag/v0.2.1. Its
-notes tell v0.2.0 users to upgrade, because the path traversal it fixes is live
-in that build. v0.1.0 is unaffected by that one — it has no history file at all —
-and should upgrade for the v0.2.0 fixes instead
+**v0.3.0 is published**, unsigned, as a GitHub pre-release with the `.dmg`
+attached: https://github.com/smkamranqadri/llamaport/releases/tag/v0.3.0, and
+installed in `/Applications`. Anyone still on v0.2.0 should upgrade for the path
+traversal v0.2.1 fixed, which is live in that build; v0.1.0 is unaffected by that
+one — it has no history file at all. Every release so far
 ([intent/release.md](../intent/release.md)).
 
 Discover was planned and then dropped ([intent/roadmap.md](../intent/roadmap.md)).
@@ -65,13 +65,11 @@ after a pipe. 180 tests, up from 177 before Last used. `$PIPESTATUS` is a bash
 name and this is zsh; it came back empty and reported nothing, which is the same
 trap under a new spelling.
 
-The published `.dmg` was downloaded back from GitHub and is byte-identical to
-what was built. Mounted, it carries `Llamaport.app` at 0.2.1 with the right
-identifier; the binary contains `is already in the queue` and no longer contains
-`this app downloads one file at a time`, so the queue is provably in the
-artefact rather than only in the tree. 0.2.1 is also installed over the 0.2.0 in
-`/Applications` — by local copy, which sets no quarantine attribute and
-therefore still does not test Gatekeeper.
+Every build's artefact proof lives with its release in
+[intent/release.md](../intent/release.md), including how v0.3.0 had to prove a
+frontend-heavy change was in the bundle when grepping the binary no longer could.
+Installing by local copy still sets no quarantine attribute, so no release yet
+has tested Gatekeeper.
 
 Queue, 2026-08-04:
 
