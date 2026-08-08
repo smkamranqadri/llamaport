@@ -1,10 +1,8 @@
 # Current
 
 ```text
-Branch:   `main`, clean. **The code at HEAD and the code at `v0.3.0` are no
-          longer identical** — the Dock reopen fix is the first behaviour change
-          since the tag, so a build of HEAD can no longer be attached to that
-          release. Everything else since the tag is documentation.
+Branch:   `main`, clean and pushed. `v0.3.1` is tagged at HEAD, and the built
+          `.dmg`s came from that commit.
 Task:     none in progress. Distribution is done: description, topics and an
           uploaded social preview, the release is no longer a pre-release, the
           front page leads with a clip, a Show and tell post is live in
@@ -15,15 +13,18 @@ Mode:     —
 Blocker:  none. Three standing items, none touched by any of this: the README's
           "Open Anyway" steps have never met a real Gatekeeper prompt, a queued
           row with nothing on disk behind it has never been seen coming back
-          from a restart, and no Intel Mac has run the universal build.
+          from a restart, and no Intel Mac has run the universal build. Two more
+          are owed by v0.3.1, which shipped without them by decision: nobody has
+          seen the Dock fix work in the built artefact, and the five-launch
+          condition was not run ([intent/release.md](../intent/release.md)).
 Next:     Show HN, drafted and unposted, is the one launch channel open today —
-          r/LocalLLaMA needs karma this account does not have. Weigh a v0.3.1
-          against it: issue 1 is fixed on `main` and every public build still
-          has it, so anyone arriving from a post gets the version that looks
-          dead when its window is closed. After that the same rule as after
-          every release: the next move is whatever the audience says. Do not
-          plan features against silence. A browser download of a `.dmg` would
-          still settle Gatekeeper in five minutes whenever it is wanted.
+          r/LocalLLaMA needs karma this account does not have. Before or after
+          it, the two conditions v0.3.1 owes are ten minutes with the display
+          free and no fullscreen app: launch the installed build five times, then
+          close its window and click the Dock icon. After that the same rule as
+          after every release: the next move is whatever the audience says. Do
+          not plan features against silence. A browser download of a `.dmg`
+          would still settle Gatekeeper in five minutes whenever it is wanted.
 ```
 
 Run and verify commands: [knowledge/technical.md](../knowledge/technical.md).
@@ -55,11 +56,12 @@ A ready model offers **Web UI**, which opens `llama-server`'s own interface in a
 second app window. The app has no chat of its own and is not getting one
 ([knowledge/project.md](../knowledge/project.md)).
 
-**v0.3.0 is published**, unsigned, as the Latest GitHub release with **two
-`.dmg`s** attached — `aarch64` and `universal`, the same build widened rather than
-a second one: https://github.com/smkamranqadri/llamaport/releases/tag/v0.3.0. It
-was a pre-release until 2026-08-08, when the badge was dropped without rebuilding
-anything ([intent/release.md](../intent/release.md)). The aarch64
+**v0.3.1 is published**, unsigned, as the Latest GitHub release with **two
+`.dmg`s** attached — `aarch64` and `universal`:
+https://github.com/smkamranqadri/llamaport/releases/tag/v0.3.1. It is v0.3.0 plus
+the Dock reopen fix and nothing else, and the first release published as Latest
+rather than pre-release; v0.3.0 was promoted to that on the same day
+([intent/release.md](../intent/release.md)). The 0.3.1 aarch64
 one is installed in `/Applications`. The app is macOS-only for reasons that are
 Darwin's rather than ARM's ([knowledge/technical.md](../knowledge/technical.md)),
 and no Intel Mac has run it. Anyone still on v0.2.0 should upgrade for the path

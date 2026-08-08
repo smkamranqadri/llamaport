@@ -306,6 +306,44 @@ from the built 0.3.0 settled what was owed: the weight distinction in the recenc
 cell, the running row tinted end to end, its hover staying one colour, and its
 figures still flush with the rows above.
 
+## v0.3.1 — shipped 2026-08-08
+
+https://github.com/smkamranqadri/llamaport/releases/tag/v0.3.1 — the first
+release published as **Latest rather than pre-release**, unsigned, both `.dmg`s
+attached from the start. One fix, no schema change; the config stays at 7.
+
+`Llamaport_0.3.1_aarch64.dmg`, 4,221,604 bytes, sha256
+`848b8d837da822321262c14629547e2af253293e169a3ef5b3596f5f6e88063a`.
+`Llamaport_0.3.1_universal.dmg`, 8,469,496 bytes, sha256
+`bd73ca4a6182cb5df89c60c8748157c9fbf0d30fa9cc59efdac4e40954bb4a0d`. Both
+downloaded back byte-identical, as with every release here. The universal one
+carries `x86_64 arm64`. The account name appears 454 times in the aarch64 binary
+and 912 in the universal, all cargo and source paths; the only hit outside them
+is the bundle identifier itself, which is public.
+
+**The frontend digests are unchanged from v0.3.0** — `index-R_7rLVpB.js` and
+`index-BaiJagCa.css` — and that is the correct result rather than a stale build:
+this release changes six lines of Rust and no frontend at all. The v0.3.0
+technique proves a *frontend* change is present; it says nothing either way about
+a Rust one, which is the gap below.
+
+**Two closing conditions were not met, and it shipped anyway — a decision, not an
+oversight.** The author chose to publish rather than hold.
+
+- **That the fix is in the artefact was inferred, not seen.** The change adds no
+  new string, so `strings` cannot find it, and the behaviour needs a real Dock
+  click to demonstrate — a synthesized press cannot settle it (see Distribution).
+  What is known: the tree was proved in a dev build, and the `.dmg` was built
+  from the tagged commit.
+- **The five-launch condition was not run.** A fullscreen app owned the display,
+  which changes how a launched app gets a Space, and every reading taken in that
+  state was noise: v0.3.1 showed no window on 4 of 5 launches and **the published
+  v0.3.0 did the same on 3 of 3**, which is what proves the measurement rather
+  than the build was at fault. Do not read those numbers as a defect in either
+  build, and do not repeat a launch check while anything is fullscreen.
+
+Both are owed against the next release rather than closed here.
+
 ## Distribution — from 2026-08-08
 
 Everything here is about being found. None of it changes the app.
