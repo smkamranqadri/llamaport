@@ -319,7 +319,8 @@ after being made public, which is where every announcement was going to land. Al
 three are now set. The description leads with "llama.cpp" rather than
 "llama-server" because that is the term people search.
 `docs/social-preview.png` is committed as the source; the upload itself is
-browser-only and lives on GitHub, not in the repo.
+browser-only, was done by the author, and lives on GitHub rather than in the repo
+— `usesCustomOpenGraphImage` reads true, which is the only way to verify it.
 
 **A Show and tell post is live in llama.cpp's own Discussions:**
 https://github.com/ggml-org/llama.cpp/discussions/26772
@@ -334,6 +335,33 @@ does, that it has no chat of its own, that it is an unsigned beta, and that no
 Intel Mac has run the universal build. Every one of those can go stale. Edit it
 whenever a release changes what it claims, and treat that as part of shipping
 rather than as publicity.
+
+**Four list submissions are open**, all disclosing authorship:
+
+- `jaywcjlove/awesome-mac`, 109k stars — https://github.com/jaywcjlove/awesome-mac/pull/2526
+- `serhii-londar/open-source-mac-os-apps`, 50k — https://github.com/serhii-londar/open-source-mac-os-apps/pull/1252
+- `rafska/awesome-local-llm`, 2.5k — https://github.com/rafska/awesome-local-llm/pull/171
+- `vince-lam/awesome-local-llms` — https://github.com/vince-lam/awesome-local-llms/issues/66
+
+Two large lists were checked and skipped as dead rather than missed:
+`Hannibal046/Awesome-LLM` (27k stars, no push in a year) and
+`underlines/awesome-ml` (16 months). A PR into an unmaintained list is a PR
+nobody merges. The vince-lam one is an issue rather than a PR because its table
+is generated weekly from the top 100 repositories by stars, which this will not
+reach for a long while; the issue says so rather than pretending otherwise.
+
+**What each channel will and will not accept, learned the hard way:**
+
+- **r/LocalLLaMA** forbids primarily LLM-generated copy outright (rule 3), and
+  requires disclosed affiliation with a 1-in-10 self-promotion guideline (rule
+  4). Posting also needs karma this account does not have. Any post here has to
+  be written by the author, in the author's words.
+- **Hacker News** has no karma gate on submissions, which makes Show HN the one
+  launch channel open today. Never solicit upvotes anywhere — HN detects voting
+  rings and penalises the submission, which is the usual way a good Show HN
+  dies. A Show HN also needs answering for its first three hours or it sinks.
+- Reddit blocks every automated route to its rules and to posting, so anything
+  about that site has to be checked by a person in a browser.
 
 **Homebrew was considered and deferred.** `homebrew/cask` requires notability —
 75 stars, 30 forks or 30 watchers — and this repository has none of them. An own
@@ -360,7 +388,12 @@ video better than a GIF. The still is kept — phase 3's retake command still na
 it and the social preview card was built from it.
 
 **A window bug turned up while recording, and this one reproduces on demand.**
-Closing the window leaves the process running, and the Dock icon does not bring
-it back; only the Window menu does. macOS convention is that the Dock icon
-reopens, so this is a missing reopen handler. Unlike the window bug under
-"Carried, not met", it is reproducible.
+Closing the window leaves the process running and the Dock icon does not bring it
+back. The route back is the tray's **Show window** — checked in the accessibility
+tree with no window open, where the app menu offers nothing and the Window menu
+holds only the standard macOS items, all inert. macOS convention is that the Dock
+icon reopens, so this is a missing reopen handler: the run loop matches only
+`ExitRequested` and `Exit`, never `RunEvent::Reopen`, while `show_main_window`
+already exists and the tray already calls it. Filed as
+https://github.com/smkamranqadri/llamaport/issues/1, the repository's first.
+Unlike the window bug under "Carried, not met", it is reproducible.

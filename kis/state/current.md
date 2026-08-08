@@ -4,10 +4,11 @@
 Branch:   `main`, clean and pushed. `v0.3.0` is tagged behind the docs commits
           that followed it; the code at the tag and the code at HEAD are still
           identical — everything since it is documentation.
-Task:     none in progress. Distribution is done bar one upload: the repository
-          has a description, topics and a committed social preview card, the
-          release is no longer a pre-release, the front page leads with a clip,
-          and a Show and tell post is live in llama.cpp's own Discussions
+Task:     none in progress. Distribution is done: description, topics and an
+          uploaded social preview, the release is no longer a pre-release, the
+          front page leads with a clip, a Show and tell post is live in
+          llama.cpp's Discussions, four list submissions are open, and the
+          author has posted to several subreddits and commented around them
           ([intent/release.md](../intent/release.md)).
 Mode:     —
 Blocker:  none. Three standing items, none touched by any of this: the README's
@@ -16,14 +17,15 @@ Blocker:  none. Three standing items, none touched by any of this: the README's
           from a restart, and no Intel Mac has run the universal build. One new
           bug, and unlike the old window one it reproduces on demand: closing
           the window leaves the app running and the Dock icon will not bring it
-          back, only the Window menu will.
-Next:     upload `docs/social-preview.png` in the repository settings. It is
-          browser-only, nothing else can do it, and Reddit and Hacker News wait
-          on it — both render the card, and neither gives a second first post.
-          After that the same rule as after every release: the next move is
-          whatever the audience says. Do not plan features against silence. A
-          browser download of a `.dmg` would still settle Gatekeeper in five
-          minutes whenever it is wanted.
+          back — only the tray's Show window does. Filed as issue 1.
+Next:     two things, either order. Show HN is drafted and unposted, and is the
+          one launch channel open today — r/LocalLLaMA needs karma this account
+          does not have. And issue 1 is worth fixing before more people arrive,
+          because a closed window makes the app look dead to someone who has had
+          it for a minute. After that the same rule as after every release: the
+          next move is whatever the audience says. Do not plan features against
+          silence. A browser download of a `.dmg` would still settle Gatekeeper
+          in five minutes whenever it is wanted.
 ```
 
 Run and verify commands: [knowledge/technical.md](../knowledge/technical.md).
@@ -73,6 +75,12 @@ artefact here the agent captured rather than the author. The Show and tell post
 in llama.cpp's Discussions is the one outward-facing thing that goes stale on its
 own: https://github.com/ggml-org/llama.cpp/discussions/26772 — edit it whenever a
 release changes what it claims, as part of shipping rather than after it.
+
+**Nothing has converted yet.** Stars, forks and watchers were all still 0 at the
+end of 2026-08-08, after the subreddit posts were up and drawing views. Views
+without stars is the measurement that matters, and the honest reading of one
+evening is that it is too early to read anything at all. The notability gate that
+would open `homebrew/cask` — 75 stars, 30 forks or 30 watchers — is untouched.
 
 Discover was planned and then dropped ([intent/roadmap.md](../intent/roadmap.md)).
 
