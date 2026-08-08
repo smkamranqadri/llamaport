@@ -8,10 +8,11 @@ Hugging Face with resume that survives a kill.
 macOS, Apple Silicon or Intel. This is an unsigned beta — see
 [Install](#install).
 
-![The Library screen, listing local GGUF models with quantisation, context length
-and size, ordered by what was run most recently. A favourite is starred at the
-top; the running model's row is highlighted and ends in a Stop
-button](docs/library.png)
+![Opening a model from the Library shows its quantisation, parameters, context and
+the launch settings it will use. Run starts llama-server and the page turns into
+a live view of KV cache, memory and token rates. Test model then reports every
+check passing — process, port, health, model list, alias, chat completion and
+streaming — with generation at 285 tokens per second](docs/launch.gif)
 
 ## Who it is for
 
