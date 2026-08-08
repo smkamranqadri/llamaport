@@ -69,18 +69,16 @@ traversal v0.2.1 fixed, which is live in that build; v0.1.0 is unaffected by tha
 one — it has no history file at all. Every release so far
 ([intent/release.md](../intent/release.md)).
 
-**The front page leads with a clip rather than a still.** `docs/launch.gif` runs
-from the Library to Test model reporting every check passed, and is the first UI
-artefact here the agent captured rather than the author. The Show and tell post
-in llama.cpp's Discussions is the one outward-facing thing that goes stale on its
-own: https://github.com/ggml-org/llama.cpp/discussions/26772 — edit it whenever a
-release changes what it claims, as part of shipping rather than after it.
+**The front page leads with `docs/launch.gif`**, and the Show and tell post at
+https://github.com/ggml-org/llama.cpp/discussions/26772 is the one outward-facing
+thing that goes stale on its own — edit it whenever a release changes what it
+claims. Both are owned by [intent/release.md](../intent/release.md).
 
 **Nothing has converted yet.** Stars, forks and watchers were all still 0 at the
 end of 2026-08-08, after the subreddit posts were up and drawing views. Views
 without stars is the measurement that matters, and the honest reading of one
-evening is that it is too early to read anything at all. The notability gate that
-would open `homebrew/cask` — 75 stars, 30 forks or 30 watchers — is untouched.
+evening is that it is too early to read anything at all. The `homebrew/cask`
+notability gate ([intent/release.md](../intent/release.md)) is untouched.
 
 Discover was planned and then dropped ([intent/roadmap.md](../intent/roadmap.md)).
 
@@ -93,15 +91,12 @@ The four commands were last run green over the working tree: `cargo fmt
 `bun run build` — all exit 0, each status captured on its own line rather than
 after a pipe. 180 tests, up from 177 before Last used.
 
-**v0.3.0 shipped 2026-08-08** and both published assets were downloaded back
-byte-identical to what was built, as with all three releases before it. The
-universal one carries both slices and its x86_64 half was launched under Rosetta
-and seen registering as a foreground app — which says the slice is real, and says
-nothing about an Intel Mac ([intent/release.md](../intent/release.md)). Every
-build's artefact proof lives with its release in
-[intent/release.md](../intent/release.md), including how a frontend-heavy change
-had to be proved present when grepping the binary no longer could. Installing by
-local copy sets no quarantine attribute, so no release yet has tested Gatekeeper.
+**v0.3.0 shipped 2026-08-08.** Every build's artefact proof lives with its
+release in [intent/release.md](../intent/release.md) — both assets downloaded
+back byte-identical, the universal build's x86_64 half run under Rosetta, and how
+a frontend-heavy change had to be proved present when grepping the binary no
+longer could. Installing by local copy sets no quarantine attribute, so no
+release yet has tested Gatekeeper.
 
 Proof sits with the work it belongs to, not here:
 

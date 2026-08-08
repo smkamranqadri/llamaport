@@ -145,10 +145,11 @@ a second copy.
 LICENSE, `docs/library.png` on the front page, and both first-launch empty states
 now say what to do rather than only what is wrong.
 
-The screenshot was the author's to capture: screen recording is denied to the
-agent, and going around a denial is not an option. Retake it with
-`screencapture -o -w docs/library.png` if the UI changes — the window alone, not
-the desktop. It shows `/Users/mkamran/models` in the subtitle, which is the
+The screenshot was the author's to capture: screen recording was denied to the
+agent **as of 2026-08-03**, and going around a denial is not an option. That
+denial was lifted on 2026-08-08 — see Distribution below, which is the current
+answer. Retake it with `screencapture -o -w docs/library.png` if the UI changes —
+the window alone, not the desktop. It shows `/Users/mkamran/models` in the subtitle, which is the
 account name otherwise scrubbed from the repo; raised before capture and shipped
 anyway, so it is a decision rather than an oversight.
 
@@ -384,12 +385,16 @@ reach. This is the first UI artefact here that is not the author's.
 `docs/launch.gif` replaces `docs/library.png` on the front page: eleven seconds,
 391 KB, two cuts out of a twenty-second take, ending on Test model reporting
 every check passed. `docs/launch.mp4` is the same cut for platforms that render
-video better than a GIF. The still is kept — phase 3's retake command still names
-it and the social preview card was built from it.
+video better than a GIF. The still is kept but is no longer the front page: phase
+3's retake command still names it, and the social preview card was built from it.
 
 **A window bug turned up while recording, and this one reproduces on demand.**
-Closing the window leaves the process running and the Dock icon does not bring it
-back. The route back is the tray's **Show window** — checked in the accessibility
+Closing the main window is *meant* to hide it rather than quit
+([knowledge/project.md](../knowledge/project.md), and the label check in
+[knowledge/technical.md](../knowledge/technical.md)) — that decision is not the
+bug and must not be "fixed" by making close quit. The bug is that nothing brings
+the hidden window back: the Dock icon does nothing. The route back is the tray's
+**Show window** — checked in the accessibility
 tree with no window open, where the app menu offers nothing and the Window menu
 holds only the standard macOS items, all inert. macOS convention is that the Dock
 icon reopens, so this is a missing reopen handler: the run loop matches only

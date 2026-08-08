@@ -43,11 +43,22 @@ Two, each with its own spec, module and screen:
    the running highlight, its hover, its alignment, and a Stop button where a
    running model used to offer a Delete it would have refused.
 
-7. **Nothing planned.** Two things owed rather than planned, both older than this
-   release and unchanged by it: the README's "Open Anyway" steps have never met a
-   real Gatekeeper prompt, and a queued row with nothing on disk behind it has
-   never been seen coming back from a restart. Now that v0.3.0 is public, the
-   first is five minutes of downloading the `.dmg` through a browser.
+7. ~~**Distribution**~~ — done 2026-08-08. The release was made findable rather
+   than extended: a description and topics where there had been none, a social
+   preview, a clip on the front page in place of a still, a Show and tell post in
+   llama.cpp's own Discussions, and four list submissions.
+   [release.md](release.md). Unlike steps 3, 5 and 6 this came from nobody using
+   the app — it came from the app having no readers.
+
+8. **Two live actions, no feature work.** Show HN is drafted and unposted, and is
+   the only launch channel open today; r/LocalLLaMA needs karma this account does
+   not have. And issue 1 below is worth fixing before more people arrive.
+
+   Three things owed rather than planned, all older than this release: the
+   README's "Open Anyway" steps have never met a real Gatekeeper prompt, a queued
+   row with nothing on disk behind it has never been seen coming back from a
+   restart, and no Intel Mac has run the universal build. Now that v0.3.0 is
+   public, the first is five minutes of downloading the `.dmg` through a browser.
 
 ## Decided against
 
@@ -79,5 +90,10 @@ unplanned.
   `show_main_window` asserts a usable frame and does not reliably achieve it.
   Predates the downloader, and is a release blocker of its own. Never reproduced
   on demand, so the fix will be structural rather than a repair.
+- The Dock icon does not reopen the main window once it has been closed. Closing
+  hides it by design ([knowledge/project.md](../knowledge/project.md)), and the
+  run loop never matches `RunEvent::Reopen`, so the only way back is the tray's
+  Show window. Filed as issue 1, and unlike the risk above it reproduces on
+  demand.
 - ~~The runner spec has no "known gaps" section, but `README.md:50` sends readers
   to one.~~ Resolved by the phase 3 README rewrite; no such reference remains.

@@ -156,7 +156,8 @@ release shipped.
   is not un-launching. Exactly one Stop appeared in the list, on the running row.
 - **Everything visual was closed by the author's screenshots of the built 0.3.0**,
   after the accessibility tooling was uninstalled mid-session and neither it nor
-  `screencapture` could reach the window. In one frame: the running Bonsai-27B
+  `screencapture` could reach the window — true of that day only; both were
+  granted on 2026-08-08 ([release.md](release.md), Distribution). In one frame: the running Bonsai-27B
   row tinted from the star at one end to its Stop button at the other, the row
   below it hovered and uniformly one colour, "today" bright against a muted "14
   days ago", and every recency value flush right including the two rows carrying
