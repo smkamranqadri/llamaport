@@ -84,6 +84,11 @@ the slice is not a stub, but Rosetta is not Intel hardware. Reports either way
 are wanted — particularly whether your `llama-server` has any GPU to offload to,
 since the default `-ngl all` assumes one.
 
+On Intel that means macOS 26 Tahoe and no further, because macOS 27 dropped Intel
+Macs entirely. Nothing here needs a newer one; it is why yours has stopped being
+offered them. Rosetta is not involved either way — a universal app runs natively
+on both architectures, which is the whole point of shipping one.
+
 **The first launch will be blocked.** This build is not signed with an Apple
 Developer certificate, so macOS quarantines it and refuses to open it. That is
 expected, and it is the price of a beta that costs nothing to publish. To open it
