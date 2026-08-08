@@ -843,10 +843,14 @@ pub fn run() {
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
-        .run(|app, event| {
-            if let tauri::RunEvent::ExitRequested { .. } | tauri::RunEvent::Exit = event {
+        .run(|app, event| match event {
+            tauri::RunEvent::ExitRequested { .. } | tauri::RunEvent::Exit => {
                 let state = app.state::<AppState>();
                 let _ = state.runner.stop();
             }
+            // Closing hides, so without this the Dock icon leads nowhere and the only way
+            // back is the tray — which is exactly where a first-time user will not look.
+            tauri::RunEvent::Reopen { .. } => show_main_window(app),
+            _ => {}
         });
 }
