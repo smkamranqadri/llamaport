@@ -5,7 +5,8 @@ A small macOS app for running and downloading local GGUF models. It wraps
 command visible, shows what it costs while it runs, and fetches new models from
 Hugging Face with resume that survives a kill.
 
-Apple Silicon only. This is an unsigned beta — see [Install](#install).
+macOS, Apple Silicon or Intel. This is an unsigned beta — see
+[Install](#install).
 
 ![The Library screen, listing local GGUF models with quantisation, context length
 and size, ordered by what was run most recently. A favourite is starred at the
@@ -56,7 +57,7 @@ of completed downloads](docs/download.png)
 
 ## Requirements
 
-- macOS on Apple Silicon
+- macOS on Apple Silicon or Intel
 - `llama-server`, which Llamaport finds on `PATH` or in the usual Homebrew
   locations:
 
@@ -69,8 +70,19 @@ it says so and lets you point at one in Settings.
 
 ## Install
 
-Download the `.dmg` from [Releases](../../releases), open it, and drag Llamaport
-to Applications.
+Download a `.dmg` from [Releases](../../releases), open it, and drag Llamaport to
+Applications. Two are published, and on Apple Silicon either one works:
+
+| File | For |
+| --- | --- |
+| `Llamaport_<version>_aarch64.dmg` | Apple Silicon, half the size |
+| `Llamaport_<version>_universal.dmg` | Apple Silicon or Intel |
+
+**The universal build has never been run on an Intel Mac.** Nobody here has one.
+Its x86_64 half was launched under Rosetta and came up as a real app, which says
+the slice is not a stub, but Rosetta is not Intel hardware. Reports either way
+are wanted — particularly whether your `llama-server` has any GPU to offload to,
+since the default `-ngl all` assumes one.
 
 **The first launch will be blocked.** This build is not signed with an Apple
 Developer certificate, so macOS quarantines it and refuses to open it. That is
@@ -107,6 +119,14 @@ Setting it skips only the cosmetic layout; the app, the `/Applications` symlink
 and the volume icon are unaffected. Drop it if you want the styled window and
 have granted the permission.
 
+That builds for the machine you are on. For the universal build, which runs on
+both architectures:
+
+```bash
+rustup target add x86_64-apple-darwin
+CI=true bun run tauri build --target universal-apple-darwin
+```
+
 For development:
 
 ```bash
@@ -116,7 +136,8 @@ bun run tauri dev
 ## What it does not do
 
 - **No chat UI.** `llama-server` already ships one; Llamaport opens it.
-- **No Windows or Linux.** macOS on Apple Silicon only.
+- **No Windows or Linux.** macOS only: the memory readings, the move-to-Trash and
+  the config location are all Darwin, and none of it has an equivalent written.
 - **No profiles or presets.** One remembered setup per model, written by a
   successful launch.
 - **One model at a time.** A busy port refuses the launch rather than moving to
