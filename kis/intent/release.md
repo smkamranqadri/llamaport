@@ -283,6 +283,21 @@ a throwaway `HOME`, it registered with LaunchServices from the mounted volume as
 the slice is not a stub. Rosetta is not Intel hardware and the README says so.
 An actual Intel Mac remains untested and nobody here has one.
 
+**The Intel audience is fixed and dated, which is the thing to weigh before
+building universal again.** macOS 26 Tahoe is the last major release for Intel
+Macs — macOS 27 is Apple Silicon only — so the reachable machines are four
+2019–2020 models frozen on Tahoe, with security updates until roughly 2028. The
+cost stays two lines of build recipe, so this is not an argument for stopping;
+it is the reason not to spend anything further on Intel beyond them.
+
+**Rosetta is a different subject and does not bear on this.** It translates Intel
+code on Apple Silicon; a universal binary runs natively on both, so nothing
+Llamaport ships ever invokes it. Rosetta was only reached here by forcing
+`arch -x86_64` for the proof above, which is also what raised the macOS 26.4
+"Intel app" notification on the author's machine — an artefact of the test, not
+something any user of this app will see. Rosetta is full through macOS 27 and cut
+back in macOS 28; neither date changes anything here.
+
 **The screenshots were the author's, and they closed the last of the UI proof.**
 Orca, the accessibility tooling this session had used all day, was uninstalled
 partway through, so nothing could read or capture the running app. Three captures
