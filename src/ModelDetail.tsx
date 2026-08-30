@@ -520,7 +520,7 @@ export default function ModelDetail({
       </section>
 
       <section className="panel">
-        <h2>Predicted memory</h2>
+        <h2>Memory</h2>
         <MemoryBar plan={preview ?? plan} />
       </section>
 
