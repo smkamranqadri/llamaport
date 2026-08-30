@@ -31,10 +31,13 @@ pub fn bytes_per_element(cache_type: &str) -> f64 {
 #[serde(rename_all = "camelCase")]
 pub struct Estimate {
     pub weights_bytes: u64,
-    /// `None` where the header describes layers whose cache it does not size.
-    pub kv_bytes: Option<u64>,
-    pub total_bytes: Option<u64>,
-    pub kv_unknown: Option<String>,
+    pub kv_bytes: u64,
+    pub total_bytes: u64,
+    /// True where a term was left out, so both figures are floors. Everything omitted
+    /// can only add, which is what makes a floor safe to print: it can never say a model
+    /// fits when it does not.
+    pub bounded: bool,
+    pub bound_note: Option<String>,
 }
 
 /// How many layers hold a cache sized to the whole context, and how many hold a
@@ -55,20 +58,19 @@ fn per_token(k_dim: u64, v_dim: u64, cache_k: &str, cache_v: &str) -> f64 {
     (k_dim as f64 * bytes_per_element(cache_k)) + (v_dim as f64 * bytes_per_element(cache_v))
 }
 
-/// The reason the cache cannot be sized, where the header gives one. It carries the
-/// numbers it read, so the screen says what this file declares rather than what such a
-/// file might.
-fn kv_unknown(md: &GgufMetadata) -> Option<String> {
+/// What the layers this file describes cannot account for. Carries the numbers it read,
+/// so the screen says what this file declares rather than what such a file might.
+fn bound_note(md: &GgufMetadata) -> Option<String> {
     let layers = md.block_count?;
     let interval = md.full_attention_interval?;
-    let (_, sliding) = layer_split(md, layers)?;
-    if sliding == 0 || md.sliding_window.is_some() {
+    let (_, uncounted) = layer_split(md, layers)?;
+    if uncounted == 0 || md.sliding_window.is_some() {
         return None;
     }
     Some(format!(
-        "This header says one layer in {interval} does full attention and gives no \
-         window size for the other {sliding}, so what those layers hold cannot be read \
-         from the file."
+        "One layer in {interval} does full attention and is counted here. The header \
+         gives no window size for the other {uncounted}, so what those hold is left out \
+         — the figures are floors, and the missing term can only add to them."
     ))
 }
 
@@ -76,28 +78,39 @@ fn kv_unknown(md: &GgufMetadata) -> Option<String> {
 /// such as deepseek2 size them differently. Sliding-window layers are summed apart from
 /// full-attention ones for the same reason one number cannot stand for both — they hold
 /// a cache the context does not grow past the window.
+///
+/// Where the header names an interval but no window, the layers it does describe are
+/// still counted and the result is marked a floor. Counting nothing there threw away a
+/// figure the file gives.
 pub fn kv_bytes(md: &GgufMetadata, ctx: u64, cache_k: &str, cache_v: &str) -> Option<u64> {
+    Some(kv_terms(md, ctx, cache_k, cache_v)?.0)
+}
+
+fn kv_terms(md: &GgufMetadata, ctx: u64, cache_k: &str, cache_v: &str) -> Option<(u64, bool)> {
     let layers = md.block_count?;
     let kv_heads = md.head_count_kv?;
     let k_dim = md.head_dim()?;
     let v_dim = md.value_head_dim()?;
-    let swa_k = md.swa_head_dim()?;
-    let swa_v = md.swa_value_head_dim()?;
 
     let (full, sliding) = layer_split(md, layers)?;
     let mut total =
         full as f64 * ctx as f64 * kv_heads as f64 * per_token(k_dim, v_dim, cache_k, cache_v);
 
-    if sliding > 0 {
-        let window = md.sliding_window?;
-        let cells = window.min(ctx);
-        total += sliding as f64
-            * cells as f64
-            * kv_heads as f64
-            * per_token(swa_k, swa_v, cache_k, cache_v);
+    if sliding == 0 {
+        return Some((total as u64, false));
     }
 
-    Some(total as u64)
+    let Some(window) = md.sliding_window else {
+        return Some((total as u64, true));
+    };
+
+    let swa_k = md.swa_head_dim()?;
+    let swa_v = md.swa_value_head_dim()?;
+    total += sliding as f64
+        * window.min(ctx) as f64
+        * kv_heads as f64
+        * per_token(swa_k, swa_v, cache_k, cache_v);
+    Some((total as u64, false))
 }
 
 pub fn estimate(
@@ -107,16 +120,17 @@ pub fn estimate(
     cache_k: &str,
     cache_v: &str,
 ) -> Option<Estimate> {
-    let kv_bytes = kv_bytes(md, ctx, cache_k, cache_v);
-    let kv_unknown = kv_unknown(md);
-    if kv_bytes.is_none() && kv_unknown.is_none() {
-        return None;
+    let (kv_bytes, bounded) = kv_terms(md, ctx, cache_k, cache_v)?;
+    let mut note = None;
+    if bounded {
+        note = bound_note(md);
     }
     Some(Estimate {
         weights_bytes: file_size,
         kv_bytes,
-        total_bytes: kv_bytes.map(|kv| file_size + kv),
-        kv_unknown,
+        total_bytes: file_size + kv_bytes,
+        bounded,
+        bound_note: note,
     })
 }
 
@@ -183,8 +197,9 @@ mod tests {
         let md = metadata(8, 128, None);
         let e = estimate(&md, 20_000_000_000, 65536, "q8_0", "q8_0").expect("estimate");
         assert_eq!(e.weights_bytes, 20_000_000_000);
-        assert_eq!(e.total_bytes, Some(e.weights_bytes + e.kv_bytes.unwrap()));
-        assert!(e.kv_unknown.is_none());
+        assert_eq!(e.total_bytes, e.weights_bytes + e.kv_bytes);
+        assert!(!e.bounded);
+        assert!(e.bound_note.is_none());
     }
 
     #[test]
@@ -253,23 +268,42 @@ mod tests {
     }
 
     #[test]
-    fn a_pattern_without_a_window_withholds_the_cache_and_keeps_the_weights() {
+    fn a_pattern_without_a_window_counts_what_it_can_and_marks_a_floor() {
         let mut md = metadata(8, 128, None);
         md.full_attention_interval = Some(4);
 
-        let e = estimate(&md, 20_000_000_000, 65536, "f16", "f16").expect("weights still known");
-        assert_eq!(e.weights_bytes, 20_000_000_000);
-        assert_eq!(e.kv_bytes, None);
-        assert_eq!(e.total_bytes, None);
+        let ctx = 65536u64;
+        let e = estimate(&md, 20_000_000_000, ctx, "f16", "f16").expect("a floor, not nothing");
 
-        let why = e.kv_unknown.expect("a reason, not a blank");
+        // Ten of the forty layers do full attention; only those are counted.
+        let counted = 10 * ctx * 8 * (128 * 2 + 128 * 2);
+        assert_eq!(e.kv_bytes, counted);
+        assert_eq!(e.total_bytes, 20_000_000_000 + counted);
+        assert!(e.bounded);
+
+        let why = e.bound_note.expect("a reason, not a blank");
         assert!(
-            why.contains("one layer in 4"),
+            why.contains("layer in 4"),
             "names the interval it read: {why}"
         );
-        assert!(
-            why.contains("other 30"),
-            "names how many layers it cannot size: {why}"
+        assert!(why.contains("other 30"), "names what it left out: {why}");
+    }
+
+    #[test]
+    fn the_floor_is_below_what_charging_every_layer_would_claim() {
+        let mut md = metadata(8, 128, None);
+        md.full_attention_interval = Some(4);
+        let flat = metadata(8, 128, None);
+
+        let ctx = 65536u64;
+        let floor = kv_bytes(&md, ctx, "f16", "f16").unwrap();
+        let charged_flat = kv_bytes(&flat, ctx, "f16", "f16").unwrap();
+
+        assert!(floor < charged_flat, "a floor is not the old over-count");
+        assert_eq!(
+            charged_flat / floor,
+            4,
+            "forty layers charged where ten are counted"
         );
     }
 

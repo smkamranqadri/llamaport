@@ -43,7 +43,17 @@ mistake — the right unit is not the same for all four.
   file. The rule against forecasting is about what cannot be known, not about
   arithmetic that has not been done yet, and marking a computable figure as a
   ceiling would be the wrong lesson drawn from the right rule.
-- **Abstain on the recurrent term rather than model it.** A hybrid keeps its
+- **Revised 2026-08-31, after seeing it: count what the header does describe and
+  mark the result a floor.** Withholding the figure entirely threw away one the
+  file gives. Ten of Ornith's forty layers do full attention and can be sized
+  exactly; only the other thirty cannot. The screen now reads "≥ 20.4 GB to
+  allocate — weights 19.7 GB plus at least 0.7 GB of KV cache", with the missing
+  term named. A floor is safe to print for the reason the earlier abstention was
+  safe: everything left out can only add, so it can never say a model fits when
+  it does not. This is the bounded-figure pattern recorded in
+  [gaps.md](gaps.md) from the Unsloth read, arrived at here by the same route
+  they arrived at it. The superseded reasoning follows.
+- **Superseded — abstain on the recurrent term rather than model it.** A hybrid keeps its
   weights figure, which is exact regardless, and withholds the KV term with the
   reason on screen. Sizing a recurrent state from `conv_kernel`, `state_size`,
   `inner_size` and `group_count` would be a second arithmetic model nobody has

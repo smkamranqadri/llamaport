@@ -65,10 +65,11 @@ export interface Profile {
 
 export interface Estimate {
   weightsBytes: number;
-  /// Null where the header describes layers whose cache it does not size.
-  kvBytes: number | null;
-  totalBytes: number | null;
-  kvUnknown: string | null;
+  kvBytes: number;
+  totalBytes: number;
+  /// True where a term was left out, so both figures are floors.
+  bounded: boolean;
+  boundNote: string | null;
 }
 
 export interface LaunchPlan {
