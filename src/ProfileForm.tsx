@@ -2,7 +2,8 @@ import { useEffect, useState, type ReactNode } from "react";
 import type { Profile } from "./types";
 
 const CACHE_TYPES = ["f16", "bf16", "q8_0", "q5_1", "q5_0", "q4_1", "q4_0"];
-const CTX_STEP = 4096;
+const CTX_MIN = 4096;
+const CTX_STEP = 1024;
 
 // macOS substitutes a dash for the `--` that starts every llama-server flag, and the
 // server rejects what comes out. Only a token's leading dash can be one: substitution
@@ -89,7 +90,7 @@ export default function ProfileForm({
         <>
           <input
             type="range"
-            min={CTX_STEP}
+            min={CTX_MIN}
             max={ctxCeiling}
             step={CTX_STEP}
             value={Math.min(value.ctx, ctxCeiling)}
