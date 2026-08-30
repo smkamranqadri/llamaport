@@ -1,0 +1,193 @@
+# Gaps
+
+What comparable tools do that Llamaport does not, read off their source on
+2026-08-30. Two so far, each under its own heading.
+
+**This is an observation list, not a plan.** Nothing here is scheduled. Several
+items contradict decisions this project has already argued, said plainly where
+they appear rather than buried, so adopting one means reopening the decision on
+purpose.
+
+---
+
+# LlamaForge
+
+[dadwritestech/LlamaForge](https://github.com/dadwritestech/LlamaForge) — a Python
+dashboard that drives llama.cpp's *router* mode with many models registered in
+`models.ini`, where this app supervises one process. Most of its surface is
+already ruled out in [knowledge/project.md](../knowledge/project.md); what is
+below is the part that is not.
+
+## Cheap, and nothing decided stands against them
+
+1. **No search in the Library.** They filter the list on a substring and focus
+   the box with `/`. `Library.tsx` has no filter at all, which is fine at twenty
+   models and not at two hundred.
+
+2. **No keyboard map.** Theirs: `↑↓`/`kj` to move, `Enter` to expand, `L`/`U` to
+   load and unload, `S` to save, `Esc` to close. This app has no key handlers.
+
+3. **A failed launch shows the log, not the reason.** `backend/diag.py` runs an
+   ordered regex table over the log tail — OOM, CUDA, context too large, unknown
+   flag, missing file, unsupported architecture — and returns one error line plus
+   a fix naming the value it means ("lower n-gpu-layers from 99"). Pure string
+   work over text we already capture in `crashTail`. The nearest thing here is
+   the reader scrolling.
+
+9. **Live telemetry is never written down.** `stats.py` polls the router's
+   `/metrics` every 5s, diffs the Prometheus token counters, attributes the delta
+   to the loaded model and persists per-model and daily buckets to `stats.json`,
+   30 days kept. This app scrapes the same endpoint for the running view and
+   discards it, so nothing survives the process it was measured from.
+
+## The three that reopen Discover
+
+6, 7 and 8 are in-app Hugging Face search, its result badges, and a fit rating —
+which is [the roadmap's "Decided against"](roadmap.md#decided-against) item,
+dropped 2026-08-02 after being planned in full. That entry asks not to be
+planned a third time, so this is a record of what a shipped version looks like,
+not an argument to build one.
+
+6. **Search.** `hub.py` is two unauthenticated calls:
+   `GET /api/models?filter=gguf&search=…&sort=downloads|likes|lastModified` then
+   `/api/models/{repo}/tree/main` for files and sizes. Note this does not answer
+   the objection that killed Discover here — `?search=` is still the substring
+   match over repo ids that made it a worse browser tab.
+
+7. **What the tree call gives for free**: shard sets collapsed
+   (`-00001-of-00005` into one row with a summed size), `mmproj` sidecars listed
+   separately, a `gated` flag from the list API, and INSTALLED from the local
+   catalog. A multi-file fetch would be a queue of jobs this app already has.
+
+8. **A fit rating before the download.** Cheap version is `size * 1.15 <= VRAM`
+   → FITS / TIGHT / CPU OFFLOAD. Theirs is now a vendored physics core
+   (`vramwise`) using bits-per-weight, MoE active-vs-total params and memory
+   bandwidth to predict a regime and a tok/s figure. **This is the forecast rule
+   verbatim** — a number wrong by 2x gets believed — so the only version
+   compatible with this project is the arithmetic `estimate.rs` already does,
+   shown against installed memory with no verdict attached.
+
+## Where their version is weaker
+
+Worth knowing, because it says the gap is breadth rather than depth: their
+downloader is one job at a time, unsegmented, unthrottled, and re-requests the
+original URL on resume — the exact failure this project exists to fix.
+
+---
+
+# Unsloth
+
+Read 2026-08-30 from [unslothai/unsloth](https://github.com/unslothai/unsloth).
+A different kind of neighbour: `studio/src-tauri` is a Tauri desktop app
+shipping a signed macOS `.dmg` that runs GGUF models through llama.cpp — our
+stack and our job — inside roughly 900k lines that are also a training
+framework, a chat UI, an agent bridge, an MCP host and a diffusion runner. Only
+the panel that runs one GGUF overlaps. What follows is that overlap, and unlike
+the LlamaForge list most of it is correctness rather than features.
+
+## Uncontested
+
+1. **No auto-update.** Someone on v0.2.0 has no way to learn v0.3.1 exists;
+   every install we have ever made is stranded on whatever it was. They run
+   Tauri's updater against `releases/latest/download/latest.json`, and
+   `desktop_update_policy.rs` splits in-app update from manual — Linux packages
+   get a release-page link instead of a download.
+
+2. **The launch always names `-c` and `-ngl all`, which turns off a feature
+   that is on by default.** Sharpened 2026-08-31 by reading the installed build
+   rather than their source: `--fit` adjusts *unset* arguments to fit device
+   memory and defaults to `on`, so this is not "a feature we could adopt" but
+   "a feature this app disables on every launch"
+   ([knowledge/technical.md](../knowledge/technical.md) carries the
+   measurements). Unsloth's auto-layers mode omits `-c` for exactly this reason.
+   Letting the Context and GPU-layers fields sit *unset* is the app declining to
+   guess, which is the forecast rule rather than an exception to it. Gated on a
+   `--help` probe like every other flag, since an older build has neither.
+
+   It also corroborates item 4 below on real hardware. `Qwen3.6-35B` runs at its
+   full 262,144 context here; the estimate this app shipped until today charged
+   40 layers a full cache and claimed 39.52 GB against 34.36 GB installed, which
+   reads as "will not fit" for a model llama.cpp was running at maximum context.
+   The attention layers alone come to 23.41 GB.
+
+   This is the largest item in this file and wants its own planning pass, not a
+   bolt-on to something else.
+
+3. **A launch that cannot fit gets no warning.** `_launch_host_shortfall_message`
+   prices weights alone against free VRAM plus available RAM, and is explicitly
+   a lower bound: KV, projector, drafter and compute buffers are all left out,
+   every omitted term moves the figure down, and so no missing term can turn a
+   quiet load into a warned one. Advisory only — it logs and launches anyway.
+   The construction is what keeps it from being a forecast.
+
+## Correctness
+
+4. **Our KV figure is wrong-high on sliding-window models, and we call it
+   exact.** `estimate.rs` charges every layer a full-context cache. Gemma-family
+   models do not hold one. They resolve the SWA period from the HF config's
+   `layer_types` (falling back to a transformers config object), persist it so
+   it is one fetch per repo, and size the cache against the layers that actually
+   keep the whole context. This is the item worth arguing for first: an exact
+   number that is wrong is worse than the forecast we refuse to make.
+
+5. **`sysmem.rs` is worth auditing against their Apple reasoning.**
+   `_apple_metal_memory_budget_bytes` takes the smaller of MLX's
+   `max_recommended_working_set_size` and `psutil.available`, then a fraction of
+   that, for two documented reasons. Both a device ceiling and total RAM
+   describe the machine rather than the moment — on a 16 GB Mac the budget came
+   out around 9 GB whether idle or nearly full. And macOS `free` omits the
+   reclaimable inactive queue, so it reads far below what a new allocation can
+   actually get; `available` adds it back. The fraction then covers the seconds
+   `llama-server` spends loading, during which another app can take memory.
+
+6. **One `.gguf` is the whole model to us.** They detect companions by filename
+   and wire the flags: `mmproj-*` projectors for vision, MTP and EAGLE drafters
+   for speculative decoding, imatrix files. A repo's shard set, projector and
+   drafter travel as one unit through download, inventory and launch.
+
+7. **`brew install llama.cpp` is our entire story for the binary.**
+   `install_llama_prebuilt.py` fetches pinned `ggml-org/llama.cpp` release
+   assets per platform and backend, verifies them against a published sha256
+   manifest, and installs into a directory it owns, with a file lock and
+   separate exit codes for busy, no-space and backend-unavailable. **This
+   contradicts the standing decision not to manage the llama.cpp installation**,
+   and is recorded because the failure it removes is real: Homebrew hands the
+   user whatever build it has today, and the `--help` probe is the only thing
+   between that and a mismatch.
+
+8. **Unsigned.** They ship a hardened runtime with an entitlements plist, a
+   notarized `.dmg`, trusted signing on Windows and a VirusTotal step. We ship
+   `xattr -dr` instructions. Already decided — $99/yr before anything says the
+   app is wanted — and listed only so the comparison is honest.
+
+## What their UI does that ours does not
+
+Their memory panel answers the same question ours does and reaches a different
+settlement with it. Worth reading before touching `Memory.tsx` or `ModelDetail`.
+
+- **A bounded figure is shown with a `≥`, not withheld.** Where the header
+  cannot size the cache, they print the floor, mark it, and say which term is
+  missing and that the cache is the one that grows fastest with context. Our
+  `estimate()` returns `Option` and the screen falls silent. Marked-and-shown is
+  compatible with the forecast rule and tells the reader more than nothing does.
+- **At most one note, most actionable first.** An unsizable cache outranks any
+  verdict drawn from the figures, because it says the figures are incomplete.
+- **"Fits the machine" and "fits what is free right now" are different
+  questions, and the second only ever warns** — the memory a pending load
+  reclaims is mostly the outgoing model's own, which cannot be attributed from
+  the panel. Apple Silicon is their single-pool case, where the pool decides the
+  wording and which figures are compared rather than whether the warning exists;
+  they shipped a version where that arm was dead code and Apple machines could
+  only ever be told "exceeds".
+- **A verdict says how bad, a cause says what would fix it** — `context`
+  against `irreducible`, since a shorter context recovers one and nothing
+  recovers the other.
+- **`formatBytes` divides by 1024³ and prints "GB".** `src/format.ts:5`, and
+  `formatRate` on all three units. Unsloth fixed exactly this and put a number
+  on it: every figure overstated by 7.4% against its label. Ours shows a
+  16.45 GiB file as "16.5 GB" where Finder, which is decimal, says 17.66 GB.
+  Either divide by 1000³ or write GiB; the two must not disagree.
+- **Captions break between bullets, not inside them.** `glueNoteItems` puts a
+  non-breaking space inside each item of a `·`-separated caption and glues each
+  bullet to the item that follows, so a narrow window never orphans a bullet or
+  strands one word on its own line.

@@ -3,28 +3,52 @@
 ```text
 Branch:   `main`, clean and pushed. `v0.3.1` is tagged at HEAD, and the built
           `.dmg`s came from that commit.
-Task:     none in progress. Distribution is done: description, topics and an
-          uploaded social preview, the release is no longer a pre-release, the
-          front page leads with a clip, a Show and tell post is live in
-          llama.cpp's Discussions, four list submissions are open, and the
-          author has posted to several subreddits and commented around them
+Task:     none in progress. **Figures is done** — both parcels, 2026-08-31
+          ([intent/figures.md](../intent/figures.md)). The KV term no longer
+          charges every layer a full-context cache, and a header that names a
+          layer interval without a window size now withholds the figure and says
+          in words which layers it could not read. Units split by what they
+          measure: files, disk and transfer rates decimal so they agree with
+          Finder, memory binary so a 32 GB Mac still says 32 GB. It ends without
+          a release by decision, so both fixes sit in the tree.
+
+          Distribution before it is done: a description, topics and an uploaded
+          social preview, the release is no longer a pre-release, the front page
+          leads with a clip, a Show and tell post is live in llama.cpp's
+          Discussions, four list submissions are open, and the author has posted
+          to several subreddits and commented around them
           ([intent/release.md](../intent/release.md)).
 Mode:     —
-Blocker:  none. Three standing items, none touched by any of this: the README's
-          "Open Anyway" steps have never met a real Gatekeeper prompt, a queued
-          row with nothing on disk behind it has never been seen coming back
-          from a restart, and no Intel Mac has run the universal build. Two more
-          are owed by v0.3.1, which shipped without them by decision: nobody has
-          seen the Dock fix work in the built artefact, and the five-launch
-          condition was not run ([intent/release.md](../intent/release.md)).
-Next:     Show HN, drafted and unposted, is the one launch channel open today —
-          r/LocalLLaMA needs karma this account does not have. Before or after
-          it, the two conditions v0.3.1 owes are ten minutes with the display
-          free and no fullscreen app: launch the installed build five times, then
-          close its window and click the Dock icon. After that the same rule as
-          after every release: the next move is whatever the audience says. Do
-          not plan features against silence. A browser download of a `.dmg`
-          would still settle Gatekeeper in five minutes whenever it is wanted.
+Blocker:  none. Four standing items, all of the same kind — something nobody
+          has looked at. **Figures has not been seen on screen**, which is the
+          one thing its suite cannot reach; the README's "Open Anyway" steps have
+          never met a real Gatekeeper prompt; a queued row with nothing on disk
+          behind it has never been seen coming back from a restart; and no Intel
+          Mac has run the universal build. Two more are owed by v0.3.1, which
+          shipped without them by decision: nobody has seen the Dock fix work in
+          the built artefact, and the five-launch condition was not run
+          ([intent/release.md](../intent/release.md)).
+Next:     Nothing is half-finished, so the next move is a choice rather than a
+          continuation. Three candidates, in the order they earn it:
+
+          Commit what is in the tree — Figures as one commit, and the
+          `ProfileForm.tsx` slider step apart from it, since it was asked for
+          separately and belongs to no phase.
+
+          `--fit` is the next phase when there is to be one, and it wants its own
+          planning pass ([intent/gaps.md](../intent/gaps.md) item 2). It is the
+          largest item in that file and it is no longer a nicety: the flag is on
+          by default and this app disables it on every launch by naming `-c` and
+          `-ngl` ([knowledge/technical.md](../knowledge/technical.md)).
+
+          And the things needing no code at all: Show HN is drafted and unposted
+          and is the one launch channel open today, and the two conditions v0.3.1
+          owes are ten minutes with the display free — launch the installed build
+          five times, then close its window and click the Dock icon. A browser
+          download of a `.dmg` would still settle Gatekeeper in five minutes
+          whenever it is wanted. After a release the same rule as ever: the next
+          move is whatever the audience says. Do not plan features against
+          silence.
 ```
 
 Run and verify commands: [knowledge/technical.md](../knowledge/technical.md).
@@ -86,12 +110,35 @@ Apart from the files named above, `git log` is the record.
 
 ## Proof
 
-The four commands were last run green over the working tree: `cargo fmt
---check`, `cargo clippy --all-targets -- -D warnings`, `cargo test`,
-`bun run build` — all exit 0, each status captured on its own line rather than
-after a pipe. 180 tests, up from 177 before Last used, and unchanged by the Dock
-fix, which carries none and is proved by the running app instead
-([intent/release.md](../intent/release.md)).
+The four commands were last run green over the working tree on 2026-08-31,
+after both Figures parcels: `cargo fmt --check`, `cargo clippy --all-targets --
+-D warnings`, `cargo test`, `bun run build` — all exit 0, each status captured
+on its own line rather than after a pipe. **187 tests**, up from 180, the seven
+new ones all in `estimate`.
+
+Those seven are trusted, having been watched to fail: with `layer_split` gutted
+to ignore the interval, exactly the three that describe layer kinds failed and
+the nine older ones passed; with `window.min(ctx)` gutted to `window`, exactly
+the one about a window wider than the context failed. A green suite was not the
+claim either time ([knowledge/technical.md](../knowledge/technical.md)).
+
+**190 tests**, after `gguf.rs` gained three of its own — it had none for the
+new keys when the first report was written. Both were watched to fail: dropping
+the second interval spelling, and never reading the window size.
+
+Two of the three screen checks were pulled back into measurement on 2026-08-31,
+by running the formatters against the real byte counts under `bun`. The Library
+figure for `Qwen3.6-35B-A3B-UD-IQ4_NL.gguf` is 18.0 GB against Finder's 18.04
+for the same 18,040,888,288 bytes; a 32 GiB machine still reports 32.0 GB; a
+rate limit typed as 10 reads back as 10, and 2.5 and 0.5 likewise. The engine's
+floor hint now reads 66 KB/s where it read 64 — the same constant, rendered
+decimal.
+
+Figures' own proof, including what llama.cpp settled about the defect on real
+hardware, is in [intent/figures.md](../intent/figures.md). What it could not
+reach is the rendering, which is on the standing list above rather than blocking
+— and nothing reaches a user unlooked-at, because the phase ends without a
+release.
 
 **v0.3.0 shipped 2026-08-08.** Every build's artefact proof lives with its
 release in [intent/release.md](../intent/release.md) — both assets downloaded

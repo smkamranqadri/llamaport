@@ -96,6 +96,32 @@ failing check. Export it first: `export PATH="$HOME/.cargo/bin:$PATH"`.
 
 ## Constraints
 
+- **`--fit` is on by default, and this app suppresses it by naming every value.**
+  It "adjusts unset arguments to fit in device memory" (`--fit [on|off]`,
+  default `on`; `--fit-target` a per-device margin, default 1024 MiB;
+  `--fit-ctx` a floor, default 4096). Every argument the launch fills in is one
+  it may no longer size. This app always passes `-c` and `-ngl`, so on every
+  launch it makes the feature inert. Measured 2026-08-31 on build b10360 with
+  nothing set: `qwen2.5-0.5b` came up at 32,768 and `Qwen3.6-35B-A3B` at
+  262,144, each the model's whole trained context, the second on a 32 GB
+  machine at 6.7 GB resident.
+
+- **A model's recommended sampling settings are already applied, and the app
+  gets them by passing nothing.** `libllama` reads a `general.sampling.*` block
+  out of the GGUF header — `sequence`, `top_k`, `top_p`, `min_p`, `temp`,
+  `penalty_last_n`, `penalty_repeat`, `xtc_probability`, `xtc_threshold`,
+  `mirostat`, `mirostat_tau`, `mirostat_eta` — and uses each as the server
+  default. Proved 2026-08-30 on build b10360 against `/props`: the same binary
+  and flags reported `temp 0.8, top_k 40` for a model without the block
+  (`qwen2.5-0.5b`) and `temp 1.0, top_k 20` for one with it
+  (`Qwen3.6-35B-A3B`, whose header declares exactly those). So adding `--temp`
+  or `--top-k` to the launch would **overrule the model's own recommendation**,
+  which is the opposite of what a sampling form would be for. A request field
+  still beats the server default, so any client that sends one wins over both.
+  What the app is missing is not the values but the display: nothing on screen
+  says 1.0 was the model's choice rather than a fallback, and a `--temp` typed
+  into extra arguments silently replaces it with no indication.
+
 - HTTP is `ureq` with `default-features = false, features = ["tls"]`, which is
   rustls plus webpki-roots. Blocking, one thread per connection — there is no
   async runtime and nothing needs one.

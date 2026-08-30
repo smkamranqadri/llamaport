@@ -60,6 +60,34 @@ Two, each with its own spec, module and screen:
    restart, and no Intel Mac has run the universal build. Now that v0.3.0 is
    public, the first is five minutes of downloading the `.dmg` through a browser.
 
+9. **Figures** — planned 2026-08-31, not started.
+   [figures.md](figures.md). Two numbers the app prints are wrong: the KV term
+   charges every layer a full-context cache, which over-counts by roughly four
+   times on the hybrid model the author runs while calling itself exact, and
+   `formatBytes` divides by 1024 cubed while printing GB, so every figure
+   disagrees with its own label by 7.4%. Neither is a feature, which is why this
+   does not test step 8's rule. Deliberately ends without a release.
+
+## Gaps
+
+What two comparable tools do and this one does not, read off their source on
+2026-08-30 and recorded in [gaps.md](gaps.md). A list, not a plan; nothing there
+is scheduled, and each item that reopens a decision says so where it stands.
+
+From **LlamaForge**: no Library search, no keyboard map, a failed launch that
+shows the log instead of the reason, live telemetry that is never written down —
+and in-app Hugging Face search with its trimmings, which is the item below.
+
+From **Unsloth**, which ships a Tauri app on our stack doing our job: no
+auto-update, a launch that always names `-c` and `-ngl all` where llama.cpp can
+now size the context itself, no warning before a load that cannot fit, and a
+handful of UI settlements around bounded figures. Two are ours rather than
+theirs. The KV estimate charges every layer a full-context cache, which is
+wrong-high on sliding-window models and printed as exact — an exact number that
+is wrong being worse than the forecast this project refuses to make. And
+`formatBytes` divides by 1024³ while printing GB, so every memory figure in the
+app disagrees with its own label by 7.4%.
+
 ## Decided against
 
 **Discover — dropped 2026-08-02, after being planned.** An in-app Hugging Face
