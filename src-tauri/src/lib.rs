@@ -487,7 +487,7 @@ fn runner_start(
     let predicted_base = plan
         .estimate
         .as_ref()
-        .map(|e| e.weights_bytes + e.kv_bytes)
+        .map(|e| e.weights_bytes + e.kv_bytes.unwrap_or(0))
         .unwrap_or(0);
 
     let spec = LaunchSpec {

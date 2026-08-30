@@ -229,6 +229,12 @@ pub struct GgufMetadata {
     pub head_count_kv: Option<u64>,
     pub key_length: Option<u64>,
     pub value_length: Option<u64>,
+    pub sliding_window: Option<u64>,
+    /// One layer in this many does full attention; the rest hold a smaller cache.
+    /// Read from either spelling architectures use for it.
+    pub full_attention_interval: Option<u64>,
+    pub key_length_swa: Option<u64>,
+    pub value_length_swa: Option<u64>,
     pub expert_count: Option<u64>,
     pub file_type: Option<u64>,
     pub has_chat_template: bool,
@@ -252,6 +258,16 @@ impl GgufMetadata {
     /// so the cache estimate cannot assume one dimension for both.
     pub fn value_head_dim(&self) -> Option<u64> {
         self.value_length.or_else(|| self.head_dim())
+    }
+
+    /// Sliding-window layers may carry their own head widths; where they do not they
+    /// are the full-attention ones.
+    pub fn swa_head_dim(&self) -> Option<u64> {
+        self.key_length_swa.or_else(|| self.head_dim())
+    }
+
+    pub fn swa_value_head_dim(&self) -> Option<u64> {
+        self.value_length_swa.or_else(|| self.value_head_dim())
     }
 
     pub fn is_moe(&self) -> bool {
@@ -327,6 +343,11 @@ pub fn parse<R: Read + Seek>(inner: R) -> Result<GgufMetadata> {
         head_count_kv: scoped("attention.head_count_kv"),
         key_length: scoped("attention.key_length"),
         value_length: scoped("attention.value_length"),
+        sliding_window: scoped("attention.sliding_window"),
+        full_attention_interval: scoped("full_attention_interval")
+            .or_else(|| scoped("attention.sliding_window_pattern")),
+        key_length_swa: scoped("attention.key_length_swa"),
+        value_length_swa: scoped("attention.value_length_swa"),
         expert_count: scoped("expert_count"),
         file_type: kv.get("general.file_type").and_then(Value::as_u64),
         has_chat_template,
@@ -474,6 +495,47 @@ mod tests {
         .unwrap();
 
         assert_eq!(md.head_dim(), Some(256));
+    }
+
+    #[test]
+    fn reads_the_layer_pattern_under_the_architecture_prefix() {
+        let md = parse(
+            minimal()
+                .u32("llama.block_count", 40)
+                .u32("llama.attention.sliding_window", 1024)
+                .u32("llama.attention.sliding_window_pattern", 6)
+                .u32("llama.attention.key_length_swa", 64)
+                .u32("llama.attention.value_length_swa", 32)
+                .finish(),
+        )
+        .unwrap();
+
+        assert_eq!(md.sliding_window, Some(1024));
+        assert_eq!(md.full_attention_interval, Some(6));
+        assert_eq!(md.key_length_swa, Some(64));
+        assert_eq!(md.value_length_swa, Some(32));
+    }
+
+    /// Qwen3.6 spells it this way; Gemma spells it the other. Both mean one layer in N
+    /// does full attention, and a file carrying either has to be read.
+    #[test]
+    fn reads_the_other_spelling_of_the_same_interval() {
+        let md = parse(minimal().u32("llama.full_attention_interval", 4).finish()).unwrap();
+        assert_eq!(md.full_attention_interval, Some(4));
+    }
+
+    #[test]
+    fn sliding_window_widths_fall_back_to_the_full_attention_ones() {
+        let md = parse(
+            minimal()
+                .u32("llama.attention.key_length", 256)
+                .u32("llama.attention.value_length", 128)
+                .finish(),
+        )
+        .unwrap();
+
+        assert_eq!(md.swa_head_dim(), Some(256));
+        assert_eq!(md.swa_value_head_dim(), Some(128));
     }
 
     #[test]

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { deleteModel, getDirInfo, listModels, setFavourite } from "./api";
-import { formatBytes, formatContext, formatRelative } from "./format";
+import { formatContext, formatFileSize, formatRelative } from "./format";
 import type { DirInfo, ModelEntry, RunnerSnapshot } from "./types";
 
 function Badges({ model }: { model: ModelEntry }) {
@@ -50,7 +50,7 @@ function Recency({ model }: { model: ModelEntry }) {
 function deleteScope(model: ModelEntry): string {
   const parts = model.shards?.present ?? 1;
   const files = parts === 1 ? "1 file" : `${parts} files`;
-  return `${files} · ${formatBytes(model.sizeBytes)}`;
+  return `${files} · ${formatFileSize(model.sizeBytes)}`;
 }
 
 /// A running model offers Stop where every other row offers Delete. Deleting it is refused
@@ -176,7 +176,7 @@ function ModelRow({
 
         <Badges model={model} />
 
-        <span className="model-stat">{formatBytes(model.sizeBytes)}</span>
+        <span className="model-stat">{formatFileSize(model.sizeBytes)}</span>
         <span className="model-stat">
           {md?.contextLength ? formatContext(md.contextLength) : "—"}
         </span>
@@ -254,7 +254,7 @@ export default function Library({
           <h1>Library</h1>
           <p className="screen-subtitle">
             {dir?.path ?? "…"}
-            {dir?.freeBytes != null && ` · ${formatBytes(dir.freeBytes)} free`}
+            {dir?.freeBytes != null && ` · ${formatFileSize(dir.freeBytes)} free`}
             {models.length > 0 &&
               ` · ${models.length} model${models.length === 1 ? "" : "s"}`}
           </p>

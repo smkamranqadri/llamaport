@@ -7,7 +7,7 @@ import {
   runnerStart,
   runnerStop,
 } from "./api";
-import { formatBytes, formatContext } from "./format";
+import { formatContext, formatFileSize, formatMemory } from "./format";
 import { bytesOr, pressureText, Stat } from "./Memory";
 import ProfileForm from "./ProfileForm";
 import HealthPanel from "./HealthPanel";
@@ -26,7 +26,7 @@ function Facts({ model }: { model: ModelEntry }) {
   const md = model.metadata;
   const facts: [string, string][] = [
     ["File", model.fileName],
-    ["Size", formatBytes(model.sizeBytes)],
+    ["Size", formatFileSize(model.sizeBytes)],
     ["Architecture", md?.architecture ?? "unknown"],
     ["Quantisation", model.quant ?? "unknown"],
     ["Parameters", md?.sizeLabel ?? "—"],
@@ -47,6 +47,18 @@ function Facts({ model }: { model: ModelEntry }) {
       ))}
     </dl>
   );
+}
+
+/// The cache is a figure or a reason there is none; it is never a guess.
+function kvStat(plan: LaunchPlan): { value: string; hint: string } {
+  const kv = plan.estimate?.kvBytes;
+  if (kv == null) {
+    return {
+      value: "Unavailable",
+      hint: "the header does not size these layers",
+    };
+  }
+  return { value: formatMemory(kv), hint: "from the model's header" };
 }
 
 function MemoryBar({ plan }: { plan: LaunchPlan }) {
@@ -72,28 +84,50 @@ function MemoryBar({ plan }: { plan: LaunchPlan }) {
     );
   }
 
-  const { weightsBytes, kvBytes, totalBytes } = plan.estimate;
-  const scale = Math.max(plan.totalMemory, totalBytes);
+  const { weightsBytes, kvBytes, totalBytes, kvUnknown } = plan.estimate;
+  const scale = Math.max(plan.totalMemory, totalBytes ?? weightsBytes);
   const width = (n: number) => `${(n / scale) * 100}%`;
+
+  const bar = (
+    <div className="memory-bar">
+      <span className="seg seg-weights" style={{ width: width(weightsBytes) }} />
+      {kvBytes != null && (
+        <span className="seg seg-kv" style={{ width: width(kvBytes) }} />
+      )}
+      <span
+        className="memory-limit"
+        style={{ left: `${(plan.totalMemory / scale) * 100}%` }}
+      />
+    </div>
+  );
+
+  if (kvBytes == null || totalBytes == null) {
+    return (
+      <div className="memory">
+        {bar}
+        <p className="memory-summary">
+          <strong>{formatMemory(weightsBytes)}</strong> of weights. What the cache
+          holds at {plan.profile.ctx.toLocaleString()} tokens is not shown.
+        </p>
+        <p className="field-hint">{kvUnknown}</p>
+        {machine}
+      </div>
+    );
+  }
 
   return (
     <div className="memory">
-      <div className="memory-bar">
-        <span className="seg seg-weights" style={{ width: width(weightsBytes) }} />
-        <span className="seg seg-kv" style={{ width: width(kvBytes) }} />
-        <span
-          className="memory-limit"
-          style={{ left: `${(plan.totalMemory / scale) * 100}%` }}
-        />
-      </div>
+      {bar}
 
       <p className="memory-summary">
-        <strong>{formatBytes(totalBytes)}</strong> to allocate — weights{" "}
-        {formatBytes(weightsBytes)} plus {formatBytes(kvBytes)} of KV cache at{" "}
+        <strong>{formatMemory(totalBytes)}</strong> to allocate — weights{" "}
+        {formatMemory(weightsBytes)} plus {formatMemory(kvBytes)} of KV cache at{" "}
         {plan.profile.ctx.toLocaleString()} tokens.
       </p>
       <p className="field-hint">
-        Exact figures from the model's header. How much of it stays resident, and
+        Exact figures from the model's header, counted as the machine counts
+        memory — the file size on the Model panel is these same bytes counted as
+        Finder counts them, so it reads larger. How much of it stays resident, and
         what that costs the machine, depends on what else is running — the numbers
         below are the machine as it is now.
       </p>
@@ -193,7 +227,7 @@ function TelemetryPanel({
           value={
             telemetry?.systemUsedBytes != null &&
             telemetry?.systemTotalBytes != null
-              ? `${formatBytes(telemetry.systemUsedBytes)} of ${formatBytes(telemetry.systemTotalBytes)}`
+              ? `${formatMemory(telemetry.systemUsedBytes)} of ${formatMemory(telemetry.systemTotalBytes)}`
               : "Unavailable"
           }
         />
@@ -462,12 +496,8 @@ export default function ModelDetail({
           />
           <Stat
             label="KV cache at this context"
-            value={
-              plan.estimate == null
-                ? "Unavailable"
-                : formatBytes(plan.estimate.kvBytes)
-            }
-            hint="exact, from the model's header"
+            value={kvStat(plan).value}
+            hint={kvStat(plan).hint}
           />
         </div>
       </section>

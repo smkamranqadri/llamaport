@@ -1,4 +1,4 @@
-import { formatBytes } from "./format";
+import { formatMemory } from "./format";
 import type { Pressure } from "./types";
 
 const PRESSURE_LABEL: Record<Pressure, string> = {
@@ -10,7 +10,7 @@ const PRESSURE_LABEL: Record<Pressure, string> = {
 
 /// A missing reading is reported as missing, never as zero.
 export function bytesOr(value: number | null | undefined): string {
-  return value == null ? "Unavailable" : formatBytes(value);
+  return value == null ? "Unavailable" : formatMemory(value);
 }
 
 export function pressureText(pressure: Pressure | null | undefined): string {

@@ -11,6 +11,10 @@ export interface GgufMetadata {
   headCountKv: number | null;
   keyLength: number | null;
   valueLength: number | null;
+  slidingWindow: number | null;
+  fullAttentionInterval: number | null;
+  keyLengthSwa: number | null;
+  valueLengthSwa: number | null;
   expertCount: number | null;
   fileType: number | null;
   hasChatTemplate: boolean;
@@ -61,8 +65,10 @@ export interface Profile {
 
 export interface Estimate {
   weightsBytes: number;
-  kvBytes: number;
-  totalBytes: number;
+  /// Null where the header describes layers whose cache it does not size.
+  kvBytes: number | null;
+  totalBytes: number | null;
+  kvUnknown: string | null;
 }
 
 export interface LaunchPlan {

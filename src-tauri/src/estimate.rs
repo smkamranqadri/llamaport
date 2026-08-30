@@ -22,26 +22,81 @@ pub fn bytes_per_element(cache_type: &str) -> f64 {
 /// impact by fitting a ratio from observed runs; four samples of the same model at the
 /// same context produced ratios from 0.42 to 0.85, because how much of a model becomes
 /// resident depends on what else is running, not on the model. A forecast that wrong is
-/// worse than no forecast — these two numbers are exact.
+/// worse than no forecast.
+///
+/// The weights figure is the file. The cache figure is the arithmetic below, which is
+/// right about what it models — it does not claim to equal what the server allocates,
+/// which rounds to whole cells and pads them.
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Estimate {
     pub weights_bytes: u64,
-    pub kv_bytes: u64,
-    pub total_bytes: u64,
+    /// `None` where the header describes layers whose cache it does not size.
+    pub kv_bytes: Option<u64>,
+    pub total_bytes: Option<u64>,
+    pub kv_unknown: Option<String>,
+}
+
+/// How many layers hold a cache sized to the whole context, and how many hold a
+/// smaller one. A model naming no interval is all full attention, which is what a
+/// plain attention model is.
+fn layer_split(md: &GgufMetadata, layers: u64) -> Option<(u64, u64)> {
+    let Some(interval) = md.full_attention_interval else {
+        return Some((layers, 0));
+    };
+    if interval == 0 {
+        return None;
+    }
+    let full = layers / interval;
+    Some((full, layers - full))
+}
+
+fn per_token(k_dim: u64, v_dim: u64, cache_k: &str, cache_v: &str) -> f64 {
+    (k_dim as f64 * bytes_per_element(cache_k)) + (v_dim as f64 * bytes_per_element(cache_v))
+}
+
+/// The reason the cache cannot be sized, where the header gives one. It carries the
+/// numbers it read, so the screen says what this file declares rather than what such a
+/// file might.
+fn kv_unknown(md: &GgufMetadata) -> Option<String> {
+    let layers = md.block_count?;
+    let interval = md.full_attention_interval?;
+    let (_, sliding) = layer_split(md, layers)?;
+    if sliding == 0 || md.sliding_window.is_some() {
+        return None;
+    }
+    Some(format!(
+        "This header says one layer in {interval} does full attention and gives no \
+         window size for the other {sliding}, so what those layers hold cannot be read \
+         from the file."
+    ))
 }
 
 /// K and V are summed separately rather than doubled: latent-attention architectures
-/// such as deepseek2 size them differently.
+/// such as deepseek2 size them differently. Sliding-window layers are summed apart from
+/// full-attention ones for the same reason one number cannot stand for both — they hold
+/// a cache the context does not grow past the window.
 pub fn kv_bytes(md: &GgufMetadata, ctx: u64, cache_k: &str, cache_v: &str) -> Option<u64> {
     let layers = md.block_count?;
     let kv_heads = md.head_count_kv?;
     let k_dim = md.head_dim()?;
     let v_dim = md.value_head_dim()?;
+    let swa_k = md.swa_head_dim()?;
+    let swa_v = md.swa_value_head_dim()?;
 
-    let per_token =
-        (k_dim as f64 * bytes_per_element(cache_k)) + (v_dim as f64 * bytes_per_element(cache_v));
-    let total = layers as f64 * ctx as f64 * kv_heads as f64 * per_token;
+    let (full, sliding) = layer_split(md, layers)?;
+    let mut total =
+        full as f64 * ctx as f64 * kv_heads as f64 * per_token(k_dim, v_dim, cache_k, cache_v);
+
+    if sliding > 0 {
+        let window = md.sliding_window?;
+        let cells = window.min(ctx);
+        total += sliding as f64
+            * cells as f64
+            * kv_heads as f64
+            * per_token(swa_k, swa_v, cache_k, cache_v);
+    }
+
     Some(total as u64)
 }
 
@@ -52,11 +107,16 @@ pub fn estimate(
     cache_k: &str,
     cache_v: &str,
 ) -> Option<Estimate> {
-    let kv = kv_bytes(md, ctx, cache_k, cache_v)?;
+    let kv_bytes = kv_bytes(md, ctx, cache_k, cache_v);
+    let kv_unknown = kv_unknown(md);
+    if kv_bytes.is_none() && kv_unknown.is_none() {
+        return None;
+    }
     Some(Estimate {
         weights_bytes: file_size,
-        kv_bytes: kv,
-        total_bytes: file_size + kv,
+        kv_bytes,
+        total_bytes: kv_bytes.map(|kv| file_size + kv),
+        kv_unknown,
     })
 }
 
@@ -78,6 +138,10 @@ mod tests {
             head_count_kv: Some(kv_heads),
             key_length: Some(k),
             value_length: v,
+            sliding_window: None,
+            full_attention_interval: None,
+            key_length_swa: None,
+            value_length_swa: None,
             expert_count: None,
             file_type: None,
             has_chat_template: true,
@@ -119,7 +183,112 @@ mod tests {
         let md = metadata(8, 128, None);
         let e = estimate(&md, 20_000_000_000, 65536, "q8_0", "q8_0").expect("estimate");
         assert_eq!(e.weights_bytes, 20_000_000_000);
-        assert_eq!(e.total_bytes, e.weights_bytes + e.kv_bytes);
+        assert_eq!(e.total_bytes, Some(e.weights_bytes + e.kv_bytes.unwrap()));
+        assert!(e.kv_unknown.is_none());
+    }
+
+    #[test]
+    fn a_model_naming_no_interval_is_all_full_attention() {
+        let md = metadata(8, 128, None);
+        let layers = md.block_count.unwrap();
+        let ctx = 4096u64;
+        let expected = layers * ctx * 8 * (128 * 2 + 128 * 2);
+        assert_eq!(kv_bytes(&md, ctx, "f16", "f16"), Some(expected));
+    }
+
+    #[test]
+    fn sliding_window_layers_are_sized_to_the_window() {
+        let mut md = metadata(8, 128, None);
+        md.full_attention_interval = Some(4);
+        md.sliding_window = Some(1024);
+
+        let ctx = 65536u64;
+        let per_layer_token = 128 * 2 + 128 * 2;
+        let full = 10u64;
+        let sliding = 30u64;
+        let expected = (full * ctx + sliding * 1024) * 8 * per_layer_token;
+
+        assert_eq!(kv_bytes(&md, ctx, "f16", "f16"), Some(expected));
+
+        let all_full = metadata(8, 128, None);
+        let charged_flat = kv_bytes(&all_full, ctx, "f16", "f16").unwrap();
+        assert!(
+            charged_flat > expected * 3,
+            "the flat sum over-counts by more than three times"
+        );
+    }
+
+    #[test]
+    fn a_window_wider_than_the_context_holds_only_the_context() {
+        let mut md = metadata(8, 128, None);
+        md.full_attention_interval = Some(4);
+        md.sliding_window = Some(200_000);
+
+        let ctx = 4096u64;
+        let flat = metadata(8, 128, None);
+        assert_eq!(
+            kv_bytes(&md, ctx, "f16", "f16"),
+            kv_bytes(&flat, ctx, "f16", "f16"),
+            "no layer holds more cells than the context has"
+        );
+    }
+
+    #[test]
+    fn sliding_layers_use_their_own_widths_where_the_header_carries_them() {
+        let mut narrow = metadata(8, 128, None);
+        narrow.full_attention_interval = Some(4);
+        narrow.sliding_window = Some(1024);
+        narrow.key_length_swa = Some(64);
+        narrow.value_length_swa = Some(64);
+
+        let mut wide = narrow.clone();
+        wide.key_length_swa = None;
+        wide.value_length_swa = None;
+
+        let ctx = 65536u64;
+        assert!(
+            kv_bytes(&narrow, ctx, "f16", "f16") < kv_bytes(&wide, ctx, "f16", "f16"),
+            "narrower sliding-window heads hold less than the full-attention ones"
+        );
+    }
+
+    #[test]
+    fn a_pattern_without_a_window_withholds_the_cache_and_keeps_the_weights() {
+        let mut md = metadata(8, 128, None);
+        md.full_attention_interval = Some(4);
+
+        let e = estimate(&md, 20_000_000_000, 65536, "f16", "f16").expect("weights still known");
+        assert_eq!(e.weights_bytes, 20_000_000_000);
+        assert_eq!(e.kv_bytes, None);
+        assert_eq!(e.total_bytes, None);
+
+        let why = e.kv_unknown.expect("a reason, not a blank");
+        assert!(
+            why.contains("one layer in 4"),
+            "names the interval it read: {why}"
+        );
+        assert!(
+            why.contains("other 30"),
+            "names how many layers it cannot size: {why}"
+        );
+    }
+
+    #[test]
+    fn an_interval_of_one_is_every_layer_full() {
+        let mut md = metadata(8, 128, None);
+        md.full_attention_interval = Some(1);
+        let flat = metadata(8, 128, None);
+        assert_eq!(
+            kv_bytes(&md, 4096, "f16", "f16"),
+            kv_bytes(&flat, 4096, "f16", "f16")
+        );
+    }
+
+    #[test]
+    fn a_header_with_no_attention_dimensions_yields_nothing() {
+        let mut md = metadata(8, 128, None);
+        md.head_count_kv = None;
+        assert!(estimate(&md, 20_000_000_000, 4096, "f16", "f16").is_none());
     }
 
     #[test]

@@ -13,7 +13,7 @@ import {
   onDownloadState,
   setDownloadOptions,
 } from "./api";
-import { formatBytes, formatDuration, formatRate } from "./format";
+import { formatDuration, formatFileSize, formatRate, MB } from "./format";
 import type {
   DirInfo,
   DownloadJob,
@@ -27,7 +27,6 @@ type Recovery = "resume" | "restart" | "none";
 /// every model ever fetched stays readable.
 const PAGE = 25;
 
-const MIB = 1024 ** 2;
 
 /// How much of the smoothed rate survives each new sample. The engine reports twice a
 /// second and the raw figure swings hard on an unlimited transfer; dividing the remaining
@@ -88,8 +87,8 @@ function percent(job: DownloadJob): number | null {
 }
 
 function moved(job: DownloadJob): string {
-  if (job.total == null) return formatBytes(job.completed);
-  return `${formatBytes(job.completed)} of ${formatBytes(job.total)}`;
+  if (job.total == null) return formatFileSize(job.completed);
+  return `${formatFileSize(job.completed)} of ${formatFileSize(job.total)}`;
 }
 
 function rateText(bytesPerSecond: number | null): string {
@@ -155,7 +154,7 @@ function detail(
     return `Waiting its turn — ${ahead} download${ahead === 1 ? "" : "s"} ahead of it.`;
   }
   if (job.state === "complete") {
-    return `In the models directory · ${formatBytes(job.completed)}`;
+    return `In the models directory · ${formatFileSize(job.completed)}`;
   }
   if (job.state === "active") {
     if (job.phase == null) return "Starting…";
@@ -307,11 +306,11 @@ function Row({
 }
 
 /// The field holds MB/s because that is how a limit is thought about; the engine holds
-/// bytes per second. `formatRate` counts a megabyte as 1024², so this has to as well, or a
-/// limit typed as 10 reads back as 9.5.
+/// bytes per second. It divides by what `formatRate` divides by, or a limit typed as 10
+/// reads back as something else.
 function toField(bytesPerSecond: number | null): string {
   if (bytesPerSecond == null) return "";
-  return String(Math.round((bytesPerSecond / MIB) * 100) / 100);
+  return String(Math.round((bytesPerSecond / MB) * 100) / 100);
 }
 
 /// `null` for no limit, `undefined` for something that is not a limit at all.
@@ -322,7 +321,7 @@ function toRate(typed: string): number | null | undefined {
   const megabytes = Number(trimmed);
   if (!Number.isFinite(megabytes) || megabytes < 0) return undefined;
   if (megabytes === 0) return null;
-  return Math.round(megabytes * MIB);
+  return Math.round(megabytes * MB);
 }
 
 function limitHint(typed: string, applied: number | null): string {
@@ -474,7 +473,7 @@ export default function Downloads({
           <h1>Downloads</h1>
           <p className="screen-subtitle">
             {dir?.path ?? "…"}
-            {dir?.freeBytes != null && ` · ${formatBytes(dir.freeBytes)} free`}
+            {dir?.freeBytes != null && ` · ${formatFileSize(dir.freeBytes)} free`}
           </p>
         </div>
         {history.length > 0 && (

@@ -1,20 +1,40 @@
 const GIB = 1024 ** 3;
+const MIB = 1024 ** 2;
 
-export function formatBytes(bytes: number): string {
+const GB = 1000 ** 3;
+export const MB = 1000 ** 2;
+const KB = 1000;
+
+/// Files, disk space and anything transferred, counted the way Finder and Hugging Face
+/// count: a figure here is meant to be compared with what those show for the same file,
+/// so it has to be the same figure.
+export function formatFileSize(bytes: number): string {
+  if (bytes >= GB) {
+    return `${(bytes / GB).toFixed(1)} GB`;
+  }
+  return `${Math.round(bytes / MB)} MB`;
+}
+
+/// Memory, counted in the binary units the machine is sold and reported in: a 32 GB Mac
+/// holds 32 GiB, and Activity Monitor says so too. The label stays GB because changing it
+/// would disagree with every other reading of the same machine the user can reach.
+export function formatMemory(bytes: number): string {
   if (bytes >= GIB) {
     return `${(bytes / GIB).toFixed(1)} GB`;
   }
-  return `${Math.round(bytes / 1024 ** 2)} MB`;
+  return `${Math.round(bytes / MIB)} MB`;
 }
 
+/// Decimal, with the download screen's rate field: what a limit is typed as and what it
+/// reads back must divide by the same thing, or 10 comes back as 9.5.
 export function formatRate(bytesPerSecond: number): string {
-  if (bytesPerSecond >= GIB) {
-    return `${(bytesPerSecond / GIB).toFixed(1)} GB/s`;
+  if (bytesPerSecond >= GB) {
+    return `${(bytesPerSecond / GB).toFixed(1)} GB/s`;
   }
-  if (bytesPerSecond >= 1024 ** 2) {
-    return `${(bytesPerSecond / 1024 ** 2).toFixed(1)} MB/s`;
+  if (bytesPerSecond >= MB) {
+    return `${(bytesPerSecond / MB).toFixed(1)} MB/s`;
   }
-  return `${Math.round(bytesPerSecond / 1024)} KB/s`;
+  return `${Math.round(bytesPerSecond / KB)} KB/s`;
 }
 
 /// Coarse on purpose. A transfer with half an hour left does not know that to the second,
