@@ -155,10 +155,20 @@ cache and claimed 39.52 GB against 34.36 GB installed — it called a model
 unfittable while the server was running it at maximum context. The attention
 layers alone come to 23.41 GB.
 
-**Not proved: nobody has looked at it.** The rendering is the one thing the
-suite cannot reach, and it now sits with the other unlooked-at things this
-project tracks rather than blocking. Nothing reaches a user unlooked-at either
-way, because this phase ends without a release by decision.
+**Seen on screen 2026-08-31**, on `ornith-1.0-35b-Q4_K_M.gguf`, which is the
+same architecture and so takes the same withheld path. Size reads 21.2 GB for
+21,166,757,760 bytes, installed memory reads 32.0 GB, the Context panel's cache
+row reads Unavailable against "the header does not size these layers", and the
+memory panel prints the sentence with the numbers it read — one layer in 4, the
+other 30.
+
+The screenshot also caught a defect in this phase's own work. The note
+explaining which counting the memory figures use rendered only in the branch
+that HAS a cache figure; the withheld branch replaced the whole hint with the
+reason. That is exactly backwards. On that screen the Model panel's 21.2 GB and
+the memory panel's 19.7 GB of weights sit one panel apart — closer than the two
+figures were assumed to be when the split was argued — and the explanation was
+the thing missing. Both branches now carry it.
 
 ## Decided while building
 

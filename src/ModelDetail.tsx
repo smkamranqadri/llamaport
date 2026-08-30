@@ -49,6 +49,12 @@ function Facts({ model }: { model: ModelEntry }) {
   );
 }
 
+/// Both branches of the memory panel say this, because both print a weights figure the
+/// Model panel prints differently, and the branch that withholds the cache is the one a
+/// reader is most likely to be studying when they notice.
+const COUNTED_AS_MEMORY =
+  "Counted as the machine counts memory — the Model panel's file size is these same bytes counted as Finder counts them, so it reads larger.";
+
 /// The cache is a figure or a reason there is none; it is never a guess.
 function kvStat(plan: LaunchPlan): { value: string; hint: string } {
   const kv = plan.estimate?.kvBytes;
@@ -109,7 +115,9 @@ function MemoryBar({ plan }: { plan: LaunchPlan }) {
           <strong>{formatMemory(weightsBytes)}</strong> of weights. What the cache
           holds at {plan.profile.ctx.toLocaleString()} tokens is not shown.
         </p>
-        <p className="field-hint">{kvUnknown}</p>
+        <p className="field-hint">
+          {kvUnknown} {COUNTED_AS_MEMORY}
+        </p>
         {machine}
       </div>
     );
@@ -125,11 +133,9 @@ function MemoryBar({ plan }: { plan: LaunchPlan }) {
         {plan.profile.ctx.toLocaleString()} tokens.
       </p>
       <p className="field-hint">
-        Exact figures from the model's header, counted as the machine counts
-        memory — the file size on the Model panel is these same bytes counted as
-        Finder counts them, so it reads larger. How much of it stays resident, and
-        what that costs the machine, depends on what else is running — the numbers
-        below are the machine as it is now.
+        Exact figures from the model's header. {COUNTED_AS_MEMORY} How much of it
+        stays resident, and what that costs the machine, depends on what else is
+        running — the numbers below are the machine as it is now.
       </p>
 
       {machine}

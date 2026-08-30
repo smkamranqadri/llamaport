@@ -19,9 +19,11 @@ Task:     none in progress. **Figures is done** — both parcels, 2026-08-31
           to several subreddits and commented around them
           ([intent/release.md](../intent/release.md)).
 Mode:     —
-Blocker:  none. Four standing items, all of the same kind — something nobody
-          has looked at. **Figures has not been seen on screen**, which is the
-          one thing its suite cannot reach; the README's "Open Anyway" steps have
+Blocker:  none. Figures came off this list on 2026-08-31: it was seen on screen,
+          and being looked at is what caught a defect in it — the note saying
+          which counting the memory figures use was missing from the one branch
+          that most needed it. Three standing items remain, all of the same kind.
+          The README's "Open Anyway" steps have
           never met a real Gatekeeper prompt; a queued row with nothing on disk
           behind it has never been seen coming back from a restart; and no Intel
           Mac has run the universal build. Two more are owed by v0.3.1, which
