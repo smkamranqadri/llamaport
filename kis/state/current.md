@@ -1,19 +1,22 @@
 # Current
 
 ```text
-Branch:   `main`, clean and pushed. `v0.4.0` is tagged at `6735316`, **four memory
+Branch:   **`tune`**, one commit ahead of `main` at `58e8fa7` and unpushed — the
+          whole phase in one commit, on a branch because the session that made it
+          was not to commit to `main` directly. `main` can fast-forward.
+          `main` itself is clean and pushed. `v0.4.0` is tagged at `6735316`, **four memory
           commits behind HEAD** — both `.dmg`s were built from the tag, not from
           HEAD. Check `git describe --exact-match` before building a release
           artefact: State claiming tag and HEAD were identical is what let a build
           of HEAD reach the v0.3.0 release
           ([intent/release.md](../intent/release.md)).
-Task:     **Tune is built and seen — all five parcels**, uncommitted
+Task:     **Tune is built, seen and committed — all five parcels**
           ([intent/tune.md](../intent/tune.md)). The suite no longer writes into
           `~/Library/Application Support/llamaport`; `speeds.json` has a store;
           the runner records a run when it settles; Tune measures a ladder that
           reproduces `tools/fits.py --run`'s ordering on Ornith; and the app now
           has one opinion, offered rather than applied.
-Mode:     Phase, complete. Nothing is committed: 14 files changed, 6 added.
+Mode:     Phase, complete. One commit, 20 files, 6 of them new.
 Blocker:  none. **The Speed panel was looked at on 2026-09-01, five defects came
           out of it, and the fixes were confirmed on screen by the author**
           ([intent/tune.md](../intent/tune.md)). None of the five was visible to
@@ -39,8 +42,9 @@ Blocker:  none. **The Speed panel was looked at on 2026-09-01, five defects came
           Two are unrelated and older: a queued download row with nothing on disk
           behind it has never been seen coming back from a restart, and no Intel
           Mac has run the universal build.
-Next:     **Commit Tune, then decide what its release is** — `v0.4.0` is tagged
-          well behind HEAD and `/Applications` still holds `v0.3.1`. After
+Next:     **Decide Tune's release** — whether `tune` merges to `main` and ships as
+          `v0.5.0`. `v0.4.0` is tagged well behind HEAD and `/Applications` still
+          holds `v0.3.1`, so the machine used daily is two releases behind. After
           that, the rest of [intent/direction.md](../intent/direction.md): the pi
           button, and search. Neither is planned.
 
