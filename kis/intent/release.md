@@ -399,6 +399,39 @@ Owed against the next release, and expected to be settled after this tag rather
 than before it (see the split above): the five-launch check, the Dock click, and
 the browser download meeting a real Gatekeeper prompt.
 
+## v0.4.0 — shipped 2026-08-31
+
+https://github.com/smkamranqadri/llamaport/releases/tag/v0.4.0 — Latest,
+unsigned, both `.dmg`s attached. **A minor rather than a patch**: the context and
+layer offload can be left unset for llama.cpp to fit, which changes what a
+never-launched model opens on, and the model screen is reorganised. No schema
+change; the config stays at 7.
+
+`Llamaport_0.4.0_aarch64.dmg`, 4,226,049 bytes, sha256
+`2a0c661626ddbf05ffe99f4054649e43979b0afe416840e1507b710e2ba2c4f1`.
+`Llamaport_0.4.0_universal.dmg`, 8,489,627 bytes, sha256
+`3244261b5748c68e9e19167abd43161ff1dc474309dee3e684ec2e5e72b84d36`. Both
+downloaded back byte-identical. The universal one carries `x86_64 arm64`, and
+each of its slices holds the change once — the frontend digest and the Rust
+string both read twice there against once in the aarch64 build, which is what
+says the fat binary is not a stub half.
+
+Provable on both layers, as v0.3.2 established: the frontend bundle
+`index-Cm_QE7SR.js` is embedded, and `"list-devices"` is a string only this
+release's Rust introduces.
+
+**Three phases in one release** — Figures, Fitting and Screen. That is more than
+the cadence set on 2026-08-31 intends, and the reason is worth recording: the
+cadence was agreed at midday and the phases were finished the same afternoon,
+faster than a release was cut. Publishing after each would have been three
+releases in six hours, which is a different failure. The rule stays "publish when
+there is something worth installing"; the judgement is that three finished phases
+in an afternoon is one such moment, not three.
+
+Owed against the next release, unchanged and now three releases old: the
+five-launch check, the Dock click, and the browser download meeting a real
+Gatekeeper prompt (see the split above).
+
 ## Distribution — from 2026-08-08
 
 Everything here is about being found. None of it changes the app.

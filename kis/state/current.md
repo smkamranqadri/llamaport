@@ -13,17 +13,13 @@ it. No assertion can see either.
 # Current
 
 ```text
-Branch:   `main`, clean and pushed. `v0.3.2` is tagged at HEAD, and both built
+Branch:   `main`, clean and pushed. `v0.4.0` is tagged at HEAD, and both built
           `.dmg`s came from that commit.
-Task:     none in progress. **Screen is done**, both parcels
-          ([intent/screen.md](../intent/screen.md)). The memory panel reads the
-          GPU ceiling from the build — 25,559 MiB here, where the app had been
-          comparing against 34.36 GB installed — and is four figures and a
-          verdict rather than four lines of prose. Launch Settings keeps the
-          three fields ever used and hides the other seven.
-
-          Unreleased: v0.3.2 is the published build and carries neither Fitting
-          nor this.
+Task:     none in progress. **v0.4.0 is published** — Figures, Fitting and Screen
+          together ([intent/release.md](../intent/release.md)). The app reads the
+          real GPU ceiling, can leave the context and offload for llama.cpp to
+          fit, sizes the cache by what each layer actually holds, and agrees with
+          Finder about file sizes.
 Mode:     —
 Blocker:  none. Three items sit in the after-the-tag list against v0.3.2, all
           needing ten minutes with the display free and nothing fullscreen: five
@@ -39,22 +35,22 @@ Blocker:  none. Three items sit in the after-the-tag list against v0.3.2, all
           changed. Not migrated, because a stored `port 8080` says those defaults
           were saved deliberately and the two fields inside them cannot be told
           apart from a choice.
-Next:     Two candidates, and the release is the cheaper one.
-
-          **Release.** Three phases now sit unreleased — Figures, Fitting,
-          Screen. The cadence set on 2026-08-31 says publish whenever there is
-          something worth installing, and this is three somethings
-          ([intent/release.md](../intent/release.md)).
-
-          **Tune** is the phase the mockup is waiting for, and the one that makes
-          a suggestion honest. Arithmetic picks 262,144 with a quantised cache
-          for Ornith; measurement picks 65,536 at full precision, 27% faster —
-          which is the number the author had been typing by hand
+Next:     **Tune** is the phase the approved mockup is waiting for and the one
+          that makes a suggestion honest. Arithmetic picks 262,144 with a
+          quantised cache for Ornith; measurement picks 65,536 at full precision,
+          27% faster — the number the author had been typing by hand
           ([intent/direction.md](../intent/direction.md)). `tools/fits.py --run`
-          already prototypes it.
+          already prototypes it, including the finding that a 0.5B mispredicts a
+          35B in both the size of the penalty and where the winner sits.
 
           Then the rest of [intent/direction.md](../intent/direction.md): the pi
-          button, and search. Neither is planned.
+          button — pi reaches 2 of 19 launched models and points at a port the
+          app rarely uses — and search. Neither is planned.
+
+          Three conditions are owed against v0.4.0 and want ten minutes with the
+          display free and nothing fullscreen: five launches of the installed
+          build, closing the window and clicking the Dock icon, and downloading a
+          `.dmg` through a browser to meet a real Gatekeeper prompt.
 ```
 
 Run and verify commands: [knowledge/technical.md](../knowledge/technical.md).
