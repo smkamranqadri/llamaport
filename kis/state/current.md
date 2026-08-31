@@ -82,18 +82,21 @@ A ready model offers **Web UI**, which opens `llama-server`'s own interface in a
 second app window. The app has no chat of its own and is not getting one
 ([knowledge/project.md](../knowledge/project.md)).
 
-**v0.3.1 is published**, unsigned, as the Latest GitHub release with **two
+**v0.4.0 is published**, unsigned, as the Latest GitHub release with **two
 `.dmg`s** attached — `aarch64` and `universal`:
-https://github.com/smkamranqadri/llamaport/releases/tag/v0.3.1. It is v0.3.0 plus
-the Dock reopen fix and nothing else, and the first release published as Latest
-rather than pre-release; v0.3.0 was promoted to that on the same day
-([intent/release.md](../intent/release.md)). The 0.3.1 aarch64
-one is installed in `/Applications`. The app is macOS-only for reasons that are
-Darwin's rather than ARM's ([knowledge/technical.md](../knowledge/technical.md)),
-and no Intel Mac has run it. Anyone still on v0.2.0 should upgrade for the path
-traversal v0.2.1 fixed, which is live in that build; v0.1.0 is unaffected by that
-one — it has no history file at all. Every release so far
+https://github.com/smkamranqadri/llamaport/releases/tag/v0.4.0. It carries three
+phases at once — Figures, Fitting and Screen — for the reason recorded in
+[intent/release.md](../intent/release.md). Two releases shipped on 2026-08-31,
+v0.3.2 and this. The app is macOS-only for reasons that are Darwin's rather than
+ARM's ([knowledge/technical.md](../knowledge/technical.md)), and no Intel Mac has
+run it. Anyone still on v0.2.0 should upgrade for the path traversal v0.2.1
+fixed; v0.1.0 has no history file and is unaffected. Every release so far
 ([intent/release.md](../intent/release.md)).
+
+**Nothing built has been installed since v0.3.1.** `/Applications` holds that
+build, so the machine the author uses daily is two releases behind what the
+repository does — which is also why the three after-the-tag conditions keep going
+unmet.
 
 **The front page leads with `docs/launch.gif`**, and the Show and tell post at
 https://github.com/ggml-org/llama.cpp/discussions/26772 is the one outward-facing
@@ -112,42 +115,27 @@ Apart from the files named above, `git log` is the record.
 
 ## Proof
 
-The four commands were last run green over the working tree on 2026-08-31,
-after both Figures parcels: `cargo fmt --check`, `cargo clippy --all-targets --
--D warnings`, `cargo test`, `bun run build` — all exit 0, each status captured
-on its own line rather than after a pipe. **187 tests**, up from 180, the seven
-new ones all in `estimate`.
+The four commands green over the working tree at `v0.4.0`, each status captured
+on its own line and never after a pipe: `cargo fmt --check`, `cargo clippy
+--all-targets -- -D warnings`, `cargo test`, `bun run build`. **202 tests**, up
+from 180 at v0.3.1.
 
-Those seven are trusted, having been watched to fail: with `layer_split` gutted
-to ignore the interval, exactly the three that describe layer kinds failed and
-the nine older ones passed; with `window.min(ctx)` gutted to `window`, exactly
-the one about a window wider than the context failed. A green suite was not the
-claim either time ([knowledge/technical.md](../knowledge/technical.md)).
+`v0.4.0`'s artefacts are proved in [intent/release.md](../intent/release.md) —
+both `.dmg`s downloaded back byte-identical, and the change provable on both
+layers, the frontend by its bundle digest and the Rust by a string only it
+introduces, appearing twice in the universal binary and once in the aarch64 one.
 
-**190 tests**, after `gguf.rs` gained three of its own — it had none for the
-new keys when the first report was written. Both were watched to fail: dropping
-the second interval spelling, and never reading the window size.
+**Eleven defects across Figures, Fitting and Screen were found by the author
+looking at the built app, and none by the suite.** The Screen pair states the
+pattern most clearly: a verdict that ignored free memory, then a free figure that
+ignored what was being asked of it — each correct alone, wrong beside its
+neighbour, and unreachable by any assertion. That is a constraint now, in
+[knowledge/technical.md](../knowledge/technical.md).
 
-Two of the three screen checks were pulled back into measurement on 2026-08-31,
-by running the formatters against the real byte counts under `bun`. The Library
-figure for `Qwen3.6-35B-A3B-UD-IQ4_NL.gguf` is 18.0 GB against Finder's 18.04
-for the same 18,040,888,288 bytes; a 32 GiB machine still reports 32.0 GB; a
-rate limit typed as 10 reads back as 10, and 2.5 and 0.5 likewise. The engine's
-floor hint now reads 66 KB/s where it read 64 — the same constant, rendered
-decimal.
-
-Figures' own proof, including what llama.cpp settled about the defect on real
-hardware, is in [intent/figures.md](../intent/figures.md). What it could not
-reach is the rendering, which is on the standing list above rather than blocking
-— and nothing reaches a user unlooked-at, because the phase ends without a
-release.
-
-**v0.3.0 shipped 2026-08-08.** Every build's artefact proof lives with its
-release in [intent/release.md](../intent/release.md) — both assets downloaded
-back byte-identical, the universal build's x86_64 half run under Rosetta, and how
-a frontend-heavy change had to be proved present when grepping the binary no
-longer could. Installing by local copy sets no quarantine attribute, so no
-release yet has tested Gatekeeper.
+Each phase carries its own proof and its own mutation record:
+[figures.md](../intent/figures.md), [fitting.md](../intent/fitting.md),
+[screen.md](../intent/screen.md). `tools/fits.py` is the standing second opinion
+on `estimate.rs` and agreed with it on two real files.
 
 Proof sits with the work it belongs to, not here:
 

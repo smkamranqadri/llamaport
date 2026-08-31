@@ -60,15 +60,15 @@ Two, each with its own spec, module and screen:
    restart, and no Intel Mac has run the universal build. Now that v0.3.0 is
    public, the first is five minutes of downloading the `.dmg` through a browser.
 
-9. **Figures** — planned 2026-08-31, not started.
-   [figures.md](figures.md). Two numbers the app prints are wrong: the KV term
-   charges every layer a full-context cache, which over-counts by roughly four
-   times on the hybrid model the author runs while calling itself exact, and
-   `formatBytes` divides by 1024 cubed while printing GB, so every figure
-   disagrees with its own label by 7.4%. Neither is a feature, which is why this
-   does not test step 8's rule. Deliberately ends without a release.
+9. ~~**Figures**~~ — done 2026-08-31, shipped in v0.4.0.
+   [figures.md](figures.md). Two numbers the app printed were wrong: the KV term
+   charged every layer a full-context cache, over-counting roughly fourfold on
+   the hybrid the author runs while calling itself exact, and `formatBytes`
+   divided by 1024 cubed while printing GB. Neither was a feature, which is why
+   planning it did not test step 8's rule. It ended without a release, as
+   planned; v0.3.2 carried it two hours later.
 
-10. **Fitting** — planned 2026-08-31, not started. [fitting.md](fitting.md).
+10. ~~**Fitting**~~ — done 2026-08-31, shipped in v0.4.0. [fitting.md](fitting.md).
    The app names `-c` and `-ngl` on every launch, and both overrule a llama.cpp
    default better than the value passed: `--fit` is on by default and adjusts
    only *unset* arguments, so filling them in switches it off once per launch.
@@ -81,7 +81,7 @@ Two, each with its own spec, module and screen:
    author as a user of the built app rather than for an audience. Step 8's rule
    stands against imagined users; it never meant do not build what you need.
 
-11. **Screen** — planned 2026-08-31, not started. [screen.md](screen.md). The
+11. ~~**Screen**~~ — done 2026-08-31, shipped in v0.4.0. [screen.md](screen.md). The
    first phase cut from [direction.md](direction.md), which rewrote what this app
    is for after the author called a screen it had just shipped confusing. Read
    the GPU ceiling instead of comparing against installed RAM, turn the memory
@@ -107,11 +107,8 @@ From **Unsloth**, which ships a Tauri app on our stack doing our job: no
 auto-update, a launch that always names `-c` and `-ngl all` where llama.cpp can
 now size the context itself, no warning before a load that cannot fit, and a
 handful of UI settlements around bounded figures. Two are ours rather than
-theirs. The KV estimate charges every layer a full-context cache, which is
-wrong-high on sliding-window models and printed as exact — an exact number that
-is wrong being worse than the forecast this project refuses to make. And
-`formatBytes` divides by 1024³ while printing GB, so every memory figure in the
-app disagrees with its own label by 7.4%.
+theirs, and both were fixed by step 9: the KV estimate charged every layer a
+full-context cache, and `formatBytes` divided by 1024³ while printing GB.
 
 ## Decided against
 

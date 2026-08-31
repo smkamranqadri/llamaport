@@ -3,10 +3,14 @@
 What comparable tools do that Llamaport does not, read off their source on
 2026-08-30. Two so far, each under its own heading.
 
-**This is an observation list, not a plan.** Nothing here is scheduled. Several
-items contradict decisions this project has already argued, said plainly where
+**This is an observation list, not a plan.** Items still open are not scheduled.
+Several contradict decisions this project has already argued, said plainly where
 they appear rather than buried, so adopting one means reopening the decision on
 purpose.
+
+**Closed items keep their entry, marked.** What another tool does is worth
+remembering after we have done it too, and the reason it was worth doing is in
+the entry. Four closed in v0.4.0 and are marked `CLOSED` below.
 
 ---
 
@@ -87,14 +91,14 @@ the LlamaForge list most of it is correctness rather than features.
 
 ## Uncontested
 
-1. **No auto-update.** Someone on v0.2.0 has no way to learn v0.3.1 exists;
+1. **No auto-update.** Someone on v0.2.0 has no way to learn v0.4.0 exists;
    every install we have ever made is stranded on whatever it was. They run
    Tauri's updater against `releases/latest/download/latest.json`, and
    `desktop_update_policy.rs` splits in-app update from manual — Linux packages
    get a release-page link instead of a download.
 
-2. **The launch always names `-c` and `-ngl all`, which turns off a feature
-   that is on by default.** Sharpened 2026-08-31 by reading the installed build
+2. **CLOSED in v0.4.0** ([fitting.md](fitting.md)) — *The launch always named
+   `-c` and `-ngl all`, which turned off a feature that is on by default.* Sharpened 2026-08-31 by reading the installed build
    rather than their source: `--fit` adjusts *unset* arguments to fit device
    memory and defaults to `on`, so this is not "a feature we could adopt" but
    "a feature this app disables on every launch"
@@ -113,7 +117,11 @@ the LlamaForge list most of it is correctness rather than features.
    This is the largest item in this file and wants its own planning pass, not a
    bolt-on to something else.
 
-3. **A launch that cannot fit gets no warning.** `_launch_host_shortfall_message`
+3. **CLOSED in v0.4.0** ([screen.md](screen.md)) — *A launch that cannot fit got
+   no warning.* The panel's verdict is now the worse of two questions, over the
+   GPU limit or beyond what is free, and it is advisory exactly as theirs is.
+   The original entry follows because its construction is why the warning is
+   safe.* `_launch_host_shortfall_message`
    prices weights alone against free VRAM plus available RAM, and is explicitly
    a lower bound: KV, projector, drafter and compute buffers are all left out,
    every omitted term moves the figure down, and so no missing term can turn a
@@ -122,8 +130,9 @@ the LlamaForge list most of it is correctness rather than features.
 
 ## Correctness
 
-4. **Our KV figure is wrong-high on sliding-window models, and we call it
-   exact.** `estimate.rs` charges every layer a full-context cache. Gemma-family
+4. **CLOSED in v0.4.0** ([figures.md](figures.md)) — *The KV figure was
+   wrong-high on sliding-window models and called exact.* The entry as first
+   written follows. `estimate.rs` charged every layer a full-context cache. Gemma-family
    models do not hold one. They resolve the SWA period from the HF config's
    `layer_types` (falling back to a transformers config object), persist it so
    it is one fetch per repo, and size the cache against the layers that actually
@@ -165,12 +174,14 @@ the LlamaForge list most of it is correctness rather than features.
 Their memory panel answers the same question ours does and reaches a different
 settlement with it. Worth reading before touching `Memory.tsx` or `ModelDetail`.
 
-- **A bounded figure is shown with a `≥`, not withheld.** Where the header
+- **CLOSED in v0.4.0** ([figures.md](figures.md)) — *A bounded figure is shown
+  with a `≥`, not withheld.* Where the header
   cannot size the cache, they print the floor, mark it, and say which term is
   missing and that the cache is the one that grows fastest with context. Our
   `estimate()` returns `Option` and the screen falls silent. Marked-and-shown is
   compatible with the forecast rule and tells the reader more than nothing does.
-- **At most one note, most actionable first.** An unsizable cache outranks any
+- **CLOSED in v0.4.0** ([screen.md](screen.md)) — *At most one note, most
+  actionable first.* An unsizable cache outranks any
   verdict drawn from the figures, because it says the figures are incomplete.
 - **"Fits the machine" and "fits what is free right now" are different
   questions, and the second only ever warns** — the memory a pending load
@@ -182,8 +193,8 @@ settlement with it. Worth reading before touching `Memory.tsx` or `ModelDetail`.
 - **A verdict says how bad, a cause says what would fix it** — `context`
   against `irreducible`, since a shorter context recovers one and nothing
   recovers the other.
-- **`formatBytes` divides by 1024³ and prints "GB".** `src/format.ts:5`, and
-  `formatRate` on all three units. Unsloth fixed exactly this and put a number
+- **CLOSED in v0.4.0** ([figures.md](figures.md)) — *`formatBytes` divided by
+  1024³ and printed "GB", and `formatRate` on all three units.* Unsloth fixed exactly this and put a number
   on it: every figure overstated by 7.4% against its label. Ours shows a
   16.45 GiB file as "16.5 GB" where Finder, which is decimal, says 17.66 GB.
   Either divide by 1000³ or write GiB; the two must not disagree.
