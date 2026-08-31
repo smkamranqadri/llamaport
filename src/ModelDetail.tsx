@@ -9,7 +9,7 @@ import {
 } from "./api";
 import { formatContext, formatFileSize, formatMemory } from "./format";
 import { bytesOr, pressureText, Stat } from "./Memory";
-import ProfileForm from "./ProfileForm";
+import ProfileForm, { AUTO_CTX } from "./ProfileForm";
 import HealthPanel from "./HealthPanel";
 import type {
   HealthReport,
@@ -55,11 +55,30 @@ function Facts({ model }: { model: ModelEntry }) {
 const COUNTED_AS_MEMORY =
   "Counted as the machine counts memory — the Model panel's file size is these same bytes counted as Finder counts them, so it reads larger.";
 
+/// What the context field is asking for. Auto asks for nothing and says so, rather than
+/// printing the 0 that carries the meaning.
+function ctxStat(ctx: number): { value: string; hint: string } {
+  if (ctx === AUTO_CTX) {
+    return {
+      value: "fitted to memory",
+      hint: "the server chooses one at launch",
+    };
+  }
+  return { value: ctx.toLocaleString(), hint: "what this launch will request" };
+}
+
 /// A figure the header supports, marked where it is only part of one.
+///
+/// `bounded` carries two different facts and they need two different sentences: a cache
+/// of nothing was not priced at all, because Auto has chosen no context yet, and saying
+/// "some layers are not counted" there names the wrong reason entirely.
 function kvStat(plan: LaunchPlan): { value: string; hint: string } {
   const estimate = plan.estimate;
   if (estimate == null) {
     return { value: "Unavailable", hint: "the header does not size it" };
+  }
+  if (estimate.kvBytes === 0) {
+    return { value: "—", hint: "no context chosen yet" };
   }
   if (estimate.bounded) {
     return {
@@ -106,6 +125,34 @@ function MemoryBar({ plan }: { plan: LaunchPlan }) {
     provenance = boundNote ?? "";
   }
 
+  // A cache of nothing is not a cache that was priced: it is Auto, where no context has
+  // been chosen, so the sentence must not offer "plus 0 B" as though it had been.
+  let summary = (
+    <p className="memory-summary">
+      <strong>
+        {sign}
+        {formatMemory(totalBytes)}
+      </strong>{" "}
+      to allocate — weights {formatMemory(weightsBytes)} plus {atLeast}
+      {formatMemory(kvBytes)} of KV cache at{" "}
+      {plan.profile.ctx.toLocaleString()} tokens.
+    </p>
+  );
+  if (kvBytes === 0) {
+    // The floor is the total, not the weights: those are exact, and it is the cache
+    // missing from beside them that makes the sum a lower bound.
+    summary = (
+      <p className="memory-summary">
+        <strong>
+          {sign}
+          {formatMemory(weightsBytes)}
+        </strong>{" "}
+        to allocate — weights {formatMemory(weightsBytes)}, and the cache is not
+        counted here.
+      </p>
+    );
+  }
+
   return (
     <div className="memory">
       <div className="memory-bar">
@@ -117,15 +164,7 @@ function MemoryBar({ plan }: { plan: LaunchPlan }) {
         />
       </div>
 
-      <p className="memory-summary">
-        <strong>
-          {sign}
-          {formatMemory(totalBytes)}
-        </strong>{" "}
-        to allocate — weights {formatMemory(weightsBytes)} plus {atLeast}
-        {formatMemory(kvBytes)} of KV cache at{" "}
-        {plan.profile.ctx.toLocaleString()} tokens.
-      </p>
+      {summary}
       <p className="field-hint">
         {provenance} {COUNTED_AS_MEMORY} How much of it stays resident, and what
         that costs the machine, depends on what else is running — the numbers
@@ -281,6 +320,10 @@ export default function ModelDetail({
   const [plan, setPlan] = useState<LaunchPlan | null>(null);
   const [form, setForm] = useState<Profile | null>(null);
   const [preview, setPreview] = useState<LaunchPlan | null>(null);
+  /// A plan priced at the context the server actually fitted. Only the memory panel
+  /// reads it — the command display must keep showing the argv that was launched, which
+  /// names no context at all.
+  const [fitted, setFitted] = useState<LaunchPlan | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [showLogs, setShowLogs] = useState(false);
@@ -301,6 +344,16 @@ export default function ModelDetail({
       })
       .catch((e) => setFailure(String(e)));
   }, [model.id]);
+
+  useEffect(() => {
+    if (!running || form?.ctx !== AUTO_CTX || runner.serverCtx == null) {
+      setFitted(null);
+      return;
+    }
+    getLaunchPlan(model.id, { ...form, ctx: runner.serverCtx })
+      .then(setFitted)
+      .catch(() => {});
+  }, [running, runner.serverCtx, model.id, form]);
 
   useEffect(() => {
     if (isCurrent && (runner.state === "starting" || runner.state === "crashed")) {
@@ -360,6 +413,12 @@ export default function ModelDetail({
       </>
     );
   }
+
+  // One source for every figure on this screen: the fitted plan while a model runs under
+  // Auto, else the debounced preview of what the form holds, else the plan as loaded.
+  // Reading some figures from one and some from another put a cache priced at 32,768
+  // beside a profile reading 0.
+  const shown = fitted ?? preview ?? plan;
 
   return (
     <>
@@ -491,13 +550,13 @@ export default function ModelDetail({
           />
           <Stat
             label="Current profile"
-            value={form.ctx.toLocaleString()}
-            hint="what this launch will request"
+            value={ctxStat(form.ctx).value}
+            hint={ctxStat(form.ctx).hint}
           />
           <Stat
             label="KV cache at this context"
-            value={kvStat(plan).value}
-            hint={kvStat(plan).hint}
+            value={kvStat(shown).value}
+            hint={kvStat(shown).hint}
           />
         </div>
       </section>
@@ -508,6 +567,7 @@ export default function ModelDetail({
         <ProfileForm
           value={form}
           maxCtx={plan.maxCtx}
+          fitAvailable={plan.fitAvailable}
           onChange={setForm}
         />
 
@@ -515,7 +575,7 @@ export default function ModelDetail({
 
       <section className="panel">
         <h2>Memory</h2>
-        <MemoryBar plan={preview ?? plan} />
+        <MemoryBar plan={shown} />
       </section>
 
       <section className="panel">

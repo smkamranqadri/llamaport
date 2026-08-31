@@ -11,20 +11,6 @@ import type { Profile, Settings } from "./types";
 /// What a model opens on before anyone has launched it. Mirrors `Profile::default()` in
 /// Rust; the two only have to agree on what the form shows, because a launch sends the
 /// whole profile rather than the fields that differ from it.
-const BUILT_IN: Profile = {
-  alias: "",
-  host: "127.0.0.1",
-  port: 8888,
-  ctx: 65536,
-  ngl: "all",
-  parallel: 1,
-  flashAttn: true,
-  cacheTypeK: "q8_0",
-  cacheTypeV: "q8_0",
-  jinja: true,
-  rawArgs: [],
-};
-
 export default function SettingsScreen({
   onModelsDirChanged,
 }: {
@@ -163,7 +149,8 @@ export default function SettingsScreen({
         </p>
 
         <ProfileForm
-          value={defaults ?? BUILT_IN}
+          fitAvailable={caps?.flags.includes("--fit") ?? false}
+          value={defaults ?? settings.builtInDefaults}
           maxCtx={null}
           showAlias={false}
           onChange={setDefaults}

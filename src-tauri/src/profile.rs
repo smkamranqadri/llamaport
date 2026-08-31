@@ -3,7 +3,18 @@ use serde::{Deserialize, Serialize};
 use crate::probe::Capabilities;
 
 pub const DEFAULT_PORT: u16 = 8888;
+
+/// What a context falls back to where llama.cpp cannot size one itself.
 pub const DEFAULT_CTX: u64 = 65536;
+
+/// Context 0 means: pass no `-c` and let the server fit one to memory. Not an invented
+/// sentinel — llama.cpp spells "loaded from model" as 0 in its own `--help`, and its
+/// fitter adjusts the arguments a launch leaves unset. Do not convert this to an
+/// `Option`; it would cost a config schema version and buy the same meaning.
+pub const AUTO_CTX: u64 = 0;
+
+/// Likewise for layer offload, which is llama.cpp's own default and not this app's.
+pub const AUTO_NGL: &str = "auto";
 
 /// The values one launch uses. Where a form opens on them is decided by `seed`: what a
 /// model was last launched with, else the configured defaults, else these.
@@ -29,8 +40,8 @@ impl Default for Profile {
             alias: String::new(),
             host: "127.0.0.1".to_string(),
             port: DEFAULT_PORT,
-            ctx: DEFAULT_CTX,
-            ngl: "all".to_string(),
+            ctx: AUTO_CTX,
+            ngl: AUTO_NGL.to_string(),
             parallel: 1,
             flash_attn: true,
             cache_type_k: "q8_0".to_string(),
@@ -98,10 +109,28 @@ impl Profile {
             args.push(self.alias.clone());
         }
 
-        args.push("-c".into());
-        args.push(self.ctx.to_string());
-        args.push("-ngl".into());
-        args.push(self.ngl.clone());
+        // A build without the fitter is given the explicit values this app used before
+        // it existed. Omitting them there fits nothing: llama.cpp falls back to the
+        // model's whole trained context — 262,144 tokens on files already on disk — and
+        // allocates against it with nothing to stop it.
+        let fits = caps.has("--fit");
+
+        if self.ctx != AUTO_CTX {
+            args.push("-c".into());
+            args.push(self.ctx.to_string());
+        } else if !fits {
+            args.push("-c".into());
+            args.push(DEFAULT_CTX.to_string());
+        }
+
+        if self.ngl != AUTO_NGL {
+            args.push("-ngl".into());
+            args.push(self.ngl.clone());
+        } else if !fits {
+            args.push("-ngl".into());
+            args.push("all".into());
+        }
+
         args.push("-np".into());
         args.push(self.parallel.to_string());
 
@@ -189,8 +218,8 @@ mod tests {
 
         assert_eq!(
             seed(None, None, None).ctx,
-            DEFAULT_CTX,
-            "with nothing stored the built-in default stands"
+            AUTO_CTX,
+            "with nothing stored a model fits itself to memory rather than to a guess"
         );
         assert_eq!(
             seed(None, None, Some(defaults.clone())).ctx,
@@ -220,7 +249,7 @@ mod tests {
         assert_eq!(seeded.parallel, 4);
         let launched = seed(None, Some(remembered), None);
         assert_eq!(
-            launched.ngl, "all",
+            launched.ngl, AUTO_NGL,
             "an unset field falls back within its own profile, not across to another"
         );
     }
@@ -251,12 +280,89 @@ mod tests {
         )
     }
 
+    /// The installed build. `full_caps` deliberately lacks `--fit`, so it stands for a
+    /// build from before the fitter existed.
+    fn fitting_caps() -> Capabilities {
+        let mut c = full_caps();
+        c.flags.insert("--fit".to_string());
+        c
+    }
+
+    #[test]
+    fn auto_omits_the_flags_the_fitter_sizes() {
+        let profile = Profile {
+            ctx: AUTO_CTX,
+            ngl: AUTO_NGL.into(),
+            ..Default::default()
+        };
+        let args = profile.args("/m.gguf", &fitting_caps());
+
+        assert!(!args.iter().any(|a| a == "-c"), "no context: {args:?}");
+        assert!(!args.iter().any(|a| a == "-ngl"), "no offload: {args:?}");
+    }
+
+    /// The one that matters. Omitting `-c` on a build with no fitter does not fit
+    /// anything — llama.cpp takes the model's whole trained context, 262,144 tokens on
+    /// files already on this disk, and allocates against it unchecked.
+    #[test]
+    fn auto_falls_back_to_explicit_values_where_the_build_cannot_fit() {
+        let profile = Profile {
+            ctx: AUTO_CTX,
+            ngl: AUTO_NGL.into(),
+            ..Default::default()
+        };
+        let args = profile.args("/m.gguf", &full_caps());
+
+        let ctx = args
+            .iter()
+            .position(|a| a == "-c")
+            .expect("a context is passed");
+        assert_eq!(args[ctx + 1], DEFAULT_CTX.to_string());
+        let ngl = args
+            .iter()
+            .position(|a| a == "-ngl")
+            .expect("an offload is passed");
+        assert_eq!(args[ngl + 1], "all");
+    }
+
+    #[test]
+    fn an_explicit_choice_is_passed_whatever_the_build_can_do() {
+        let profile = Profile {
+            ctx: 32768,
+            ngl: "24".into(),
+            ..Default::default()
+        };
+        for caps in [full_caps(), fitting_caps()] {
+            let args = profile.args("/m.gguf", &caps);
+            let ctx = args.iter().position(|a| a == "-c").expect("-c");
+            assert_eq!(args[ctx + 1], "32768");
+            let ngl = args.iter().position(|a| a == "-ngl").expect("-ngl");
+            assert_eq!(args[ngl + 1], "24");
+        }
+    }
+
+    #[test]
+    fn a_profile_written_without_a_context_reads_as_auto() {
+        let profile: Profile = serde_json::from_str("{}").expect("an empty profile");
+        assert_eq!(profile.ctx, AUTO_CTX);
+        assert_eq!(profile.ngl, AUTO_NGL);
+    }
+
+    #[test]
+    fn a_stored_number_is_not_turned_into_auto() {
+        let profile: Profile =
+            serde_json::from_str(r#"{"ctx":65536,"ngl":"all"}"#).expect("a stored profile");
+        assert_eq!(profile.ctx, 65536);
+        assert_eq!(profile.ngl, "all");
+    }
+
     #[test]
     fn renders_the_expected_command() {
         let profile = Profile {
             alias: "qwen3.6-35b-a3b".into(),
             ..Profile::default()
         };
+        // `full_caps` has no fitter, so a default profile renders the fallback values.
         let args = profile.args("/Users/me/models/Q.gguf", &full_caps());
         let rendered = render_command("llama-server", &args);
 
@@ -268,6 +374,16 @@ mod tests {
         assert!(rendered.contains("--cache-type-k q8_0 --cache-type-v q8_0"));
         assert!(rendered.contains("--jinja"));
         assert!(rendered.contains("--metrics"));
+
+        // The same profile on the installed build: the two flags are simply absent, and
+        // what is shown is what will run.
+        let fitted = render_command(
+            "llama-server",
+            &profile.args("/Users/me/models/Q.gguf", &fitting_caps()),
+        );
+        assert!(!fitted.contains("-c "), "no context in {fitted}");
+        assert!(!fitted.contains("-ngl "), "no offload in {fitted}");
+        assert!(fitted.contains("-np 1"));
     }
 
     #[test]

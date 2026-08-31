@@ -68,6 +68,19 @@ Two, each with its own spec, module and screen:
    disagrees with its own label by 7.4%. Neither is a feature, which is why this
    does not test step 8's rule. Deliberately ends without a release.
 
+10. **Fitting** — planned 2026-08-31, not started. [fitting.md](fitting.md).
+   The app names `-c` and `-ngl` on every launch, and both overrule a llama.cpp
+   default better than the value passed: `--fit` is on by default and adjusts
+   only *unset* arguments, so filling them in switches it off once per launch.
+   Context gains an Auto, `-ngl` stops insisting on `all`, and the cache figure
+   Auto gives up before launch comes back at Ready from the server's own
+   `n_ctx`. The load-bearing part is a capability gate: without `--fit`,
+   omitting `-c` asks a 262,144-token cache of a 32 GB machine.
+
+   The first item planned from [gaps.md](gaps.md), and the first planned for the
+   author as a user of the built app rather than for an audience. Step 8's rule
+   stands against imagined users; it never meant do not build what you need.
+
 ## Gaps
 
 What two comparable tools do and this one does not, read off their source on

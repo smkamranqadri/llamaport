@@ -103,6 +103,9 @@ struct LaunchPlan {
     args: Vec<String>,
     command: String,
     estimate: Option<Estimate>,
+    /// Whether the installed build can fit unset arguments to memory, and so whether
+    /// Auto is a choice the form may offer.
+    fit_available: bool,
     total_memory: u64,
     memory: PlanMemory,
     /// Model metadata: the ceiling the file declares.
@@ -131,19 +134,38 @@ struct Settings {
     /// Absent until the user sets them, which is what tells the screen to offer the
     /// built-in values rather than pretending they were chosen.
     launch_defaults: Option<Profile>,
+    /// What those built-in values are. Sent rather than restated on the screen: a second
+    /// copy of this drifted from the first the moment a default changed, and the screen
+    /// went on offering a context the app no longer chooses.
+    built_in_defaults: Profile,
     capabilities: Option<Capabilities>,
     capability_error: Option<String>,
 }
 
 /// Fills in what the user has not chosen: an alias derived from the model's name, and a
 /// context clamped to what the file actually supports.
-fn resolve(model: &ModelEntry, chosen: Profile) -> Profile {
+/// `fits` is whether the installed build has a fitter. Without one, Auto is not a
+/// choice the app can honour, so it is resolved away here rather than in `args` — the
+/// form shows what the launch will do, and a form reading Auto beside a command naming
+/// a number is the disagreement this app refuses everywhere else.
+fn resolve(model: &ModelEntry, chosen: Profile, fits: bool) -> Profile {
     let mut resolved = chosen;
     if resolved.alias.trim().is_empty() {
         resolved.alias = profile::default_alias(&model.display_name);
     }
-    if let Some(max) = model.metadata.as_ref().and_then(|m| m.context_length) {
-        resolved.ctx = resolved.ctx.min(max);
+    if !fits {
+        if resolved.ctx == profile::AUTO_CTX {
+            resolved.ctx = profile::DEFAULT_CTX;
+        }
+        if resolved.ngl == profile::AUTO_NGL {
+            resolved.ngl = "all".to_string();
+        }
+    }
+    // Auto carries no number to cap, and 0.min(max) would not be one either.
+    if resolved.ctx != profile::AUTO_CTX {
+        if let Some(max) = model.metadata.as_ref().and_then(|m| m.context_length) {
+            resolved.ctx = resolved.ctx.min(max);
+        }
     }
     resolved
 }
@@ -163,7 +185,9 @@ fn build_plan(
         )
     };
 
-    let profile = resolve(&model, profile::seed(draft, remembered, defaults));
+    let caps = state.capabilities();
+    let fits = caps.as_ref().map(|c| c.has("--fit")).unwrap_or(false);
+    let profile = resolve(&model, profile::seed(draft, remembered, defaults), fits);
 
     let estimate = model.metadata.as_ref().and_then(|md| {
         estimate::estimate(
@@ -175,7 +199,6 @@ fn build_plan(
         )
     });
 
-    let caps = state.capabilities();
     let (args, command, capability_error) = match &caps {
         Ok(caps) => {
             let args = profile.args(&model.path, caps);
@@ -209,6 +232,7 @@ fn build_plan(
         args,
         command,
         estimate,
+        fit_available: fits,
         capability_error,
     })
 }
@@ -330,6 +354,7 @@ fn settings_view(state: &AppState) -> Settings {
         llama_server_path: config.llama_server_path.clone(),
         downloads: config.downloads.clone(),
         launch_defaults: config.launch_defaults.clone(),
+        built_in_defaults: Profile::default(),
         capabilities: caps.as_ref().ok().cloned(),
         capability_error: caps.err(),
     }

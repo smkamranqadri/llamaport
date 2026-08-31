@@ -77,6 +77,9 @@ export interface LaunchPlan {
   args: string[];
   command: string;
   estimate: Estimate | null;
+  /// Whether the installed build can fit unset arguments to memory, and so whether
+  /// the form may offer Auto.
+  fitAvailable: boolean;
   totalMemory: number;
   memory: PlanMemory;
   maxCtx: number | null;
@@ -218,6 +221,8 @@ export interface Settings {
   downloads: DownloadOptions;
   /// Null until the user sets them: the built-in values are then in force.
   launchDefaults: Profile | null;
+  /// What those built-in values are, so the screen never restates them.
+  builtInDefaults: Profile;
   capabilities: Capabilities | null;
   capabilityError: string | null;
 }

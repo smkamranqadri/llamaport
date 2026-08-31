@@ -3,51 +3,32 @@
 ```text
 Branch:   `main`, clean and pushed. `v0.3.2` is tagged at HEAD, and both built
           `.dmg`s came from that commit.
-Task:     none in progress. **v0.3.2 is published** — Figures, the slider step,
-          and the version bump ([intent/release.md](../intent/release.md)). It is
-          the first release cut on a cadence rather than as an event: publish
-          whenever there is something worth installing. The reasoning is written
-          down there, because it reverses the "gather an audience, then build"
-          order the project started with. No audience arrived; the author is the
-          user, and has been the source of every good change since step 3.
+Task:     **Fitting**, parcel 1 done and parcel 2 written but unseen
+          ([intent/fitting.md](../intent/fitting.md)). Context and GPU layers now
+          default to Auto and pass no flag, gated on `--fit` being in the probed
+          `--help`. Ornith under Auto came up at 262,144 tokens against the
+          65,536 that used to be typed by hand.
+Mode:     Phase
+Blocker:  **Parcel 2's screen has not been looked at.** Auto adds a control, a
+          weights-only summary and a sentence, and the suite reaches none of
+          that. `bun run tauri dev` is running now.
 
-          Distribution before it is done: a description, topics and an uploaded
-          social preview, the front page leads with a clip, a Show and tell post
-          is live in llama.cpp's Discussions, four list submissions are open, and
-          the author has posted to several subreddits and commented around them
-          ([intent/release.md](../intent/release.md)).
-Mode:     —
-Blocker:  none. The standing list changed shape on 2026-08-31 rather than
-          growing: the closing conditions were split into what gates a build and
-          what can only happen once one is published
-          ([intent/release.md](../intent/release.md)). Two of them had gone unmet
-          across two releases, and the Gatekeeper one could never have been met —
-          it names a browser download, which needs a published asset, so as a
-          pre-publish gate it was unsatisfiable from v0.1.0 on.
-
-          Three now sit in the after-the-tag list against v0.3.2, all needing ten
-          minutes with the display free and nothing fullscreen: five launches of
-          the installed build, closing the window and clicking the Dock icon, and
-          downloading a `.dmg` through a browser to meet a real Gatekeeper
+          Three items sit in the after-the-tag list against v0.3.2, all needing
+          ten minutes with the display free and nothing fullscreen: five launches
+          of the installed build, closing the window and clicking the Dock icon,
+          and downloading a `.dmg` through a browser to meet a real Gatekeeper
           prompt. Two more are unrelated and unchanged: a queued row with nothing
           on disk behind it has never been seen coming back from a restart, and
           no Intel Mac has run the universal build.
-Next:     Plan features from [gaps.md](../intent/gaps.md), which is what it was
-          written for. `--fit` is the largest item and wants its own planning
-          pass: the flag is on by default and this app disables it on every
-          launch by naming `-c` and `-ngl`
-          ([knowledge/technical.md](../knowledge/technical.md)). The cheap
-          uncontested ones are a Library search, a keyboard map, and persisting
-          the telemetry the running view already collects.
+Next:     Look at a model's detail screen with Auto on, then at one while it is
+          running. Expected: the context field reads "fitted to memory" with a
+          checkbox, the command shows neither `-c` nor `-ngl`, the memory panel
+          shows weights alone and says the cache is not counted, and once Ready
+          the panel prices the cache at the context the server reports. Then
+          commit, and the release cadence says publish.
 
-          The three after-the-tag conditions above want the ten minutes whenever
-          the display is free. Show HN is drafted and unposted and is deferred by
-          the author, not blocked.
-
-          The old rule was "do not plan features against silence". It stands
-          against imagined users and not against the author, who is using this
-          daily — every good change since step 3 came from exactly that, and
-          three defects this week came from looking at the built app.
+          After that, [intent/gaps.md](../intent/gaps.md). Auto-update is the item
+          whose value rose with the cadence change.
 ```
 
 Run and verify commands: [knowledge/technical.md](../knowledge/technical.md).

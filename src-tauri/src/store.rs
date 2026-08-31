@@ -356,8 +356,8 @@ mod tests {
         );
         assert_eq!(
             loaded.last_used.get("abc").map(|p| p.ctx),
-            Some(65536),
-            "the rest fall back"
+            Some(crate::profile::AUTO_CTX),
+            "the rest fall back, and the fallback for a context is now Auto"
         );
         assert_eq!(loaded.models_dir.as_deref(), Some("/models"));
     }

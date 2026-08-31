@@ -120,6 +120,23 @@ pub fn estimate(
     cache_k: &str,
     cache_v: &str,
 ) -> Option<Estimate> {
+    // Auto: no context has been chosen, so there is nothing to size a cache against.
+    // The weights are still exact, and they are a floor for the whole.
+    if ctx == crate::profile::AUTO_CTX {
+        return Some(Estimate {
+            weights_bytes: file_size,
+            kv_bytes: 0,
+            total_bytes: file_size,
+            bounded: true,
+            bound_note: Some(
+                "No context has been chosen. The server fits one to memory when it \
+                 starts and sizes the cache with it, and this screen says what it chose \
+                 once it is running."
+                    .to_string(),
+            ),
+        });
+    }
+
     let (kv_bytes, bounded) = kv_terms(md, ctx, cache_k, cache_v)?;
     let mut note = None;
     if bounded {
@@ -316,6 +333,21 @@ mod tests {
             kv_bytes(&md, 4096, "f16", "f16"),
             kv_bytes(&flat, 4096, "f16", "f16")
         );
+    }
+
+    #[test]
+    fn auto_prices_the_weights_and_says_the_cache_is_not_chosen_yet() {
+        let md = metadata(8, 128, None);
+        let e = estimate(&md, 20_000_000_000, crate::profile::AUTO_CTX, "f16", "f16")
+            .expect("weights are known whatever the context");
+
+        assert_eq!(e.weights_bytes, 20_000_000_000);
+        assert_eq!(e.kv_bytes, 0, "no context, so no cache is priced");
+        assert_eq!(e.total_bytes, 20_000_000_000);
+        assert!(e.bounded, "weights alone are a floor for the whole");
+
+        let why = e.bound_note.expect("a reason");
+        assert!(why.contains("No context has been chosen"), "{why}");
     }
 
     #[test]
