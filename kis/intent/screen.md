@@ -55,7 +55,7 @@ the mockup on purpose**, and that is the cost of not shipping a bad default.
   ceiling and size the same launch; where they disagree, one is wrong. The
   script already agrees with `estimate.rs` on two real files.
 
-## Parcel 1 — the real ceiling
+## Parcel 1 — the real ceiling — DONE 2026-08-31
 
 `probe.rs` parses `--list-devices` into `Capabilities`. `lib.rs` carries it to
 the plan. `sysmem.rs` already reports what is free and what is swapping; nothing
@@ -67,6 +67,30 @@ Four figures and no paragraph: what this launch wants, the GPU limit, what is
 free now, swap. The bar marks the limit rather than installed memory. The seven
 untouched fields move behind Advanced, still editable, and the three the author
 uses stay in front.
+
+## Proof — parcel 1, 2026-08-31
+
+Four commands green, **202 tests**, up from 197. `Capabilities` now carries the
+device list and `device_budget_mib()`; `LaunchPlan` carries it as
+`deviceBudgetBytes`, 26,800,553,984 bytes on this machine, which is the 25,559
+MiB `tools/fits.py` reads and not the 34.36 GB installed.
+
+**Two of five new tests were weaker than they looked, and mutation testing is
+what said so.**
+
+- Removing the filter that ignores a device reporting no memory changed nothing,
+  because `max()` over `[0, 25559]` is 25559 either way. The case that filter
+  actually guards is a build reporting *only* memoryless backends, where without
+  it the budget is `Some(0)` — which reads on screen as "nothing fits", a worse
+  lie than "unknown". A test for that now exists and fails under the mutation.
+- Gating the `--list-devices` call on the flag being present also survived, and
+  that one is correct: an older build prints an error, `parse_devices` finds
+  nothing, and the result is the same empty list. The gate saves a process spawn
+  and changes no behaviour, so there is nothing to assert. Recorded rather than
+  covered by a test that would only appear to test it.
+
+The third mutation, collapsing total and free into one figure, failed the parse
+test as it should.
 
 ## Out of scope
 

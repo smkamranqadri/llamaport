@@ -12,6 +12,18 @@ const FALLBACK_PATHS: [&str; 3] = [
     "/usr/bin/llama-server",
 ];
 
+/// A device llama.cpp will allocate on, as it reports itself. The totals here are the
+/// only honest ceiling: on an M2 Pro the Metal working set is 25,559 MiB against 32,768
+/// MiB of installed memory, and it is installed memory this app used to measure against.
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct Device {
+    pub id: String,
+    pub name: String,
+    pub total_mib: u64,
+    pub free_mib: u64,
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Capabilities {
@@ -19,12 +31,83 @@ pub struct Capabilities {
     pub version: Option<String>,
     pub flags: BTreeSet<String>,
     pub flash_attn_takes_value: bool,
+    /// Empty where the build cannot report them. Callers say the ceiling is unknown
+    /// rather than falling back to installed memory, which is the defect being fixed.
+    pub devices: Vec<Device>,
 }
 
 impl Capabilities {
     pub fn has(&self, flag: &str) -> bool {
         self.flags.contains(flag)
     }
+
+    /// What a fully offloaded launch has to fit inside, or `None` where the build did
+    /// not say. The largest reporting device: llama.cpp lists compute backends with no
+    /// memory of their own beside the one that has it.
+    pub fn device_budget_mib(&self) -> Option<u64> {
+        self.devices
+            .iter()
+            .map(|d| d.total_mib)
+            .filter(|t| *t > 0)
+            .max()
+    }
+}
+
+/// Parses `llama-server --list-devices`, whose lines read
+/// `  MTL0: Apple M2 Pro (25559 MiB, 25558 MiB free)`. Anything that does not match that
+/// shape is skipped rather than guessed at.
+fn parse_devices(text: &str) -> Vec<Device> {
+    let mut out = Vec::new();
+    for line in text.lines() {
+        let line = line.trim();
+        let Some((id, rest)) = line.split_once(':') else {
+            continue;
+        };
+        let Some(open) = rest.rfind('(') else {
+            continue;
+        };
+        let Some(close) = rest.rfind(')') else {
+            continue;
+        };
+        if close < open {
+            continue;
+        }
+        let name = rest[..open].trim();
+        let inside = &rest[open + 1..close];
+        let Some((total, free)) = inside.split_once(',') else {
+            continue;
+        };
+        let mib = |s: &str| -> Option<u64> {
+            s.split_whitespace()
+                .next()
+                .and_then(|n| n.parse::<u64>().ok())
+        };
+        let (Some(total_mib), Some(free_mib)) = (mib(total), mib(free)) else {
+            continue;
+        };
+        if id.is_empty() || name.is_empty() {
+            continue;
+        }
+        out.push(Device {
+            id: id.trim().to_string(),
+            name: name.to_string(),
+            total_mib,
+            free_mib,
+        });
+    }
+    out
+}
+
+fn read_devices(binary: &Path) -> Vec<Device> {
+    let Ok(output) = Command::new(binary).arg("--list-devices").output() else {
+        return Vec::new();
+    };
+    let text = format!(
+        "{}{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    parse_devices(&text)
 }
 
 pub fn discover(configured: Option<&str>) -> Option<PathBuf> {
@@ -120,10 +203,18 @@ pub fn probe(binary: &Path) -> Result<Capabilities, String> {
         ));
     }
 
+    // Only asked for where the build says it can answer: an older one would spend a
+    // process spawn to print an error.
+    let mut devices = Vec::new();
+    if flags.contains("--list-devices") {
+        devices = read_devices(binary);
+    }
+
     Ok(Capabilities {
         binary: binary.to_string_lossy().into_owned(),
         version: read_version(binary),
         flash_attn_takes_value: flash_attn_takes_value(&help),
+        devices,
         flags,
     })
 }
@@ -150,6 +241,79 @@ mod tests {
         assert!(flags.contains("--n-gpu-layers"));
         assert!(flags.contains("--metrics"));
         assert!(flags.contains("--no-jinja"));
+    }
+
+    const DEVICES_SAMPLE: &str = "\
+Available devices:
+  BLAS: Accelerate (0 MiB, 0 MiB free)
+  MTL0: Apple M2 Pro (25559 MiB, 25558 MiB free)
+";
+
+    #[test]
+    fn reads_the_ceiling_the_build_reports() {
+        let devices = parse_devices(DEVICES_SAMPLE);
+        assert_eq!(devices.len(), 2);
+        assert_eq!(
+            devices[1],
+            Device {
+                id: "MTL0".into(),
+                name: "Apple M2 Pro".into(),
+                total_mib: 25559,
+                free_mib: 25558,
+            }
+        );
+    }
+
+    /// A compute backend with no memory of its own must not become the ceiling.
+    #[test]
+    fn the_budget_is_the_device_that_has_memory() {
+        let caps = Capabilities {
+            binary: "llama-server".into(),
+            version: None,
+            flags: BTreeSet::new(),
+            flash_attn_takes_value: false,
+            devices: parse_devices(DEVICES_SAMPLE),
+        };
+        assert_eq!(caps.device_budget_mib(), Some(25559));
+    }
+
+    /// Where every device reports no memory of its own, the ceiling is unknown rather
+    /// than zero. `Some(0)` would read on screen as "nothing fits", which is a different
+    /// and worse lie than "unknown".
+    #[test]
+    fn devices_that_all_report_nothing_leave_the_budget_unknown() {
+        let caps = Capabilities {
+            binary: "llama-server".into(),
+            version: None,
+            flags: BTreeSet::new(),
+            flash_attn_takes_value: false,
+            devices: parse_devices("  BLAS: Accelerate (0 MiB, 0 MiB free)\n"),
+        };
+        assert_eq!(caps.devices.len(), 1, "the device was parsed");
+        assert_eq!(caps.device_budget_mib(), None);
+    }
+
+    /// The defect this exists to fix: a build that cannot report devices must leave the
+    /// ceiling unknown, never fall back to installed memory.
+    #[test]
+    fn a_build_that_cannot_report_devices_has_no_budget() {
+        let caps = Capabilities {
+            binary: "llama-server".into(),
+            version: None,
+            flags: BTreeSet::new(),
+            flash_attn_takes_value: false,
+            devices: Vec::new(),
+        };
+        assert_eq!(caps.device_budget_mib(), None);
+    }
+
+    #[test]
+    fn lines_that_are_not_devices_are_skipped_rather_than_guessed_at() {
+        let devices = parse_devices(
+            "Available devices:\n  ggml_metal_init: picking default device\n               note: something (unparseable) here\n  MTL0: Apple M2 Pro (100 MiB, 50 MiB free)\n",
+        );
+        assert_eq!(devices.len(), 1);
+        assert_eq!(devices[0].total_mib, 100);
     }
 
     #[test]

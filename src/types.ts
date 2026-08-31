@@ -80,6 +80,9 @@ export interface LaunchPlan {
   /// Whether the installed build can fit unset arguments to memory, and so whether
   /// the form may offer Auto.
   fitAvailable: boolean;
+  /// What a fully offloaded launch must fit inside, read from the build. Null where it
+  /// could not be read; the screen then says so rather than using installed memory.
+  deviceBudgetBytes: number | null;
   totalMemory: number;
   memory: PlanMemory;
   maxCtx: number | null;

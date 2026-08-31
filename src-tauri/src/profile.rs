@@ -263,6 +263,7 @@ mod tests {
             version: None,
             flags: flags.iter().map(|f| f.to_string()).collect::<BTreeSet<_>>(),
             flash_attn_takes_value: flash_value,
+            devices: Vec::new(),
         }
     }
 

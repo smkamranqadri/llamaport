@@ -106,6 +106,11 @@ struct LaunchPlan {
     /// Whether the installed build can fit unset arguments to memory, and so whether
     /// Auto is a choice the form may offer.
     fit_available: bool,
+    /// What a fully offloaded launch has to fit inside, read from the build rather than
+    /// computed from installed memory. `None` where it could not be read — the screen
+    /// then says the ceiling is unknown, because falling back to `total_memory` is the
+    /// defect this replaced.
+    device_budget_bytes: Option<u64>,
     total_memory: u64,
     memory: PlanMemory,
     /// Model metadata: the ceiling the file declares.
@@ -233,6 +238,11 @@ fn build_plan(
         command,
         estimate,
         fit_available: fits,
+        device_budget_bytes: caps
+            .as_ref()
+            .ok()
+            .and_then(|c| c.device_budget_mib())
+            .map(|mib| mib * 1024 * 1024),
         capability_error,
     })
 }
