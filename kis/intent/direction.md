@@ -147,6 +147,26 @@ reversed deliberately, not overlooked.
   and speed to be part of the answer. If it cannot be better than the browser
   tab, it should not ship.
 
+## The approved mockup
+
+https://claude.ai/code/artifact/8d38ec5a-18fe-49ed-bf46-cdc7bf58620c — approved
+by the author on 2026-08-31. Two tabs, and every figure in it measured against
+Ornith on this machine rather than invented.
+
+**Half of it has shipped and half is Tune.** The memory panel, the collapsed
+Advanced and the real ceiling landed in v0.4.0
+([screen.md](screen.md)). What has not: the app stating a chosen setting, the
+"chosen" labels, and the Tune button with its comparison table. Its "Before
+launch" tab shows a suggestion marked *never measured*; its "After Tune" tab
+shows measurement overruling arithmetic by 27%. That disagreement is the mockup's
+argument, and it is the argument for Tune.
+
+Two details in it are already superseded. Advanced is drawn with a per-field
+override marker, which v0.4.0 ships without — the fields are editable but nothing
+marks one as the user's, because nothing suggests values yet. And its speed panel
+reports generation only; the prompt figures it once showed came from a 36-token
+prompt and were withdrawn as meaningless.
+
 ## The shape this implies
 
 Not a plan. The pieces, so the plan has something to cut up.
