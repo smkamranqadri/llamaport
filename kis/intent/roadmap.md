@@ -81,6 +81,18 @@ Two, each with its own spec, module and screen:
    author as a user of the built app rather than for an audience. Step 8's rule
    stands against imagined users; it never meant do not build what you need.
 
+11. **Screen** — planned 2026-08-31, not started. [screen.md](screen.md). The
+   first phase cut from [direction.md](direction.md), which rewrote what this app
+   is for after the author called a screen it had just shipped confusing. Read
+   the GPU ceiling instead of comparing against installed RAM, turn the memory
+   panel's four lines of prose into four figures, and put the seven settings the
+   author has never touched behind Advanced.
+
+   **Deliberately smaller than the mockup that was approved.** The app deciding
+   the settings needs a measurement to be honest: the only rule available
+   without one picks the slowest of three candidates on the model the author
+   runs. That waits for Tune.
+
 ## Gaps
 
 What two comparable tools do and this one does not, read off their source on

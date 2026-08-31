@@ -3,15 +3,16 @@
 ```text
 Branch:   `main`, clean and pushed. `v0.3.2` is tagged at HEAD, and both built
           `.dmg`s came from that commit.
-Task:     none in progress. **Fitting is done**, both parcels
-          ([intent/fitting.md](../intent/fitting.md)). Context and GPU layers can
-          sit unset and llama.cpp sizes them, gated on `--fit` being in the
-          probed `--help` — without it, omitting `-c` would ask a 262,144-token
-          cache of this machine. Ornith under Auto came up at 262,144 tokens
-          against the 65,536 that used to be typed by hand.
+Task:     **Screen**, planned 2026-08-31 and not started
+          ([intent/screen.md](../intent/screen.md)). Read the GPU ceiling rather
+          than comparing against installed RAM, make the memory panel a glance,
+          and collapse the seven settings never touched across 21 launches.
 
-          Unreleased: v0.3.2 is the published build and does not carry this.
-Mode:     —
+          It follows [intent/direction.md](../intent/direction.md), which rewrote
+          the app's scope around what the author actually wants after they said a
+          just-shipped screen confused them. Two standing decisions were reversed
+          there: no presets, and no Discover.
+Mode:     Standard
 Blocker:  none. Three items sit in the after-the-tag list against v0.3.2, all
           needing ten minutes with the display free and nothing fullscreen: five
           launches of the installed build, closing the window and clicking the
@@ -26,22 +27,20 @@ Blocker:  none. Three items sit in the after-the-tag list against v0.3.2, all
           changed. Not migrated, because a stored `port 8080` says those defaults
           were saved deliberately and the two fields inside them cannot be told
           apart from a choice.
-Next:     Release. The cadence set on 2026-08-31 says publish whenever there is
-          something worth installing, and Fitting is that
-          ([intent/release.md](../intent/release.md)). It would carry the four
-          screen defects fixed today as well.
+Next:     Screen, parcel 1: parse `llama-server --list-devices` into
+          `Capabilities` and carry it to the plan, with a build that cannot
+          report devices saying the ceiling is unknown rather than falling back
+          to installed RAM — the fallback is the defect. Then parcel 2, the
+          panel as four figures and the form collapsed.
 
-          Then [intent/gaps.md](../intent/gaps.md). Auto-update is the item whose
-          value rose with the cadence change: more releases means more builds for
-          a user to be stranded behind, and there is still no way for one to
-          learn a new version exists.
+          Tune is the phase after, and it is what makes a suggestion honest:
+          arithmetic picks 262,144 with a quantised cache for Ornith and
+          measurement picks 65,536 at full precision, 27% faster
+          ([intent/direction.md](../intent/direction.md)).
 
-          The lesson this phase paid for twice over is in
-          [knowledge/technical.md](../knowledge/technical.md): the suite reaches
-          arithmetic and never reaches a sentence beside it. Four defects here
-          were found by the author looking at the built app and none by 197
-          tests, and one of them was a confidently wrong explanation printed next
-          to a correct number.
+          Unreleased: v0.3.2 is the published build. It carries neither Fitting
+          nor any of this. Three after-the-tag conditions still want ten minutes
+          with the display free ([intent/release.md](../intent/release.md)).
 ```
 
 Run and verify commands: [knowledge/technical.md](../knowledge/technical.md).
