@@ -1,18 +1,30 @@
+Figures, Fitting and Screen each carry their own proof
+([intent/figures.md](../intent/figures.md),
+[intent/fitting.md](../intent/fitting.md),
+[intent/screen.md](../intent/screen.md)). 202 tests, up from 180 at v0.3.1.
+
+**Eleven defects across the three phases were found by looking at the built app
+and none by the suite** ([knowledge/technical.md](../knowledge/technical.md)
+carries that as a constraint). The Screen ones are the sharpest: a value correct
+on its own and wrong beside its neighbour, twice, one level apart — a verdict
+that ignored free memory, then a free figure that ignored what was being asked of
+it. No assertion can see either.
+
 # Current
 
 ```text
 Branch:   `main`, clean and pushed. `v0.3.2` is tagged at HEAD, and both built
           `.dmg`s came from that commit.
-Task:     **Screen**, planned 2026-08-31 and not started
-          ([intent/screen.md](../intent/screen.md)). Read the GPU ceiling rather
-          than comparing against installed RAM, make the memory panel a glance,
-          and collapse the seven settings never touched across 21 launches.
+Task:     none in progress. **Screen is done**, both parcels
+          ([intent/screen.md](../intent/screen.md)). The memory panel reads the
+          GPU ceiling from the build — 25,559 MiB here, where the app had been
+          comparing against 34.36 GB installed — and is four figures and a
+          verdict rather than four lines of prose. Launch Settings keeps the
+          three fields ever used and hides the other seven.
 
-          It follows [intent/direction.md](../intent/direction.md), which rewrote
-          the app's scope around what the author actually wants after they said a
-          just-shipped screen confused them. Two standing decisions were reversed
-          there: no presets, and no Discover.
-Mode:     Standard
+          Unreleased: v0.3.2 is the published build and carries neither Fitting
+          nor this.
+Mode:     —
 Blocker:  none. Three items sit in the after-the-tag list against v0.3.2, all
           needing ten minutes with the display free and nothing fullscreen: five
           launches of the installed build, closing the window and clicking the
@@ -27,20 +39,22 @@ Blocker:  none. Three items sit in the after-the-tag list against v0.3.2, all
           changed. Not migrated, because a stored `port 8080` says those defaults
           were saved deliberately and the two fields inside them cannot be told
           apart from a choice.
-Next:     Screen, parcel 1: parse `llama-server --list-devices` into
-          `Capabilities` and carry it to the plan, with a build that cannot
-          report devices saying the ceiling is unknown rather than falling back
-          to installed RAM — the fallback is the defect. Then parcel 2, the
-          panel as four figures and the form collapsed.
+Next:     Two candidates, and the release is the cheaper one.
 
-          Tune is the phase after, and it is what makes a suggestion honest:
-          arithmetic picks 262,144 with a quantised cache for Ornith and
-          measurement picks 65,536 at full precision, 27% faster
-          ([intent/direction.md](../intent/direction.md)).
+          **Release.** Three phases now sit unreleased — Figures, Fitting,
+          Screen. The cadence set on 2026-08-31 says publish whenever there is
+          something worth installing, and this is three somethings
+          ([intent/release.md](../intent/release.md)).
 
-          Unreleased: v0.3.2 is the published build. It carries neither Fitting
-          nor any of this. Three after-the-tag conditions still want ten minutes
-          with the display free ([intent/release.md](../intent/release.md)).
+          **Tune** is the phase the mockup is waiting for, and the one that makes
+          a suggestion honest. Arithmetic picks 262,144 with a quantised cache
+          for Ornith; measurement picks 65,536 at full precision, 27% faster —
+          which is the number the author had been typing by hand
+          ([intent/direction.md](../intent/direction.md)). `tools/fits.py --run`
+          already prototypes it.
+
+          Then the rest of [intent/direction.md](../intent/direction.md): the pi
+          button, and search. Neither is planned.
 ```
 
 Run and verify commands: [knowledge/technical.md](../knowledge/technical.md).
