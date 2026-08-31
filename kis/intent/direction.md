@@ -94,29 +94,37 @@ the optimizer rather than a refinement of it, and it means the screen's job is
 to show what is actually free right now — which is what the author asked for in
 item 4 and is the same question.
 
-## Measured: a large context costs speed, and q8_0 buys it back
+## Measured: "largest that fits" is the wrong rule
 
-`tools/fits.py --run` on `qwen2.5-0.5b`, 2026-08-31:
+`tools/fits.py --run` on Ornith 1.0 35B, 2026-08-31, one 3,794-token prompt for
+every candidate so each did identical work:
 
-    32,768 ctx / f16    145.3 tok/s
-     8,192 ctx / f16    178.5 tok/s   fastest
-    32,768 ctx / q8_0   175.2 tok/s
+     context  cache   generation   prompt
+      65,536  f16     41.6 tok/s   508 tok/s   fastest prompt, ties fastest generation
+       8,192  f16     41.7 tok/s   487 tok/s
+     262,144  q8_0    30.5 tok/s   419 tok/s   what the arithmetic chose
 
-Two things follow, and both were guesses before.
+**Arithmetic and measurement disagree by 27% of generation speed.** The rule this
+direction was about to be built on — take the largest context and most precise
+cache that fits — picks the slowest of the three. A full cache is expensive to
+read through, and quantising it to buy context costs more than the context is
+worth on this model.
 
-**"Largest that fits" is not the rule.** Four times the context cost 19% of
-generation speed. A memory sum cannot see that, so the optimizer cannot be pure
-arithmetic — which is the author's objection arriving a second time, from a
-direction nobody was looking.
+**The measured winner is 65,536 with a full-precision cache, which is what the
+author had been typing by hand for 17 of 21 launches.** The guess beat both the
+app's default and the rule that was going to replace it.
 
-**The inherited `q8_0` is right for a second independent reason.** It was
-already what lets a 35B hold its full context on this GPU
-([knowledge/technical.md](../knowledge/technical.md)); it now also runs within
-2% of `f16` at a quarter of the context. This project criticised that default
-twice today and was wrong both times.
+**Three readings of the same question, each overturned by a better measurement.**
+q8_0 was called a needless quality cost, then load-bearing for context, then
+within 2% of f16 on speed — that last one measured against a 36-token prompt,
+which is startup overhead rather than throughput. With a real prompt it is 27%
+slower. Nothing here should be built on a single reading, and the small model was
+a poor guide to the large one: it put the context penalty at 19% where the 35B
+says 27%, with the winner in a different place.
 
-Measured on a 0.5B. Whether it holds for a 35B is unknown and is the first thing
-a real Tune should settle.
+So the app suggests by arithmetic, marks the suggestion as unmeasured, and Tune
+is what makes it true. That is the whole argument for Tune, and it is now a
+measurement rather than an intuition.
 
 ## Decisions this reverses
 
