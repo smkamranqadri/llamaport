@@ -162,7 +162,26 @@ def best(rows, key):
 
 # ---------- measuring ----------
 
-def measure(m, ctx, cache, port=9977):
+# A prompt long enough that prompt-eval measures throughput rather than startup. Built
+# from varied text rather than one repeated line, because a repeated line is not what a
+# coding agent sends and is not what the cache does with it.
+_WORDS = ("model context window memory cache attention layer token embedding gradient "
+          "kernel buffer offload quantise inference throughput latency batch server "
+          "prompt decode residual weights tensor matrix vector scalar precision").split()
+
+
+def long_prompt(tokens):
+    """Roughly `tokens` tokens of prose. English runs near 0.75 words per token."""
+    words = max(32, int(tokens * 0.75))
+    out = []
+    for i in range(words):
+        out.append(_WORDS[(i * 7 + i // len(_WORDS)) % len(_WORDS)])
+        if i % 12 == 11:
+            out.append(".\n")
+    return " ".join(out)
+
+
+def measure(m, ctx, cache, prompt, port=9977):
     args = ["llama-server", "-m", m["path"], "--host", "127.0.0.1", "--port", str(port),
             "-c", str(ctx), "--cache-type-k", cache, "--cache-type-v", cache,
             "--flash-attn", "on", "-np", "1", "--no-warmup"]
@@ -178,8 +197,8 @@ def measure(m, ctx, cache, port=9977):
                         break
             except Exception:
                 time.sleep(0.5)
-        body = json.dumps({"prompt": "Write one paragraph about the sea.",
-                           "n_predict": 128, "stream": False}).encode()
+        body = json.dumps({"prompt": prompt, "n_predict": 64, "stream": False,
+                           "cache_prompt": False}).encode()
         req = urllib.request.Request(f"{base}/completion", data=body,
                                      headers={"Content-Type": "application/json"})
         started = time.time()
@@ -189,7 +208,7 @@ def measure(m, ctx, cache, port=9977):
         rss = subprocess.run(["ps", "-o", "rss=", "-p", str(proc.pid)],
                              capture_output=True, text=True).stdout.strip()
         return {"gen_tps": t.get("predicted_per_second"), "prompt_tps": t.get("prompt_per_second"),
-                "wall_s": round(time.time() - started, 1),
+                "prompt_n": t.get("prompt_n"), "wall_s": round(time.time() - started, 1),
                 "rss_gb": round(int(rss) / 1024 / 1024, 1) if rss else None}
     finally:
         proc.terminate()
@@ -249,18 +268,25 @@ def main():
 
         if do_run and on_gpu:
             print("\n  MEASURING — a memory sum says a launch is allowed, never that it is good")
+            cands = candidates(rows, on_gpu)
+            # One prompt for every candidate, sized to the smallest context so each does
+            # identical work. Comparing configs on different prompts compares nothing.
+            budget = min(c["ctx"] for c in cands)
+            prompt = long_prompt(min(4096, max(256, budget // 2)))
+            print(f"  same prompt for each, about {min(4096, max(256, budget//2)):,} tokens\n")
             results = []
-            for cand in candidates(rows, on_gpu):
+            for cand in cands:
                 print(f"    {cand['ctx']:>9,} ctx / {cand['cache']:<5} ...", end="", flush=True)
-                got = measure(m, cand["ctx"], cand["cache"])
+                got = measure(m, cand["ctx"], cand["cache"], prompt)
                 if got.get("error"):
                     print(f" did not run: {got['error']}")
                     continue
                 got.update(ctx=cand["ctx"], cache=cand["cache"])
                 results.append(got)
                 print(f" {got['gen_tps']:6.1f} tok/s generation · {got['prompt_tps']:7.1f} prompt"
-                      f" · {got['rss_gb']} GB resident")
+                      f" ({got['prompt_n']} tokens) · {got['rss_gb']} GB resident")
             if results:
+                quickest_prompt = max(results, key=lambda r: r["prompt_tps"])
                 fastest = max(results, key=lambda r: r["gen_tps"])
                 widest = max(results, key=lambda r: r["ctx"])
                 print(f"\n  fastest        : {fastest['ctx']:,} ctx / {fastest['cache']}"
@@ -272,6 +298,9 @@ def main():
                           f" {widest['ctx']-fastest['ctx']:,} more tokens")
                 else:
                     print("  the widest context was also the fastest — nothing was traded")
+                print(f"  quickest prompt: {quickest_prompt['ctx']:,} ctx /"
+                      f" {quickest_prompt['cache']}  at {quickest_prompt['prompt_tps']:.1f} tok/s"
+                      f"  — the number that matters for an agent sending long context")
 
 if __name__ == "__main__":
     main()
