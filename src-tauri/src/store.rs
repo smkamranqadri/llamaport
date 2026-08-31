@@ -6,9 +6,11 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
 use std::collections::{BTreeMap, BTreeSet};
+use std::sync::{Mutex, OnceLock};
 
 use crate::downloads::{DownloadJob, Options};
 use crate::profile::Profile;
+use crate::speeds::SpeedRecord;
 
 /// Bumped whenever the shape changes. Absence means the original shape, which had no
 /// version field at all.
@@ -60,7 +62,20 @@ fn support_dir() -> PathBuf {
     home().join("Library").join("Application Support")
 }
 
+static CONFIG_DIR: OnceLock<PathBuf> = OnceLock::new();
+
+/// Points everything the app keeps at another directory. The suite drives the real
+/// runner, which writes a pidfile and mirrors the run log through `config_dir`, so
+/// without this it writes them into the directory the installed app is using — which is
+/// how `last-run.log` came to hold test output. Taken once; the first caller wins.
+pub fn use_config_dir(dir: PathBuf) {
+    let _ = CONFIG_DIR.set(dir);
+}
+
 pub fn config_dir() -> PathBuf {
+    if let Some(dir) = CONFIG_DIR.get() {
+        return dir.clone();
+    }
     support_dir().join("llamaport")
 }
 
@@ -88,6 +103,38 @@ pub fn load_history(path: &Path) -> Vec<DownloadJob> {
 
 pub fn save_history(path: &Path, jobs: &[DownloadJob]) -> io::Result<()> {
     write_atomic(path, &serde_json::to_string_pretty(jobs)?)
+}
+
+/// A file of its own for the same reason `downloads.json` is one: it grows on every run,
+/// and a history that cannot be read should cost the user their history and nothing else.
+pub fn speeds_path() -> PathBuf {
+    config_dir().join("speeds.json")
+}
+
+/// What models have actually done. A row whose figures are not finite and non-negative is
+/// dropped rather than ranked: this file sits in a directory anything with write access
+/// can write to, and a negative second would win every comparison it entered.
+pub fn load_speeds(path: &Path) -> Vec<SpeedRecord> {
+    let Ok(raw) = fs::read_to_string(path) else {
+        return Vec::new();
+    };
+    let records: Vec<SpeedRecord> = serde_json::from_str(&raw).unwrap_or_default();
+    records.into_iter().filter(SpeedRecord::is_sound).collect()
+}
+
+/// Serialises the read-modify-write below. Two runs settling in the same instant both
+/// read the file before either wrote it, and the second rename silently discarded the
+/// first row — seen once in five runs of the suite. Held only here: `load_speeds` is
+/// called from inside this function and a `std::sync::Mutex` is not reentrant.
+static APPENDING: Mutex<()> = Mutex::new(());
+
+/// Never trimmed, and never rewritten in place: a run adds to what is there. A cap would
+/// be a number nobody has evidence for.
+pub fn append_speed(path: &Path, record: SpeedRecord) -> io::Result<()> {
+    let _guard = APPENDING.lock().unwrap_or_else(|e| e.into_inner());
+    let mut records = load_speeds(path);
+    records.push(record);
+    write_atomic(path, &serde_json::to_string_pretty(&records)?)
 }
 
 /// Takes over a directory left under an older name, once.
@@ -217,6 +264,91 @@ mod tests {
 
     fn scratch(name: &str) -> PathBuf {
         scratch_dir(name).join("config.json")
+    }
+
+    fn speed_record(ctx: u64) -> SpeedRecord {
+        SpeedRecord {
+            timestamp_secs: ctx,
+            key: crate::speeds::SpeedKey::of(
+                "model",
+                &Profile {
+                    ctx,
+                    ..Default::default()
+                },
+            ),
+            llama_version: Some("b10360".into()),
+            source: crate::speeds::Source::Observed,
+            prompt_tokens: 3794.0,
+            prompt_seconds: 7.47,
+            gen_tokens: 64.0,
+            gen_seconds: 1.54,
+        }
+    }
+
+    #[test]
+    fn two_runs_at_different_settings_are_two_rows() {
+        let path = scratch_dir("speeds-two").join("speeds.json");
+        append_speed(&path, speed_record(65_536)).expect("first");
+        append_speed(&path, speed_record(262_144)).expect("second");
+
+        let loaded = load_speeds(&path);
+        assert_eq!(loaded.len(), 2, "a second run must not overwrite the first");
+        assert_eq!(loaded[0].key.ctx, 65_536);
+        assert_eq!(loaded[1].key.ctx, 262_144);
+    }
+
+    #[test]
+    fn a_row_whose_figures_cannot_have_happened_is_dropped() {
+        let path = scratch_dir("speeds-unsound").join("speeds.json");
+        append_speed(&path, speed_record(65_536)).expect("sound");
+
+        let mut planted = load_speeds(&path);
+        let mut bad = speed_record(8192);
+        bad.gen_seconds = -1.0;
+        planted.push(bad);
+        write_atomic(
+            &path,
+            &serde_json::to_string_pretty(&planted).expect("json"),
+        )
+        .expect("plant");
+
+        let loaded = load_speeds(&path);
+        assert_eq!(loaded.len(), 1, "the sound row must survive its neighbour");
+        assert_eq!(loaded[0].key.ctx, 65_536);
+    }
+
+    #[test]
+    fn rows_appended_at_once_do_not_overwrite_each_other() {
+        let path = scratch_dir("speeds-at-once").join("speeds.json");
+        let writers: Vec<_> = (0..8)
+            .map(|writer| {
+                let path = path.clone();
+                std::thread::spawn(move || {
+                    for run in 0..8 {
+                        append_speed(&path, speed_record(writer * 100 + run)).expect("append");
+                    }
+                })
+            })
+            .collect();
+        for writer in writers {
+            writer.join().expect("writer");
+        }
+
+        assert_eq!(
+            load_speeds(&path).len(),
+            64,
+            "an append that read the file before its neighbour wrote discards a run"
+        );
+    }
+
+    #[test]
+    fn an_unreadable_speeds_file_is_an_empty_history() {
+        let dir = scratch_dir("speeds-unreadable");
+        assert!(load_speeds(&dir.join("nothing-here.json")).is_empty());
+
+        let path = dir.join("speeds.json");
+        fs::write(&path, "{ not json").expect("write");
+        assert!(load_speeds(&path).is_empty());
     }
 
     #[test]

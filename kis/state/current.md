@@ -1,17 +1,33 @@
 # Current
 
 ```text
-Branch:   `main`, clean and pushed. `v0.4.0` is tagged at `6735316`, **two memory
+Branch:   `main`, clean and pushed. `v0.4.0` is tagged at `6735316`, **four memory
           commits behind HEAD** — both `.dmg`s were built from the tag, not from
           HEAD. Check `git describe --exact-match` before building a release
           artefact: State claiming tag and HEAD were identical is what let a build
           of HEAD reach the v0.3.0 release
           ([intent/release.md](../intent/release.md)).
-Task:     none in progress. **v0.4.0 is published**, carrying Figures, Fitting and
-          Screen together ([intent/release.md](../intent/release.md)).
-Mode:     —
-Blocker:  none. Five standing items, all of one kind — something nobody has
-          looked at.
+Task:     **Tune is built and seen — all five parcels**, uncommitted
+          ([intent/tune.md](../intent/tune.md)). The suite no longer writes into
+          `~/Library/Application Support/llamaport`; `speeds.json` has a store;
+          the runner records a run when it settles; Tune measures a ladder that
+          reproduces `tools/fits.py --run`'s ordering on Ornith; and the app now
+          has one opinion, offered rather than applied.
+Mode:     Phase, complete. Nothing is committed: 14 files changed, 6 added.
+Blocker:  none. **The Speed panel was looked at on 2026-09-01, five defects came
+          out of it, and the fixes were confirmed on screen by the author**
+          ([intent/tune.md](../intent/tune.md)). None of the five was visible to
+          the suite; four were in the panel as first written and the fifth
+          appeared only after fixing those, on a different model.
+
+          **`benchmarks.json` is left alone**: this app had a benchmark store
+          once, deleted by `31031b2` as scope discipline and never recorded in
+          KIS. The author decided 2026-08-31 to start clean, so `speeds.json` is
+          new and that file stays where it sits. Written down now in
+          [intent/roadmap.md](../intent/roadmap.md) and
+          [intent/tune.md](../intent/tune.md), which is the part that was missing.
+
+          Five standing items, all of one kind — something nobody has looked at.
 
           Three are owed against v0.4.0 and want ten minutes with the display
           free and nothing fullscreen: five launches of the installed build,
@@ -23,14 +39,21 @@ Blocker:  none. Five standing items, all of one kind — something nobody has
           Two are unrelated and older: a queued download row with nothing on disk
           behind it has never been seen coming back from a restart, and no Intel
           Mac has run the universal build.
-Next:     **Tune** — the phase the approved mockup waits for, and the one that
-          makes a suggestion honest. Arithmetic picks 262,144 with a quantised
-          cache for Ornith; measurement picks 65,536 at full precision, 27%
-          faster, which is the number the author had been typing by hand.
-          `tools/fits.py --run` prototypes it
-          ([intent/direction.md](../intent/direction.md)).
+Next:     **Commit Tune, then decide what its release is** — `v0.4.0` is tagged
+          well behind HEAD and `/Applications` still holds `v0.3.1`. After
+          that, the rest of [intent/direction.md](../intent/direction.md): the pi
+          button, and search. Neither is planned.
 
-          After that, the rest of [intent/direction.md](../intent/direction.md):
+          Three rows for Ornith are in the author's real `speeds.json`, written by
+          a Tune run this session started without being asked — legitimate data at
+          the author's own settings, kept rather than deleted, and easily removed
+          if unwanted. Two of the plan's
+          decisions go against the approved mockup and are argued in
+          [intent/tune.md](../intent/tune.md): no suggestion until something has
+          measured, and rows from ordinary use may be ranked under a workload
+          gate.
+
+          After Tune, the rest of [intent/direction.md](../intent/direction.md):
           the pi button, and search. Neither is planned.
 ```
 
@@ -66,7 +89,12 @@ deferred by the author rather than blocked
 ## Proof
 
 The four commands green at `v0.4.0`, each status captured on its own line and
-never after a pipe. **202 tests**, up from 180 at v0.3.1.
+never after a pipe. **202 tests**, up from 180 at v0.3.1. Green again on HEAD at
+**234**, the thirty-two new tests being Tune's
+([intent/tune.md](../intent/tune.md)). Two suites need the real machine:
+`real_launch` proves a run is recorded against the real binary and a real model,
+and `real_tune` checks the candidate picker against `tools/fits.py` on the file
+in the models directory, with the ladder itself behind `--ignored`.
 
 Proof sits with the work it belongs to, not here. Every phase file carries its
 own, including the mutation records: [figures.md](../intent/figures.md),

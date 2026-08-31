@@ -93,6 +93,27 @@ Two, each with its own spec, module and screen:
    without one picks the slowest of three candidates on the model the author
    runs. That waits for Tune.
 
+12. **Tune** — built 2026-08-31, seen and corrected on screen 2026-09-01,
+   unreleased.
+   [tune.md](tune.md). The second
+   phase from [direction.md](direction.md) and the one the approved mockup waits
+   for: the app measures rather than guesses, and only then has an opinion. Five
+   parcels, and the first is that `cargo test` currently writes into the live
+   Application Support directory — a speed record written on settle would have
+   the suite corrupting the records the optimizer ranks.
+
+   **Two of its decisions go against the mockup and against the recommendation
+   made while planning**, and both are recorded where they were made. No
+   arithmetic suggestion ships, because the only rule available picks the slowest
+   of three; and rows from ordinary use may be ranked, gated on workload, which
+   is a comparison this project has already been burned by.
+
+   Five parcels, all built. What it measured changed the rule it was built on: the
+   two full-precision rungs are within noise of each other, so the app suggests the
+   widest of what it cannot tell apart rather than the fastest reading. **The
+   screen was then looked at, and five defects came out of it that the suite could
+   not see — which is where this project finds its defects, every time.
+
 ## Gaps
 
 What two comparable tools do and this one does not, read off their source on
@@ -118,6 +139,21 @@ user. The entry below stays as written: its reason was never wrong, and it now
 sets the bar. A search box over repo ids is still a worse browser tab. What is
 in scope is finding the *best model for this machine*, which is a different
 problem.
+
+**Benchmarks — removed 2026-08-01, after being built.** Recorded here on
+2026-08-31, having never been written down at the time.
+`31031b2` deleted `benchmarks.rs`, the Benchmarks and Connect screens, the
+benchmark half of `health.rs` and the profile CRUD surface: 6,707 lines of Rust to
+5,061, 29 commands to 17, on the grounds that roughly a third of the app served
+features that were never part of the goal while the resumable downloader — half of
+that goal — remained unbuilt. The reason was scope discipline, not a fault in the
+design.
+
+`benchmarks.json` was left on disk untouched and is still there, holding records
+from that day keyed on model, context, both cache types, `ngl`, `parallel` and
+`llamaVersion`. **[tune.md](tune.md) is that feature coming back**, asked for by
+the author as the app's user, and it should read the deleted implementation before
+writing a new one.
 
 **Discover — dropped 2026-08-02, after being planned.** An in-app Hugging Face
 browser: search, repo file listing, quant selection. Planned in full, then cut

@@ -7,8 +7,10 @@ pub mod health;
 pub mod probe;
 pub mod profile;
 pub mod runner;
+pub mod speeds;
 pub mod store;
 pub mod sysmem;
+pub mod tune;
 
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
@@ -28,6 +30,7 @@ use probe::Capabilities;
 use profile::Profile;
 use runner::{EventSink, LaunchSpec, Orphan, RunState, Runner, RunnerSnapshot};
 use store::Config;
+use tune::Tuner;
 
 struct TauriEvents(AppHandle);
 
@@ -47,6 +50,7 @@ struct AppState {
     models: Mutex<Vec<ModelEntry>>,
     caps: Mutex<Option<Result<Capabilities, String>>>,
     runner: Runner,
+    tuner: Tuner,
     downloads: Downloads,
     tray: Mutex<Option<TrayHandles>>,
     orphan: Mutex<Vec<Orphan>>,
@@ -543,6 +547,8 @@ fn runner_start(
         cache_type_k: plan.profile.cache_type_k.clone(),
         cache_type_v: plan.profile.cache_type_v.clone(),
         predicted_base,
+        speed_key: speeds::SpeedKey::of(&model_id, &plan.profile),
+        llama_version: caps.version.clone(),
     };
 
     state.runner.start(spec)?;
@@ -592,9 +598,73 @@ fn runner_stop(app: AppHandle, state: State<'_, AppState>) -> Result<RunnerSnaps
 #[tauri::command]
 fn orphan_status(state: State<'_, AppState>) -> Vec<Orphan> {
     let ours = state.runner.snapshot().pid;
-    let found = runner::detect_orphans(ours);
+    // A server Tune is measuring right now is not something the user left behind.
+    let measuring = state.tuner.live_pid();
+    let found: Vec<Orphan> = runner::detect_orphans(ours)
+        .into_iter()
+        .filter(|orphan| Some(orphan.pid) != measuring)
+        .collect();
     *state.orphan.lock().expect("orphan lock") = found.clone();
     found
+}
+
+/// What this model has been seen to do, ranked where the runs earned it.
+#[tauri::command]
+fn speeds_for(model_id: String, state: State<'_, AppState>) -> speeds::Summary {
+    let build = state.capabilities().ok().and_then(|caps| caps.version);
+    let records: Vec<speeds::SpeedRecord> = store::load_speeds(&store::speeds_path())
+        .into_iter()
+        .filter(|record| record.key.model_id == model_id)
+        .collect();
+    speeds::summarise(&records, build.as_deref())
+}
+
+/// What the app would measure, and why it might refuse to.
+#[tauri::command]
+fn tune_status(state: State<'_, AppState>) -> tune::Report {
+    state.tuner.report()
+}
+
+/// Launches each candidate in turn and times it. Refuses while a model is running: this
+/// app runs one at a time, and a measurement is not worth stopping a server someone is
+/// talking to.
+#[tauri::command]
+fn tune_start(model_id: String, state: State<'_, AppState>) -> Result<tune::Report, String> {
+    if state.runner.snapshot().state != RunState::Idle {
+        return Err(
+            "stop the running model first — Tune launches servers of its own and this app \
+             runs one model at a time"
+                .into(),
+        );
+    }
+
+    let model = state.model(&model_id)?;
+    let caps = state.capabilities()?;
+    let plan = build_plan(&state, &model_id, None)?;
+    plan.profile.check_raw_args()?;
+
+    let metadata = model
+        .metadata
+        .as_ref()
+        .ok_or("this model's header could not be read, so nothing can be sized")?;
+    let candidates = tune::candidates(metadata, model.size_bytes, &caps);
+
+    state.tuner.start(tune::Request {
+        model_id,
+        model_name: model.display_name.clone(),
+        model_path: model.path.clone(),
+        base: plan.profile,
+        candidates,
+        llama_version: caps.version.clone(),
+        caps,
+    })?;
+    Ok(state.tuner.report())
+}
+
+#[tauri::command]
+fn tune_cancel(state: State<'_, AppState>) -> tune::Report {
+    state.tuner.cancel();
+    state.tuner.report()
 }
 
 #[tauri::command]
@@ -767,6 +837,7 @@ pub fn run() {
             let handle = app.handle().clone();
 
             let runner = Runner::new(Arc::new(TauriEvents(handle.clone())));
+            let tuner = Tuner::new(Arc::new(TauriEvents(handle.clone())));
             let downloads = {
                 let handle = handle.clone();
                 Downloads::new(
@@ -783,6 +854,7 @@ pub fn run() {
                 models: Mutex::new(Vec::new()),
                 caps: Mutex::new(None),
                 runner,
+                tuner,
                 downloads,
                 tray: Mutex::new(None),
                 orphan: Mutex::new(runner::detect_orphans(None)),
@@ -873,6 +945,10 @@ pub fn run() {
             health_test,
             orphan_status,
             orphan_stop,
+            speeds_for,
+            tune_status,
+            tune_start,
+            tune_cancel,
             download_start,
             download_pause,
             download_resume,
@@ -888,6 +964,7 @@ pub fn run() {
             tauri::RunEvent::ExitRequested { .. } | tauri::RunEvent::Exit => {
                 let state = app.state::<AppState>();
                 let _ = state.runner.stop();
+                state.tuner.cancel();
             }
             // Closing hides, so without this the Dock icon leads nowhere and the only way
             // back is the tray — which is exactly where a first-time user will not look.

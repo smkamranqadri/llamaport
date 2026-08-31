@@ -231,3 +231,74 @@ export interface Settings {
   capabilities: Capabilities | null;
   capabilityError: string | null;
 }
+
+export interface TuneCandidate {
+  ctx: number;
+  cacheK: string;
+  cacheV: string;
+}
+
+export interface TuneReading {
+  promptTokens: number;
+  promptSeconds: number;
+  genTokens: number;
+  genSeconds: number;
+}
+
+/// A failure is a result too: "this did not load" answers the question the ladder asked.
+export interface TuneOutcome {
+  candidate: TuneCandidate;
+  reading: TuneReading | null;
+  error: string | null;
+}
+
+export interface TuneReport {
+  running: boolean;
+  modelId: string | null;
+  modelName: string | null;
+  promptWords: number | null;
+  current: TuneCandidate | null;
+  done: number;
+  total: number;
+  rows: TuneOutcome[];
+  error: string | null;
+  cancelled: boolean;
+}
+
+export type SpeedSource = "observed" | "measured";
+export type SpeedConfidence = "neverMeasured" | "observed" | "tuned";
+
+export interface SpeedKey {
+  modelId: string;
+  ctx: number;
+  ngl: string;
+  cacheTypeK: string;
+  cacheTypeV: string;
+  flashAttn: boolean;
+  parallel: number;
+  rawArgs: string[];
+}
+
+export interface SpeedRow {
+  key: SpeedKey;
+  source: SpeedSource;
+  genTps: number | null;
+  promptTps: number | null;
+  promptTokens: number;
+  genTokens: number;
+  timestampSecs: number;
+  llamaVersion: string | null;
+  stale: boolean;
+  ranked: boolean;
+  runs: number;
+}
+
+export interface SpeedSummary {
+  rows: SpeedRow[];
+  confidence: SpeedConfidence;
+  suggestion: SpeedKey | null;
+  suggestedTps: number | null;
+  tied: number;
+  beats: SpeedKey | null;
+  beatsByPercent: number | null;
+}

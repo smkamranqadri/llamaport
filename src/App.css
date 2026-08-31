@@ -1141,3 +1141,61 @@ input[type="range"] {
 .advanced > .form-grid {
   margin-top: 12px;
 }
+
+.tune-table {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin-top: 12px;
+}
+
+.tune-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 16px;
+  align-items: baseline;
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-variant-numeric: tabular-nums;
+}
+
+.tune-row span:not(:first-child) {
+  min-width: 96px;
+  text-align: right;
+}
+
+.tune-head {
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.tune-row.is-fastest {
+  background: var(--surface-raised, rgba(127, 127, 127, 0.12));
+  font-weight: 600;
+}
+
+.tune-note {
+  margin-left: 8px;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.tune-row.is-unranked {
+  color: var(--muted);
+}
+
+.tune-suggestion {
+  margin-top: 12px;
+}
+
+.tune-history-head {
+  margin: 20px 0 0;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}

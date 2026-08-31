@@ -44,6 +44,11 @@ below is the part that is not.
    30 days kept. This app scrapes the same endpoint for the running view and
    discards it, so nothing survives the process it was measured from.
 
+   **Scheduled 2026-08-31** as parcels 1 and 2 of [tune.md](tune.md), and the
+   only item here that is. What it grew into is not a stats screen: a record
+   keyed on the settings a run used, so the app can say what a model got and
+   what a change to its settings did.
+
 ## The three that reopen Discover
 
 6, 7 and 8 are in-app Hugging Face search, its result badges, and a fit rating —

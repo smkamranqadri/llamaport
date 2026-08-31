@@ -70,7 +70,13 @@ anything at all.
 
 This changes what **Tune** is. Measuring by launching a model several times is
 the fallback, not the first move: the first move is to remember what ordinary
-use already demonstrated. It also merges with
+use already demonstrated.
+
+**Half of that was reversed when Tune was planned** ([tune.md](tune.md)). A
+record of ordinary use says what a model got at the settings it ran at; it cannot
+say which setting is faster, because those runs did different work — which is the
+same mistake as the 36-token prompt below, one level up. So the remembering is
+evidence and the controlled run is the verdict, and both ship. It also merges with
 [gaps.md](gaps.md)'s item on persisting telemetry, which was filed as a
 nice-to-have and is now load-bearing.
 
@@ -122,9 +128,15 @@ slower. Nothing here should be built on a single reading, and the small model wa
 a poor guide to the large one: it put the context penalty at 19% where the 35B
 says 27%, with the winner in a different place.
 
-So the app suggests by arithmetic, marks the suggestion as unmeasured, and Tune
-is what makes it true. That is the whole argument for Tune, and it is now a
-measurement rather than an intuition.
+That is the whole argument for Tune, and it is now a measurement rather than an
+intuition.
+
+It was written here as "the app suggests by arithmetic, marks the suggestion as
+unmeasured, and Tune is what makes it true". **The first half was dropped when
+Tune was planned** ([tune.md](tune.md)): a label is thin protection for a rule
+measured as picking the slowest of three, and prose beside a figure is where
+every defect of this day was found. Until something has been measured, the app
+says nothing.
 
 ## Decisions this reverses
 
@@ -161,11 +173,14 @@ launch" tab shows a suggestion marked *never measured*; its "After Tune" tab
 shows measurement overruling arithmetic by 27%. That disagreement is the mockup's
 argument, and it is the argument for Tune.
 
-Two details in it are already superseded. Advanced is drawn with a per-field
-override marker, which v0.4.0 ships without — the fields are editable but nothing
-marks one as the user's, because nothing suggests values yet. And its speed panel
-reports generation only; the prompt figures it once showed came from a 36-token
-prompt and were withdrawn as meaningless.
+Three details in it are already superseded. Its "Before launch" tab shows the app
+suggesting before anything has measured, which [tune.md](tune.md) decided
+against — that tab now reads as a model nobody has run does: what fits, and no
+opinion. Advanced is drawn with a per-field override marker, which v0.4.0 ships
+without — the fields are editable but nothing marks one as the user's, because
+nothing suggests values yet. And its speed panel reports generation only; the
+prompt figures it once showed came from a 36-token prompt and were withdrawn as
+meaningless.
 
 ## The shape this implies
 
@@ -206,8 +221,5 @@ revisit next.
 ## Not settled
 
 - What "best model" means, which item 7 cannot be built without.
-- Whether a speed record is keyed on the model alone or on the model and its
-  settings together. Only the second can answer "did that change help", which is
-  the whole point of an optimizer.
 - Whether hunting and working are two screens or one.
 - What the named choices are called, and how many there are.

@@ -2,22 +2,28 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   getLaunchPlan,
   healthTest,
+  onTuneReport,
   openWebUi,
   revealPath,
   runnerStart,
   runnerStop,
+  speedsFor,
+  tuneStatus,
 } from "./api";
 import { formatContext, formatFileSize, formatMemory } from "./format";
 import { bytesOr, pressureText, Stat } from "./Memory";
 import ProfileForm, { AUTO_CTX } from "./ProfileForm";
 import HealthPanel from "./HealthPanel";
+import TunePanel from "./TunePanel";
 import type {
   HealthReport,
   LaunchPlan,
   ModelEntry,
   Profile,
   RunnerSnapshot,
+  SpeedSummary,
   Telemetry,
+  TuneReport,
 } from "./types";
 
 const SPARK_POINTS = 60;
@@ -349,6 +355,8 @@ export default function ModelDetail({
   const [showLogs, setShowLogs] = useState(false);
   const [health, setHealth] = useState<HealthReport | null>(null);
   const [testing, setTesting] = useState(false);
+  const [tune, setTune] = useState<TuneReport | null>(null);
+  const [speeds, setSpeeds] = useState<SpeedSummary | null>(null);
   const history = useRef<number[]>([]);
 
   const isCurrent = runner.modelId === model.id;
@@ -384,6 +392,20 @@ export default function ModelDetail({
       setHealth(null);
     }
   }, [isCurrent, runner.state]);
+
+  useEffect(() => {
+    tuneStatus().then(setTune).catch(() => {});
+    const stop = onTuneReport(setTune);
+    return () => {
+      void stop.then((off) => off());
+    };
+  }, []);
+
+  // Rows are written when a run settles and as each candidate finishes, so the history is
+  // re-read on both rather than only when the screen opens.
+  useEffect(() => {
+    speedsFor(model.id).then(setSpeeds).catch(() => {});
+  }, [model.id, runner.state, tune?.done, tune?.running]);
 
   useEffect(() => {
     if (telemetry?.genTps == null) return;
@@ -580,6 +602,20 @@ export default function ModelDetail({
           />
         </div>
       </section>
+
+      <TunePanel
+        modelId={model.id}
+        blocked={
+          blocked ??
+          (runner.state === "idle"
+            ? null
+            : "Tune launches servers of its own, and this app runs one model at a time. Stop the running model first.")
+        }
+        report={tune}
+        onReport={setTune}
+        summary={speeds}
+        onApply={(settings) => setForm((current) => current && { ...current, ...settings })}
+      />
 
       <section className="panel">
         <h2>Launch settings</h2>

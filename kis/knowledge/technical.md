@@ -24,12 +24,14 @@ src-tauri/src/
   download.rs  the transfer engine: resolve, segments, resume, verify
   downloads.rs the job manager the commands drive; admission and settling
   store.rs     the single JSON config under Application Support
+  speeds.rs    what a model did, and the settings it did it under
   sysmem.rs    machine memory readings via libc
   profile.rs   launch settings -> argv
 src/
   App.tsx, Library.tsx, ModelDetail.tsx, ProfileForm.tsx, SettingsScreen.tsx,
   HealthPanel.tsx, Memory.tsx, Downloads.tsx, api.ts, types.ts, format.ts
 src-tauri/tests/   integration tests; real_* need a model, a binary or the network
+                   common/ isolates the config directory; call it before any runner
 ```
 
 Both long-running subsystems report through a trait they own rather than calling
@@ -63,8 +65,22 @@ back as — so both are written here, and `only_record_of` is where that is
 decided. Writing only the queued state made the queue survive one restart and not
 the next.
 
+What a model actually did is a third file, `speeds.json`, appended when a run that
+reached Ready and generated something settles — on either path out, the user
+stopping it or the process exiting. Its rows hold the run's *totals*, not a tick's
+snapshot, and the rates are derived so nothing on disk can disagree with itself. A
+row is keyed on everything that can move the number and stamped with the build.
+Split out for the same reason as the history above.
+
+**The suite writes none of this.** `store::use_config_dir` takes the directory
+once, and the tests that can start a runner call `common::isolate_config_dir`
+first. Before that existed, `cargo test` wrote `runner.pid` and `last-run.log`
+into the directory the installed app was using, and the log sitting there was test
+output.
+
 Everything the app keeps lives in `~/Library/Application Support/llamaport`:
-that config, `downloads.json`, the runner pidfile, the last run log.
+that config, `downloads.json`, `speeds.json`, the runner pidfile, the last run
+log.
 `store::adopt_legacy_dir`
 takes over the directory left under the old `llama-cpp-hub` name, once, as the
 first statement in `setup` — before the pidfile is read or the config is loaded,
@@ -163,6 +179,16 @@ failing check. Export it first: `export PATH="$HOME/.cargo/bin:$PATH"`.
   says 1.0 was the model's choice rather than a fallback, and a `--temp` typed
   into extra arguments silently replaces it with no indication.
 
+- **`write_atomic` cannot take two writers at once.** Its temporary is
+  `path.with_extension("tmp")` — one name per destination, not per writer — so two
+  threads writing the same file race on it and the loser's rename fails with
+  `NotFound`. Every caller is serialised today, and any new one must be: a
+  read-modify-write on one of these files needs a mutex around the whole pair, not
+  just faith in the rename. Found by removing `store::append_speed`'s lock and
+  watching a concurrent-append test fail on the collision rather than on the lost
+  row it was written for. Losing a row silently is the failure it prevents in
+  production, where writers are serialised — the collision is what happens when
+  they are not.
 - HTTP is `ureq` with `default-features = false, features = ["tls"]`, which is
   rustls plus webpki-roots. Blocking, one thread per connection — there is no
   async runtime and nothing needs one.

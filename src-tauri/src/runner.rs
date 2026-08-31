@@ -9,6 +9,8 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use serde::{Deserialize, Serialize};
 use sysinfo::{Pid, ProcessesToUpdate, System};
 
+use crate::speeds::{SpeedKey, SpeedRecord};
+use crate::store;
 use crate::sysmem::{self, Pressure};
 
 /// The runner reports through this rather than talking to Tauri directly, so its
@@ -91,6 +93,11 @@ pub struct LaunchSpec {
     pub cache_type_k: String,
     pub cache_type_v: String,
     pub predicted_base: u64,
+    /// What this run will be filed under if it produces a reading. Built by the caller
+    /// from the profile, so the runner records what it is told to rather than knowing
+    /// which settings can move a number.
+    pub speed_key: SpeedKey,
+    pub llama_version: Option<String>,
 }
 
 struct Inner {
@@ -106,6 +113,10 @@ struct Inner {
     started_secs: Option<u64>,
     port: Option<u16>,
     server_ctx: Option<u64>,
+    /// The last totals this run reported. Only the telemetry loop writes them and it only
+    /// runs after Ready, so their presence is what says a run got far enough to be worth
+    /// recording.
+    counters: Option<Counters>,
 }
 
 impl Inner {
@@ -159,6 +170,7 @@ impl Runner {
                 started_secs: None,
                 port: None,
                 server_ctx: None,
+                counters: None,
             })),
         }
     }
@@ -200,7 +212,9 @@ impl Runner {
             inner.port = None;
             inner.started_secs = None;
             inner.server_ctx = None;
+            drop(inner);
             clear_pidfile();
+            record_speed(&self.inner);
         }
 
         // On a real transition, on every path out. The tray learns the state only from this
@@ -212,6 +226,43 @@ impl Runner {
         }
         Ok(())
     }
+}
+
+/// One row per run that reached Ready and generated something.
+///
+/// Taking the counters is what makes it once per run: both settle paths call this, and a
+/// stop that follows an exit finds nothing left to write. A run that never became Ready
+/// never had counters at all.
+fn record_speed(inner: &Arc<Mutex<Inner>>) {
+    let (counters, spec) = {
+        let mut guard = inner.lock().expect("runner lock");
+        (guard.counters.take(), guard.spec.clone())
+    };
+    let (Some(counters), Some(spec)) = (counters, spec) else {
+        return;
+    };
+    if counters.gen_tokens <= 0.0 {
+        return;
+    }
+
+    let record = SpeedRecord {
+        timestamp_secs: SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0),
+        key: spec.speed_key,
+        llama_version: spec.llama_version,
+        source: crate::speeds::Source::Observed,
+        prompt_tokens: counters.prompt_tokens,
+        prompt_seconds: counters.prompt_seconds,
+        gen_tokens: counters.gen_tokens,
+        gen_seconds: counters.gen_seconds,
+    };
+    // `parse_metrics` accepts anything f64 parses, which includes NaN and inf.
+    if !record.is_sound() {
+        return;
+    }
+    let _ = store::append_speed(&store::speeds_path(), record);
 }
 
 fn emit_state(events: &Events, inner: &Arc<Mutex<Inner>>) {
@@ -415,6 +466,7 @@ fn spawn_health_and_telemetry(
     });
 }
 
+#[derive(Clone)]
 struct Counters {
     prompt_tokens: f64,
     prompt_seconds: f64,
@@ -510,6 +562,13 @@ fn telemetry_loop(
             telemetry.tokens_prompt = metrics.get("llamacpp:prompt_tokens_total").copied();
 
             let current = read_counters(&metrics);
+            {
+                let mut guard = inner.lock().expect("runner lock");
+                if guard.generation != generation {
+                    return;
+                }
+                guard.counters = Some(current.clone());
+            }
             if let Some(prev) = &previous {
                 telemetry.gen_tps = rate(
                     current.gen_tokens,
@@ -561,6 +620,7 @@ fn spawn_waiter(inner: Arc<Mutex<Inner>>, events: Events, generation: u64, spec:
         };
 
         clear_pidfile();
+        record_speed(&inner);
 
         // A crash before Ready is a configuration problem; restarting reproduces it.
         if was_ready && !already_restarted {

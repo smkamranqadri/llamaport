@@ -12,6 +12,8 @@ use llamaport_lib::probe;
 use llamaport_lib::profile::{self, Profile};
 use llamaport_lib::runner::{EventSink, LaunchSpec, RunState, Runner};
 
+mod common;
+
 struct Printer {
     telemetry: Mutex<Vec<serde_json::Value>>,
 }
@@ -57,6 +59,7 @@ fn launches_the_real_server_with_the_generated_command() {
     let printer = Arc::new(Printer {
         telemetry: Mutex::new(Vec::new()),
     });
+    common::isolate_config_dir();
     let runner = Runner::new(printer.clone());
 
     runner
@@ -72,6 +75,8 @@ fn launches_the_real_server_with_the_generated_command() {
             cache_type_k: launch.cache_type_k.clone(),
             cache_type_v: launch.cache_type_v.clone(),
             predicted_base: model.size_bytes,
+            speed_key: llamaport_lib::speeds::SpeedKey::of(&model.id, &launch),
+            llama_version: caps.version.clone(),
         })
         .expect("start");
 
@@ -112,6 +117,35 @@ fn launches_the_real_server_with_the_generated_command() {
         "totals should come from the metrics endpoint"
     );
 
+    // Nothing has asked the server for anything yet, so there is nothing to record and a
+    // row here would be a run that measured its own idleness.
+    let port = snapshot.port.expect("port");
+    let asked = ureq::post(&format!("http://127.0.0.1:{port}/completion"))
+        .timeout(Duration::from_secs(120))
+        .set("Content-Type", "application/json")
+        .send_string(r#"{"prompt":"Count from one to twenty.","n_predict":48,"stream":false}"#)
+        .expect("completion");
+    let body: serde_json::Value =
+        serde_json::from_str(&asked.into_string().expect("body")).expect("json");
+    println!("timings {}", body["timings"]);
+    thread::sleep(Duration::from_secs(2));
+
     runner.stop().expect("stop");
     assert_eq!(runner.snapshot().state, RunState::Idle);
+
+    let rows = llamaport_lib::store::load_speeds(&llamaport_lib::store::speeds_path());
+    let row = rows
+        .iter()
+        .find(|row| row.key.model_id == model.id)
+        .expect("the run left no reading behind");
+    println!(
+        "recorded {:.1} tok/s generation, {:.1} prompt, at {} ctx on {}",
+        row.gen_tps().unwrap_or(0.0),
+        row.prompt_tps().unwrap_or(0.0),
+        row.key.ctx,
+        row.llama_version.clone().unwrap_or_default()
+    );
+    assert!(row.gen_tokens > 0.0, "the server generated nothing");
+    assert_eq!(row.key.ctx, launch.ctx);
+    assert_eq!(row.llama_version, caps.version);
 }

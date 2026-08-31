@@ -12,7 +12,9 @@ import type {
   RunnerSnapshot,
   Orphan,
   Settings,
+  SpeedSummary,
   Telemetry,
+  TuneReport,
 } from "./types";
 
 export function listModels(): Promise<ModelEntry[]> {
@@ -111,6 +113,22 @@ export function orphanStop(pid: number): Promise<Orphan[]> {
   return invoke<Orphan[]>("orphan_stop", { pid });
 }
 
+export function speedsFor(modelId: string): Promise<SpeedSummary> {
+  return invoke<SpeedSummary>("speeds_for", { modelId });
+}
+
+export function tuneStatus(): Promise<TuneReport> {
+  return invoke<TuneReport>("tune_status");
+}
+
+export function tuneStart(modelId: string): Promise<TuneReport> {
+  return invoke<TuneReport>("tune_start", { modelId });
+}
+
+export function tuneCancel(): Promise<TuneReport> {
+  return invoke<TuneReport>("tune_cancel");
+}
+
 export function downloadStart(url: string): Promise<DownloadJob[]> {
   return invoke<DownloadJob[]>("download_start", { url });
 }
@@ -149,6 +167,10 @@ export function onTelemetry(handler: (telemetry: Telemetry) => void) {
   return listen<Telemetry>("runner:telemetry", (event) =>
     handler(event.payload),
   );
+}
+
+export function onTuneReport(handler: (report: TuneReport) => void) {
+  return listen<TuneReport>("tune:report", (event) => handler(event.payload));
 }
 
 export function onDownloadState(handler: (jobs: DownloadJob[]) => void) {
