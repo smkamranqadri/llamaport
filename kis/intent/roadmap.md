@@ -103,6 +103,13 @@ app disagrees with its own label by 7.4%.
 
 ## Decided against
 
+**Discover was dropped twice and is back in scope from 2026-08-31**
+([direction.md](direction.md)), because the author asked for it as the app's
+user. The entry below stays as written: its reason was never wrong, and it now
+sets the bar. A search box over repo ids is still a worse browser tab. What is
+in scope is finding the *best model for this machine*, which is a different
+problem.
+
 **Discover — dropped 2026-08-02, after being planned.** An in-app Hugging Face
 browser: search, repo file listing, quant selection. Planned in full, then cut
 before any code was written.

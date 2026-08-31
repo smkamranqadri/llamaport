@@ -14,8 +14,12 @@ context a model supports or what a given `-c` costs. Separately, `curl -L -C -`
 against Hugging Face does not resume reliably and is slow on one connection,
 so downloads currently go through an external download manager.
 
-**In scope:** list models with real GGUF metadata, launch one, report what it
-costs, stop it, say whether it works; download with resume.
+**In scope**, rewritten 2026-08-31 by the author as its only user — see
+[intent/direction.md](../intent/direction.md), which supersedes the two lines
+below where they disagree: list models with real GGUF metadata, launch one,
+report what it costs, stop it, say whether it works; download with resume; have
+an opinion about the settings rather than offering knobs; point pi at what is
+running; and, later, help find a model worth downloading.
 
 **Out of scope:** a chat UI of our own — `llama-server` ships one, enabled by
 default, and a ready model opens it in a second app window labelled Web UI. That
@@ -50,7 +54,13 @@ Each is argued in the specs; this is the index, not a second copy.
 - Read GGUF headers directly, and walk the entire KV block.
 - One model at a time; a busy port refuses the launch instead of moving.
 - Find stray servers by scanning processes, not by reading a pidfile.
-- No profile system, and no merging. A form opens on the most specific whole
+- ~~No profile system~~ — **reversed 2026-08-31**
+  ([intent/direction.md](../intent/direction.md)). Not into presets: the seven
+  fields the author has never once changed across 21 launches become the
+  optimizer's business, and the app takes a position instead of offering knobs.
+  The rule was right that a form of knobs nobody sets is bad and wrong about the
+  remedy. What survives unchanged is the no-merging rule below.
+- No merging. A form opens on the most specific whole
   profile there is: what is being edited, else this model's last **successful**
   launch, else the launch defaults set in Settings, else the built-in values.
   Defaults seed a model nobody has launched; they never overrule one that has.

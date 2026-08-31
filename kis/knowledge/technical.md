@@ -79,6 +79,18 @@ bun run tauri dev
 
 ## Verify
 
+`tools/fits.py MODEL.gguf` is a **second opinion on `estimate.rs`**, not a
+convenience. The suite only ever sizes synthetic headers; the script sizes a
+real file in the models directory by an independent route, so a disagreement
+between them is a finding rather than a nuisance. Checked 2026-08-31 and they
+agree: 204 MiB for `qwen2.5-0.5b` at 32,768 with all 24 layers charged, 680 MiB
+for Ornith at 65,536 with 10 of 40 charged.
+
+It also reads the two ceilings correctly, which the app does not yet do —
+`llama-server --list-devices` for the GPU working set, `vm_stat` for what is
+free. `--run` launches the winner and reports real tokens per second.
+
+
 Also in the README. Both copies are deliberate: the session anchor loads this
 one, contributors read that one. Not a duplication to clean up.
 
@@ -95,6 +107,25 @@ commands exit **127**, which is "command not found" wearing the shape of a
 failing check. Export it first: `export PATH="$HOME/.cargo/bin:$PATH"`.
 
 ## Constraints
+
+- **Installed memory is the wrong ceiling, and "fits" is not "works".** On this
+  M2 Pro `llama-server -lv 10` reports `MTL0 : Apple M2 Pro (25559 MiB, 25558
+  MiB free)` against `CPU : 32768 MiB` — the Metal working set is **25,559 MiB
+  (26.80 GB)**, not the 34.36 GB installed, and llama.cpp keeps `--fit-target`'s
+  1,024 MiB below it. Read the real figure from that log line rather than
+  computing a fraction of RAM.
+
+  Two ceilings bite, and arithmetic against either can still be wrong. Ornith at
+  its full 262,144 context needs 23,931 MiB with a `q8_0` cache and fits, and
+  26,335 MiB with `f16` and does not. Separately, what is *available* is far
+  below both: 14.83 GB free with 6.26 of 7.17 GB of swap already used, on a
+  machine whose spec sheet says 32 GB.
+
+  This corrected a claim made in this project on 2026-08-31 — that the inherited
+  `q8_0` cache was buying memory nobody needed at a cost to quality. Against the
+  real ceiling it is what buys the full context. The author's objection, "fit
+  does not mean it works", is the rule: a memory sum says a launch is *allowed*,
+  never that it is good, and only running it says the second.
 
 - **A green suite says nothing about the sentence beside the number.** Figures
   and Fitting each shipped arithmetic that was tested, mutation-checked and
