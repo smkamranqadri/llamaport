@@ -94,6 +94,30 @@ the optimizer rather than a refinement of it, and it means the screen's job is
 to show what is actually free right now — which is what the author asked for in
 item 4 and is the same question.
 
+## Measured: a large context costs speed, and q8_0 buys it back
+
+`tools/fits.py --run` on `qwen2.5-0.5b`, 2026-08-31:
+
+    32,768 ctx / f16    145.3 tok/s
+     8,192 ctx / f16    178.5 tok/s   fastest
+    32,768 ctx / q8_0   175.2 tok/s
+
+Two things follow, and both were guesses before.
+
+**"Largest that fits" is not the rule.** Four times the context cost 19% of
+generation speed. A memory sum cannot see that, so the optimizer cannot be pure
+arithmetic — which is the author's objection arriving a second time, from a
+direction nobody was looking.
+
+**The inherited `q8_0` is right for a second independent reason.** It was
+already what lets a 35B hold its full context on this GPU
+([knowledge/technical.md](../knowledge/technical.md)); it now also runs within
+2% of `f16` at a quarter of the context. This project criticised that default
+twice today and was wrong both times.
+
+Measured on a 0.5B. Whether it holds for a 35B is unknown and is the first thing
+a real Tune should settle.
+
 ## Decisions this reverses
 
 Both are written into [knowledge/project.md](../knowledge/project.md) and are
@@ -129,6 +153,14 @@ Not a plan. The pieces, so the plan has something to cut up.
   four other providers, so writing behind the author's back is wrong. It should
   follow the conventions already in that file rather than invent one, and it
   has to deal with the 8080 collision.
+- **Tune is the script's `--run`, rewritten in Rust.** Not a shell-out: a
+  shipped app cannot depend on python3 being present. `fits.py` stays the oracle
+  the Rust is checked against, the same relationship it has with `estimate.rs`.
+- **Advanced is per-field override, not a form behind a toggle.** Each decided
+  value is editable in place; touching one marks it the user's and the optimizer
+  stops deciding that field for that model, with a way back to the suggestion.
+  The existing rule carries it — a model opens on its last successful launch —
+  so an override persists like a hand-set context does today.
 - **The app should read the ceiling the way `tools/fits.py` does.** One call to
   `llama-server --list-devices` gives `MTL0: Apple M2 Pro (25559 MiB, 25558 MiB
   free)` with no model loaded. Until it does, the memory panel is comparing

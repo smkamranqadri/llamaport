@@ -131,6 +131,28 @@ def ladder(m, gpu_mib, avail_mib):
     return rows
 
 
+def candidates(rows, on_gpu):
+    """A few that fit, spread across the axes that actually differ: how much context,
+    and how precise the cache. Measuring every rung would take all afternoon."""
+    fits = [r for r in rows if r["on_gpu"]]
+    picks, seen = [], set()
+    wanted = [on_gpu]
+    small = [r for r in fits if r["ctx"] <= 8192]
+    if small:
+        wanted.append(max(small, key=lambda r: (r["cache"] == "f16", r["ctx"])))
+    mid = [r for r in fits if 16384 <= r["ctx"] <= 65536]
+    if mid:
+        wanted.append(max(mid, key=lambda r: (r["cache"] == "f16", r["ctx"])))
+    other = [r for r in fits if r["ctx"] == on_gpu["ctx"] and r["cache"] != on_gpu["cache"]]
+    wanted += other
+    for r in wanted:
+        key = (r["ctx"], r["cache"])
+        if key not in seen:
+            seen.add(key)
+            picks.append(r)
+    return picks
+
+
 def best(rows, key):
     ok = [r for r in rows if r[key]]
     if not ok:
@@ -226,13 +248,30 @@ def main():
             print("  nothing has room right now even for its cache — close something")
 
         if do_run and on_gpu:
-            print(f"\n  measuring {on_gpu['ctx']:,} ctx / {on_gpu['cache']} ...", flush=True)
-            got = measure(m, on_gpu["ctx"], on_gpu["cache"])
-            if got.get("error"):
-                print(f"  it did not run: {got['error']}")
-            else:
-                print(f"  generation {got['gen_tps']:.1f} tok/s · prompt {got['prompt_tps']:.1f} tok/s"
-                      f" · resident {got['rss_gb']} GB · {got['wall_s']}s")
+            print("\n  MEASURING — a memory sum says a launch is allowed, never that it is good")
+            results = []
+            for cand in candidates(rows, on_gpu):
+                print(f"    {cand['ctx']:>9,} ctx / {cand['cache']:<5} ...", end="", flush=True)
+                got = measure(m, cand["ctx"], cand["cache"])
+                if got.get("error"):
+                    print(f" did not run: {got['error']}")
+                    continue
+                got.update(ctx=cand["ctx"], cache=cand["cache"])
+                results.append(got)
+                print(f" {got['gen_tps']:6.1f} tok/s generation · {got['prompt_tps']:7.1f} prompt"
+                      f" · {got['rss_gb']} GB resident")
+            if results:
+                fastest = max(results, key=lambda r: r["gen_tps"])
+                widest = max(results, key=lambda r: r["ctx"])
+                print(f"\n  fastest        : {fastest['ctx']:,} ctx / {fastest['cache']}"
+                      f"  at {fastest['gen_tps']:.1f} tok/s")
+                if fastest is not widest:
+                    lost = (1 - widest["gen_tps"] / fastest["gen_tps"]) * 100
+                    print(f"  widest context : {widest['ctx']:,} ctx / {widest['cache']}"
+                          f"  at {widest['gen_tps']:.1f} tok/s — {lost:.0f}% slower for"
+                          f" {widest['ctx']-fastest['ctx']:,} more tokens")
+                else:
+                    print("  the widest context was also the fastest — nothing was traded")
 
 if __name__ == "__main__":
     main()
