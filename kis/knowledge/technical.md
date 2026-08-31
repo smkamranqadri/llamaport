@@ -96,6 +96,16 @@ failing check. Export it first: `export PATH="$HOME/.cargo/bin:$PATH"`.
 
 ## Constraints
 
+- **A green suite says nothing about the sentence beside the number.** Figures
+  and Fitting each shipped arithmetic that was tested, mutation-checked and
+  correct, under captions that were wrong: a cache stat reading "≥ 0 MB" hinted
+  "some layers are not counted" on a dense model where every layer was counted,
+  a panel reading two different plans at once, a raw sentinel printed as `0`, and
+  a form naming a context its own command contradicted. Seven defects across the
+  two phases, every one found by the author looking at the built app and none by
+  the suite. Anything that puts prose next to a figure earns a look before it is
+  called done.
+
 - **`--fit` is on by default, and this app suppresses it by naming every value.**
   It "adjusts unset arguments to fit in device memory" (`--fit [on|off]`,
   default `on`; `--fit-target` a per-device margin, default 1024 MiB;

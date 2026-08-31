@@ -3,32 +3,45 @@
 ```text
 Branch:   `main`, clean and pushed. `v0.3.2` is tagged at HEAD, and both built
           `.dmg`s came from that commit.
-Task:     **Fitting**, parcel 1 done and parcel 2 written but unseen
-          ([intent/fitting.md](../intent/fitting.md)). Context and GPU layers now
-          default to Auto and pass no flag, gated on `--fit` being in the probed
-          `--help`. Ornith under Auto came up at 262,144 tokens against the
-          65,536 that used to be typed by hand.
-Mode:     Phase
-Blocker:  **Parcel 2's screen has not been looked at.** Auto adds a control, a
-          weights-only summary and a sentence, and the suite reaches none of
-          that. `bun run tauri dev` is running now.
+Task:     none in progress. **Fitting is done**, both parcels
+          ([intent/fitting.md](../intent/fitting.md)). Context and GPU layers can
+          sit unset and llama.cpp sizes them, gated on `--fit` being in the
+          probed `--help` — without it, omitting `-c` would ask a 262,144-token
+          cache of this machine. Ornith under Auto came up at 262,144 tokens
+          against the 65,536 that used to be typed by hand.
 
-          Three items sit in the after-the-tag list against v0.3.2, all needing
-          ten minutes with the display free and nothing fullscreen: five launches
-          of the installed build, closing the window and clicking the Dock icon,
-          and downloading a `.dmg` through a browser to meet a real Gatekeeper
-          prompt. Two more are unrelated and unchanged: a queued row with nothing
-          on disk behind it has never been seen coming back from a restart, and
-          no Intel Mac has run the universal build.
-Next:     Look at a model's detail screen with Auto on, then at one while it is
-          running. Expected: the context field reads "fitted to memory" with a
-          checkbox, the command shows neither `-c` nor `-ngl`, the memory panel
-          shows weights alone and says the cache is not counted, and once Ready
-          the panel prices the cache at the context the server reports. Then
-          commit, and the release cadence says publish.
+          Unreleased: v0.3.2 is the published build and does not carry this.
+Mode:     —
+Blocker:  none. Three items sit in the after-the-tag list against v0.3.2, all
+          needing ten minutes with the display free and nothing fullscreen: five
+          launches of the installed build, closing the window and clicking the
+          Dock icon, and downloading a `.dmg` through a browser to meet a real
+          Gatekeeper prompt. Two more are unrelated and unchanged: a queued row
+          with nothing on disk behind it has never been seen coming back from a
+          restart, and no Intel Mac has run the universal build.
 
-          After that, [intent/gaps.md](../intent/gaps.md). Auto-update is the item
-          whose value rose with the cadence change.
+          One thing the author should know rather than a blocker: the stored
+          launch defaults hold `ctx 65536, ngl "all"`, and those seed every model
+          never launched, so Auto stays inert for new models until Settings is
+          changed. Not migrated, because a stored `port 8080` says those defaults
+          were saved deliberately and the two fields inside them cannot be told
+          apart from a choice.
+Next:     Release. The cadence set on 2026-08-31 says publish whenever there is
+          something worth installing, and Fitting is that
+          ([intent/release.md](../intent/release.md)). It would carry the four
+          screen defects fixed today as well.
+
+          Then [intent/gaps.md](../intent/gaps.md). Auto-update is the item whose
+          value rose with the cadence change: more releases means more builds for
+          a user to be stranded behind, and there is still no way for one to
+          learn a new version exists.
+
+          The lesson this phase paid for twice over is in
+          [knowledge/technical.md](../knowledge/technical.md): the suite reaches
+          arithmetic and never reaches a sentence beside it. Four defects here
+          were found by the author looking at the built app and none by 197
+          tests, and one of them was a confidently wrong explanation printed next
+          to a correct number.
 ```
 
 Run and verify commands: [knowledge/technical.md](../knowledge/technical.md).
