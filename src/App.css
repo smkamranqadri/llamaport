@@ -601,6 +601,18 @@ input[type="range"] {
   font-variant-numeric: tabular-nums;
 }
 
+.telemetry-value.tone-ok {
+  color: var(--ok, #3fb950);
+}
+
+.telemetry-value.tone-warn {
+  color: var(--warn, #d29922);
+}
+
+.telemetry-value.tone-bad {
+  color: var(--danger, #f85149);
+}
+
 .telemetry-stats .field-hint {
   display: block;
 }
@@ -1099,4 +1111,33 @@ input[type="range"] {
   display: flex;
   gap: 8px;
   margin-top: 14px;
+}
+
+.advanced {
+  margin-top: 6px;
+  border-top: 1px solid var(--line, #2a2f36);
+  padding-top: 12px;
+}
+
+.advanced > summary {
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--text-muted);
+  list-style: none;
+}
+
+.advanced > summary::-webkit-details-marker {
+  display: none;
+}
+
+.advanced > summary::before {
+  content: "\25b8  ";
+}
+
+.advanced[open] > summary::before {
+  content: "\25be  ";
+}
+
+.advanced > .form-grid {
+  margin-top: 12px;
 }

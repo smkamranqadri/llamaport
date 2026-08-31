@@ -115,6 +115,8 @@ export type Pressure = "normal" | "warning" | "critical" | "unknown";
 export interface PlanMemory {
   installedBytes: number | null;
   usedBytes: number | null;
+  /// What the machine can hand out now — available, not free.
+  availableBytes: number | null;
   swapUsedBytes: number | null;
   pressure: Pressure;
 }

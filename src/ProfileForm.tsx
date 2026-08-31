@@ -93,7 +93,8 @@ export default function ProfileForm({
   const ctxCeiling = maxCtx ?? 131072;
 
   return (
-    <div className="form-grid">
+    <>
+      <div className="form-grid">
       {showAlias && (
         <Field
           label="Alias"
@@ -144,87 +145,94 @@ export default function ProfileForm({
         </>
       </Field>
 
-      <Field
-        label="GPU layers"
-        hint="auto lets the server place them; all, or a number"
-      >
-        <input
-          value={value.ngl}
-          onChange={(e) => set("ngl", e.currentTarget.value)}
-        />
-      </Field>
-
-      <Field
-        label="Parallel slots"
-      >
-        <input
-          type="number"
-          min={1}
-          value={value.parallel}
-          onChange={(e) => set("parallel", Number(e.currentTarget.value))}
-        />
-      </Field>
-
-      <Field
-        label="Cache type K"
-      >
-        <select
-          value={value.cacheTypeK}
-          onChange={(e) => set("cacheTypeK", e.currentTarget.value)}
-        >
-          {CACHE_TYPES.map((type) => (
-            <option key={type}>{type}</option>
-          ))}
-        </select>
-      </Field>
-
-      <Field
-        label="Cache type V"
-      >
-        <select
-          value={value.cacheTypeV}
-          onChange={(e) => set("cacheTypeV", e.currentTarget.value)}
-        >
-          {CACHE_TYPES.map((type) => (
-            <option key={type}>{type}</option>
-          ))}
-        </select>
-      </Field>
-
-      <Field label="Flags">
-        <span className="toggles">
-          <label className="toggle">
-            <input
-              type="checkbox"
-              checked={value.flashAttn}
-              onChange={(e) => set("flashAttn", e.currentTarget.checked)}
-            />
-            flash attention
-          </label>
-          <label className="toggle">
-            <input
-              type="checkbox"
-              checked={value.jinja}
-              onChange={(e) => set("jinja", e.currentTarget.checked)}
-            />
-            jinja
-          </label>
-        </span>
-      </Field>
-
-      <Field
-        label="Extra arguments"
-        hint="space separated, passed through verbatim"
-      >
-        <input
-          value={rawText}
-          onChange={(e) => {
-            const text = undoDashSubstitution(e.currentTarget.value);
-            setRawText(text);
-            set("rawArgs", splitArgs(text));
-          }}
-        />
-      </Field>
     </div>
+
+    <details className="advanced">
+      <summary>Advanced — the settings you have never had to change</summary>
+      <div className="form-grid">
+        <Field
+          label="GPU layers"
+          hint="auto lets the server place them; all, or a number"
+        >
+          <input
+            value={value.ngl}
+            onChange={(e) => set("ngl", e.currentTarget.value)}
+          />
+        </Field>
+
+        <Field
+          label="Parallel slots"
+        >
+          <input
+            type="number"
+            min={1}
+            value={value.parallel}
+            onChange={(e) => set("parallel", Number(e.currentTarget.value))}
+          />
+        </Field>
+
+        <Field
+          label="Cache type K"
+        >
+          <select
+            value={value.cacheTypeK}
+            onChange={(e) => set("cacheTypeK", e.currentTarget.value)}
+          >
+            {CACHE_TYPES.map((type) => (
+              <option key={type}>{type}</option>
+            ))}
+          </select>
+        </Field>
+
+        <Field
+          label="Cache type V"
+        >
+          <select
+            value={value.cacheTypeV}
+            onChange={(e) => set("cacheTypeV", e.currentTarget.value)}
+          >
+            {CACHE_TYPES.map((type) => (
+              <option key={type}>{type}</option>
+            ))}
+          </select>
+        </Field>
+
+        <Field label="Flags">
+          <span className="toggles">
+            <label className="toggle">
+              <input
+                type="checkbox"
+                checked={value.flashAttn}
+                onChange={(e) => set("flashAttn", e.currentTarget.checked)}
+              />
+              flash attention
+            </label>
+            <label className="toggle">
+              <input
+                type="checkbox"
+                checked={value.jinja}
+                onChange={(e) => set("jinja", e.currentTarget.checked)}
+              />
+              jinja
+            </label>
+          </span>
+        </Field>
+
+        <Field
+          label="Extra arguments"
+          hint="space separated, passed through verbatim"
+        >
+          <input
+            value={rawText}
+            onChange={(e) => {
+              const text = undoDashSubstitution(e.currentTarget.value);
+              setRawText(text);
+              set("rawArgs", splitArgs(text));
+            }}
+          />
+        </Field>
+      </div>
+    </details>
+    </>
   );
 }

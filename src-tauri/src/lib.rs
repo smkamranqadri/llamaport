@@ -126,6 +126,10 @@ struct LaunchPlan {
 struct PlanMemory {
     installed_bytes: Option<u64>,
     used_bytes: Option<u64>,
+    /// What the machine can hand out now. Available rather than free: macOS counts the
+    /// reclaimable inactive queue as neither used nor free, so `free` reads far below
+    /// what a new allocation can actually get.
+    available_bytes: Option<u64>,
     swap_used_bytes: Option<u64>,
     pressure: sysmem::Pressure,
 }
@@ -219,11 +223,13 @@ fn build_plan(
     let installed = sysmem::installed_bytes().or_else(|| Some(system.total_memory()));
     let swap_used = sysmem::swap_used_bytes().or_else(|| Some(system.used_swap()));
     let used = Some(system.used_memory());
+    let available = Some(system.available_memory());
     let pressure = sysmem::pressure();
 
     let memory = PlanMemory {
         installed_bytes: installed,
         used_bytes: used,
+        available_bytes: available,
         swap_used_bytes: swap_used,
         pressure,
     };

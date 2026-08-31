@@ -49,12 +49,6 @@ function Facts({ model }: { model: ModelEntry }) {
   );
 }
 
-/// Both branches of the memory panel say this, because both print a weights figure the
-/// Model panel prints differently, and the branch that withholds the cache is the one a
-/// reader is most likely to be studying when they notice.
-const COUNTED_AS_MEMORY =
-  "Counted as the machine counts memory — the Model panel's file size is these same bytes counted as Finder counts them, so it reads larger.";
-
 /// What the context field is asking for. Auto asks for nothing and says so, rather than
 /// printing the 0 that carries the meaning.
 function ctxStat(ctx: number): { value: string; hint: string } {
@@ -92,14 +86,44 @@ function kvStat(plan: LaunchPlan): { value: string; hint: string } {
 function MemoryBar({ plan }: { plan: LaunchPlan }) {
   const { memory } = plan;
 
-  const machine = (
-    <div className="telemetry-stats">
-      <Stat label="Installed" value={bytesOr(memory.installedBytes)} />
-      <Stat label="In use now" value={bytesOr(memory.usedBytes)} />
-      <Stat label="Swap in use" value={bytesOr(memory.swapUsedBytes)} />
-      <Stat label="macOS pressure" value={pressureText(memory.pressure)} />
-    </div>
-  );
+  // Four figures, and the ceiling among them is the one the app used to get wrong: it
+  // compared against installed memory, which nothing allocates from.
+  const budget = plan.deviceBudgetBytes;
+  const free = memory.availableBytes;
+  const strained = memory.pressure === "warning" || memory.pressure === "critical";
+
+  // Free memory is only good or bad relative to what is being asked of it, so the
+  // figure cannot be coloured until the launch's size is known. Green beside a warning
+  // that says the opposite is the bug this closes.
+  const machineStats = (wants: number | null) => {
+    let freeTone: "ok" | "warn" | "bad" | undefined;
+    if (free != null) {
+      freeTone = "ok";
+      if (wants != null && free < wants) {
+        freeTone = "warn";
+      }
+      if (strained || free < 1024 * 1024 * 1024) {
+        freeTone = "bad";
+      }
+    }
+    return (
+      <div className="telemetry-stats">
+        <Stat
+          label="GPU limit"
+          value={budget == null ? "Unknown" : formatMemory(budget)}
+          hint={budget == null ? "this build does not report it" : "what a launch must fit inside"}
+        />
+        <Stat
+          label="Free right now"
+          value={bytesOr(free)}
+          tone={freeTone}
+          hint={`macOS pressure ${pressureText(memory.pressure)}`}
+        />
+        <Stat label="Swap in use" value={bytesOr(memory.swapUsedBytes)} hint="paging costs speed" />
+        <Stat label="Installed" value={bytesOr(memory.installedBytes)} hint="the machine's spec" />
+      </div>
+    );
+  };
 
   if (!plan.estimate) {
     return (
@@ -107,50 +131,49 @@ function MemoryBar({ plan }: { plan: LaunchPlan }) {
         <p className="empty-detail">
           Not enough header metadata to size this model's cache.
         </p>
-        {machine}
+        {machineStats(null)}
       </div>
     );
   }
 
   const { weightsBytes, kvBytes, totalBytes, bounded, boundNote } = plan.estimate;
-  const scale = Math.max(plan.totalMemory, totalBytes);
+  // The bar is drawn against the ceiling a launch has to fit inside, falling back to
+  // installed memory only where the build would not say what that ceiling is.
+  const ceiling = budget ?? plan.totalMemory;
+  const scale = Math.max(ceiling, totalBytes);
   const width = (n: number) => `${(n / scale) * 100}%`;
+  const over = budget != null && totalBytes > budget;
 
-  let atLeast = "";
   let sign = "";
-  let provenance = "Exact figures from the model's header.";
   if (bounded) {
-    atLeast = "at least ";
     sign = "≥ ";
-    provenance = boundNote ?? "";
   }
 
-  // A cache of nothing is not a cache that was priced: it is Auto, where no context has
-  // been chosen, so the sentence must not offer "plus 0 B" as though it had been.
-  let summary = (
-    <p className="memory-summary">
-      <strong>
-        {sign}
-        {formatMemory(totalBytes)}
-      </strong>{" "}
-      to allocate — weights {formatMemory(weightsBytes)} plus {atLeast}
-      {formatMemory(kvBytes)} of KV cache at{" "}
-      {plan.profile.ctx.toLocaleString()} tokens.
-    </p>
-  );
+  let wants = `${sign}${formatMemory(totalBytes)}`;
+  let breakdown = `${formatMemory(weightsBytes)} weights + ${formatMemory(kvBytes)} cache at ${plan.profile.ctx.toLocaleString()} tokens`;
   if (kvBytes === 0) {
-    // The floor is the total, not the weights: those are exact, and it is the cache
-    // missing from beside them that makes the sum a lower bound.
-    summary = (
-      <p className="memory-summary">
-        <strong>
-          {sign}
-          {formatMemory(weightsBytes)}
-        </strong>{" "}
-        to allocate — weights {formatMemory(weightsBytes)}, and the cache is not
-        counted here.
-      </p>
-    );
+    wants = `${sign}${formatMemory(weightsBytes)}`;
+    breakdown = "weights only — no context chosen, so the cache is not counted";
+  }
+
+  // Two questions, and the verdict is the worse of them. Fitting the GPU says a launch is
+  // allowed; it says nothing about a machine with nothing left to give, which is what
+  // "fit does not mean it works" means and what this panel got wrong first time.
+  const crowded = free != null && totalBytes > free;
+  let verdict = "fits";
+  let tone: "ok" | "warn" | "bad" = "ok";
+  if (over) {
+    verdict = "over the GPU limit";
+    tone = "bad";
+  } else if (budget == null) {
+    verdict = "ceiling unknown";
+    tone = "warn";
+  } else if (strained) {
+    verdict = "fits, but the machine is under pressure";
+    tone = "bad";
+  } else if (crowded) {
+    verdict = "fits the GPU, not what is free";
+    tone = "warn";
   }
 
   return (
@@ -158,20 +181,17 @@ function MemoryBar({ plan }: { plan: LaunchPlan }) {
       <div className="memory-bar">
         <span className="seg seg-weights" style={{ width: width(weightsBytes) }} />
         <span className="seg seg-kv" style={{ width: width(kvBytes) }} />
-        <span
-          className="memory-limit"
-          style={{ left: `${(plan.totalMemory / scale) * 100}%` }}
-        />
+        <span className="memory-limit" style={{ left: `${(ceiling / scale) * 100}%` }} />
       </div>
 
-      {summary}
-      <p className="field-hint">
-        {provenance} {COUNTED_AS_MEMORY} How much of it stays resident, and what
-        that costs the machine, depends on what else is running — the numbers
-        below are the machine as it is now.
-      </p>
+      <div className="telemetry-stats">
+        <Stat label="This launch wants" value={wants} hint={breakdown} />
+        <Stat label="Against the limit" value={verdict} tone={tone} />
+      </div>
 
-      {machine}
+      {bounded && boundNote && <p className="field-hint">{boundNote}</p>}
+
+      {machineStats(totalBytes)}
     </div>
   );
 }

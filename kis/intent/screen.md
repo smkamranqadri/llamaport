@@ -61,7 +61,7 @@ the mockup on purpose**, and that is the cost of not shipping a bad default.
 the plan. `sysmem.rs` already reports what is free and what is swapping; nothing
 there changes.
 
-## Parcel 2 — the panel is a glance
+## Parcel 2 — the panel is a glance — DONE 2026-08-31
 
 Four figures and no paragraph: what this launch wants, the GPU limit, what is
 free now, swap. The bar marks the limit rather than installed memory. The seven
@@ -91,6 +91,34 @@ what said so.**
 
 The third mutation, collapsing total and free into one figure, failed the parse
 test as it should.
+
+## Proof — parcel 2, 2026-08-31
+
+Four commands green, 202 tests. Seen on screen across three models and both
+states, which is the only way this parcel could be proved: the paragraph is gone,
+the bar marks the GPU ceiling instead of installed memory, and Launch Settings
+shows three fields with six groups behind Advanced, expanded and still editable.
+
+**Looking found the same defect twice, one level apart.** Both times a value was
+correct on its own and wrong beside its neighbour, and no assertion could see
+either.
+
+- The verdict compared only against the GPU ceiling, so it printed "fits" in
+  green on a machine with **0 MB free**, 6.7 GB of swap and elevated pressure.
+  That is the author's own objection — fit does not mean it works — reintroduced
+  inside the panel built to answer it. It is now the worse of two questions.
+- With that fixed, the free figure itself still read **11.9 GB in green** beside
+  an amber "fits the GPU, not what is free". Free memory is only good or bad
+  relative to what is asked of it, so it could not be coloured before the
+  launch's size was known.
+
+Also restored: macOS pressure, which was dropped while removing prose and is the
+machine's own verdict.
+
+Confirmed by the author across the three states — green `fits` with 14.2 GB free
+on the 0.5B, amber `fits the GPU, not what is free` with 11.2 GB on Qwen3.6 at
+65,536, and red `fits, but the machine is under pressure` with 0 MB free at
+262,144.
 
 ## Out of scope
 
