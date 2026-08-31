@@ -146,6 +146,17 @@ from another produces a combination nobody chose and the screen cannot explain.
 Queueing — one at a time still refuses rather than queues. Auto-resume on
 launch. A named-preset profile system. A configurable history cap.
 
+## Proof — not recorded
+
+**This phase was marked done in 2026-08-03 without a proof section**, and it is
+the only completed phase here without one. Noticed by the audit on 2026-08-31 and
+left as a gap rather than filled: nobody knows now what was actually run, and
+writing something plausible would turn an honest hole into a false record. What
+is known is only what the commits of that day show.
+
+Every phase since carries proof, and the habit of recording it started here by
+its absence.
+
 ## Verification
 
 The four commands in [knowledge/technical.md](../knowledge/technical.md), green,
