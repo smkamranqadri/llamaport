@@ -194,18 +194,42 @@ account name comes back. All 54 commits are authored
 
 ## Closing conditions
 
-- Launching the built `.app` five times from Finder shows a usable window every
-  time, with the tray never the only way to get one.
+**Split 2026-08-31, after the same two went unmet across two releases.** They
+were not being skipped out of carelessness. They were written as gates on
+publishing, and half of them cannot be performed until a release exists — the
+Gatekeeper one names a download *through a browser*, which needs a published
+asset, so as a pre-publish gate it was unsatisfiable from v0.1.0 onward. A
+condition that cannot be met does not get met, and then reads as a lapse. So
+they are two lists now, and the second is expected to be settled after the tag
+rather than before it.
+
+### Before the tag — these gate the build
+
 - `rawArgs` containing `--host` or `--port` is refused with a message naming the
   field that owns it, covered by a test.
 - No Tauri logo anywhere in the bundle; the Dock icon is the new mark.
+- LICENSE present; the README answers what, who and how without assuming the
+  reader has seen the code.
+- The change is demonstrable **in the artefact**, not inferred from the tree. A
+  frontend change is proved by its new bundle digest, a Rust change by a string
+  only it introduces. v0.3.1 could do neither and had to infer; v0.3.2 has both.
+
+### After the tag — these need a published asset or a human at the machine
+
+Owed against the *next* release if they go unmet, and recorded as owed rather
+than quietly carried.
+
+- Launching the installed `.app` five times from Finder shows a usable window
+  every time, with the tray never the only way to get one. **Never with anything
+  fullscreen** — that is what made the v0.3.1 attempt pure noise.
+- Closing the window and clicking the Dock icon brings it back. Needs a real
+  click; a synthesized press cannot settle it.
 - No `llama-server` found, and no models directory, both say what to do rather
   than showing an empty list.
 - The `.dmg` is downloaded *through a browser* and opened following only what
   the README says. Copying the file locally does not count: quarantine is set by
   the download, and without it the test does not reproduce what a tester meets.
-- LICENSE present; the README answers what, who and how without assuming the
-  reader has seen the code.
+  **This one is why the list was split** — it needs a published release.
 
 ## Verification
 
@@ -343,6 +367,37 @@ oversight.** The author chose to publish rather than hold.
   build, and do not repeat a launch check while anything is fullscreen.
 
 Both are owed against the next release rather than closed here.
+
+## v0.3.2 — shipped 2026-08-31
+
+https://github.com/smkamranqadri/llamaport/releases/tag/v0.3.2 — Latest,
+unsigned, both `.dmg`s attached. Three corrected figures and one slider step; no
+schema change, the config stays at 7.
+
+`Llamaport_0.3.2_aarch64.dmg`, 4,222,157 bytes, sha256
+`5a4c2356dbd44c2f9406b6a410950fe4be52f949f52fee62d27d38c100943d3e`.
+`Llamaport_0.3.2_universal.dmg`, 8,472,231 bytes, sha256
+`e9b6fd5e4df1bb375cfd07514badee8fc43ff69fd1be473abd28ee982ab3f141`. Both
+downloaded back byte-identical. The universal one carries `x86_64 arm64`.
+
+**The artefact gap v0.3.1 recorded is closed here, rather than merely absent.**
+That release changed six lines of Rust with no new string, so `strings` could not
+find the fix and its presence had to be inferred. This one is provable on both
+layers independently: the frontend bundle `index-g7XWERza.js` is embedded, and
+the Rust string "does full attention" appears in the binary — twice in the
+universal, once per slice, which is also what says the fat binary is not a stub
+half.
+
+**Why it shipped now rather than at some later "end".** The plan had been to
+gather an audience first and build after. No audience arrived, and meanwhile the
+author is using the app daily and asking for things. Batching optimises for
+readers who are not there yet at the cost of the one user who is, and holding
+fixes repeats v0.3.0, which carried a known Dock bug through a whole release.
+The cadence is now: publish whenever there is something worth installing.
+
+Owed against the next release, and expected to be settled after this tag rather
+than before it (see the split above): the five-launch check, the Dock click, and
+the browser download meeting a real Gatekeeper prompt.
 
 ## Distribution — from 2026-08-08
 

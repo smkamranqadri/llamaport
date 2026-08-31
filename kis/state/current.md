@@ -1,56 +1,53 @@
 # Current
 
 ```text
-Branch:   `main`, clean and pushed. `v0.3.1` is tagged at HEAD, and the built
+Branch:   `main`, clean and pushed. `v0.3.2` is tagged at HEAD, and both built
           `.dmg`s came from that commit.
-Task:     none in progress. **Figures is done** — both parcels, 2026-08-31
-          ([intent/figures.md](../intent/figures.md)). The KV term no longer
-          charges every layer a full-context cache, and a header that names a
-          layer interval without a window size now withholds the figure and says
-          in words which layers it could not read. Units split by what they
-          measure: files, disk and transfer rates decimal so they agree with
-          Finder, memory binary so a 32 GB Mac still says 32 GB. It ends without
-          a release by decision, so both fixes sit in the tree.
+Task:     none in progress. **v0.3.2 is published** — Figures, the slider step,
+          and the version bump ([intent/release.md](../intent/release.md)). It is
+          the first release cut on a cadence rather than as an event: publish
+          whenever there is something worth installing. The reasoning is written
+          down there, because it reverses the "gather an audience, then build"
+          order the project started with. No audience arrived; the author is the
+          user, and has been the source of every good change since step 3.
 
           Distribution before it is done: a description, topics and an uploaded
-          social preview, the release is no longer a pre-release, the front page
-          leads with a clip, a Show and tell post is live in llama.cpp's
-          Discussions, four list submissions are open, and the author has posted
-          to several subreddits and commented around them
+          social preview, the front page leads with a clip, a Show and tell post
+          is live in llama.cpp's Discussions, four list submissions are open, and
+          the author has posted to several subreddits and commented around them
           ([intent/release.md](../intent/release.md)).
 Mode:     —
-Blocker:  none. Figures came off this list on 2026-08-31: it was seen on screen,
-          and being looked at is what caught a defect in it — the note saying
-          which counting the memory figures use was missing from the one branch
-          that most needed it. Three standing items remain, all of the same kind.
-          The README's "Open Anyway" steps have
-          never met a real Gatekeeper prompt; a queued row with nothing on disk
-          behind it has never been seen coming back from a restart; and no Intel
-          Mac has run the universal build. Two more are owed by v0.3.1, which
-          shipped without them by decision: nobody has seen the Dock fix work in
-          the built artefact, and the five-launch condition was not run
-          ([intent/release.md](../intent/release.md)).
-Next:     Nothing is half-finished, so the next move is a choice rather than a
-          continuation. Three candidates, in the order they earn it:
+Blocker:  none. The standing list changed shape on 2026-08-31 rather than
+          growing: the closing conditions were split into what gates a build and
+          what can only happen once one is published
+          ([intent/release.md](../intent/release.md)). Two of them had gone unmet
+          across two releases, and the Gatekeeper one could never have been met —
+          it names a browser download, which needs a published asset, so as a
+          pre-publish gate it was unsatisfiable from v0.1.0 on.
 
-          Commit what is in the tree — Figures as one commit, and the
-          `ProfileForm.tsx` slider step apart from it, since it was asked for
-          separately and belongs to no phase.
+          Three now sit in the after-the-tag list against v0.3.2, all needing ten
+          minutes with the display free and nothing fullscreen: five launches of
+          the installed build, closing the window and clicking the Dock icon, and
+          downloading a `.dmg` through a browser to meet a real Gatekeeper
+          prompt. Two more are unrelated and unchanged: a queued row with nothing
+          on disk behind it has never been seen coming back from a restart, and
+          no Intel Mac has run the universal build.
+Next:     Plan features from [gaps.md](../intent/gaps.md), which is what it was
+          written for. `--fit` is the largest item and wants its own planning
+          pass: the flag is on by default and this app disables it on every
+          launch by naming `-c` and `-ngl`
+          ([knowledge/technical.md](../knowledge/technical.md)). The cheap
+          uncontested ones are a Library search, a keyboard map, and persisting
+          the telemetry the running view already collects.
 
-          `--fit` is the next phase when there is to be one, and it wants its own
-          planning pass ([intent/gaps.md](../intent/gaps.md) item 2). It is the
-          largest item in that file and it is no longer a nicety: the flag is on
-          by default and this app disables it on every launch by naming `-c` and
-          `-ngl` ([knowledge/technical.md](../knowledge/technical.md)).
+          The three after-the-tag conditions above want the ten minutes whenever
+          the display is free. Show HN is drafted and unposted and is deferred by
+          the author, not blocked.
 
-          And the things needing no code at all: Show HN is drafted and unposted
-          and is the one launch channel open today, and the two conditions v0.3.1
-          owes are ten minutes with the display free — launch the installed build
-          five times, then close its window and click the Dock icon. A browser
-          download of a `.dmg` would still settle Gatekeeper in five minutes
-          whenever it is wanted. After a release the same rule as ever: the next
-          move is whatever the audience says. Do not plan features against
-          silence.
+          The old rule was "do not plan features against silence". It stands
+          against imagined users and not against the author, who is using this
+          daily — every good change since step 3 came from exactly that, and
+          three defects this week came from looking at the built app.
 ```
 
 Run and verify commands: [knowledge/technical.md](../knowledge/technical.md).
