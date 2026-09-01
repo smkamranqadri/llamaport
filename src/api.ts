@@ -11,6 +11,7 @@ import type {
   Profile,
   RunnerSnapshot,
   Orphan,
+  PiPreview,
   Settings,
   SpeedSummary,
   Telemetry,
@@ -161,6 +162,14 @@ export function onRunnerState(handler: (snapshot: RunnerSnapshot) => void) {
 
 export function onRunnerLog(handler: (line: string) => void) {
   return listen<string>("runner:log", (event) => handler(event.payload));
+}
+
+export function piPreview(): Promise<PiPreview> {
+  return invoke<PiPreview>("pi_preview");
+}
+
+export function piApply(reasoning: boolean): Promise<PiPreview> {
+  return invoke<PiPreview>("pi_apply", { reasoning });
 }
 
 export function onTelemetry(handler: (telemetry: Telemetry) => void) {

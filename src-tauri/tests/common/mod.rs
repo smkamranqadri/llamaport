@@ -10,5 +10,7 @@ pub fn isolate_config_dir() -> PathBuf {
     let dir = std::env::temp_dir().join(format!("llamaport-test-{}", std::process::id()));
     std::fs::create_dir_all(&dir).expect("test config dir");
     llamaport_lib::store::use_config_dir(dir.clone());
+    llamaport_lib::store::use_pi_models_path(dir.join("pi-models.json"));
+    llamaport_lib::store::use_pi_settings_path(dir.join("pi-settings.json"));
     dir
 }

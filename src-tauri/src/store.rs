@@ -83,6 +83,41 @@ pub fn config_path() -> PathBuf {
     config_dir().join("config.json")
 }
 
+static PI_MODELS_PATH: OnceLock<PathBuf> = OnceLock::new();
+
+/// Points the pi integration at another file. This one is not the app's to lose: it is
+/// hand-maintained, it holds four providers this app knows nothing about, and a suite
+/// that reached it would be editing the user's tools. Taken once; the first caller wins.
+pub fn use_pi_models_path(path: PathBuf) {
+    let _ = PI_MODELS_PATH.set(path);
+}
+
+pub fn pi_models_path() -> PathBuf {
+    if let Some(path) = PI_MODELS_PATH.get() {
+        return path.clone();
+    }
+    pi_dir().join("models.json")
+}
+
+static PI_SETTINGS_PATH: OnceLock<PathBuf> = OnceLock::new();
+
+/// The second pi file the app writes, and the more sensitive one: it holds the user's
+/// default model and provider. Same reason for the override as the one above.
+pub fn use_pi_settings_path(path: PathBuf) {
+    let _ = PI_SETTINGS_PATH.set(path);
+}
+
+pub fn pi_settings_path() -> PathBuf {
+    if let Some(path) = PI_SETTINGS_PATH.get() {
+        return path.clone();
+    }
+    pi_dir().join("settings.json")
+}
+
+fn pi_dir() -> PathBuf {
+    home().join(".pi").join("agent")
+}
+
 /// A file of its own rather than a section of the config.
 ///
 /// A transfer settles often and the config holds the models directory, the llama-server

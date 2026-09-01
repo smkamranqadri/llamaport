@@ -4,6 +4,7 @@ pub mod downloads;
 pub mod estimate;
 pub mod gguf;
 pub mod health;
+pub mod pi;
 pub mod probe;
 pub mod profile;
 pub mod runner;
@@ -619,6 +620,53 @@ fn speeds_for(model_id: String, state: State<'_, AppState>) -> speeds::Summary {
     speeds::summarise(&records, build.as_deref())
 }
 
+/// What pi would be told, from the server that is actually answering.
+///
+/// Ready and nothing earlier: the port and the context both come from a server that has
+/// replied, and `--fit` is free to give a context the launch never asked for.
+fn serving(state: &State<'_, AppState>) -> Result<pi::Serving, String> {
+    let snapshot = state.runner.snapshot();
+    if snapshot.state != RunState::Ready {
+        return Err("no model is serving — pi needs a port that answers".into());
+    }
+    let (Some(alias), Some(name), Some(port)) =
+        (snapshot.alias, snapshot.model_name, snapshot.port)
+    else {
+        return Err("the running model has no alias, name or port to give pi".into());
+    };
+    let ctx = snapshot
+        .server_ctx
+        .ok_or("the server has not reported its context yet")?;
+
+    Ok(pi::Serving {
+        alias,
+        name,
+        port,
+        ctx,
+    })
+}
+
+/// What stands in pi's file, and what confirming would put there.
+#[tauri::command]
+fn pi_preview(state: State<'_, AppState>) -> Result<pi::Preview, String> {
+    pi::preview(
+        &store::pi_models_path(),
+        &store::pi_settings_path(),
+        &serving(&state)?,
+    )
+}
+
+/// Replaces one provider and writes the rest of the file back untouched.
+#[tauri::command]
+fn pi_apply(reasoning: bool, state: State<'_, AppState>) -> Result<pi::Preview, String> {
+    pi::apply(
+        &store::pi_models_path(),
+        &store::pi_settings_path(),
+        &serving(&state)?,
+        reasoning,
+    )
+}
+
 /// What the app would measure, and why it might refuse to.
 #[tauri::command]
 fn tune_status(state: State<'_, AppState>) -> tune::Report {
@@ -949,6 +997,8 @@ pub fn run() {
             tune_status,
             tune_start,
             tune_cancel,
+            pi_preview,
+            pi_apply,
             download_start,
             download_pause,
             download_resume,

@@ -21,7 +21,9 @@ tauri-build = { version = "2", features = [] }
 tauri = { version = "2", features = ["tray-icon"] }
 tauri-plugin-opener = "2"
 serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+# preserve_order keeps pi's hand-written provider order intact on a round trip;
+# indexmap is already in the tree through tauri, so this adds nothing to the build.
+serde_json = { version = "1", features = ["preserve_order"] }
 sha2 = "0.10"
 sysinfo = "0.33"
 ureq = { version = "2", default-features = false, features = ["tls"] }

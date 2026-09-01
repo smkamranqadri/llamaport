@@ -14,6 +14,7 @@ import { formatContext, formatFileSize, formatMemory } from "./format";
 import { bytesOr, pressureText, Stat } from "./Memory";
 import ProfileForm, { AUTO_CTX } from "./ProfileForm";
 import HealthPanel from "./HealthPanel";
+import PiPanel from "./PiPanel";
 import TunePanel from "./TunePanel";
 import type {
   HealthReport,
@@ -354,6 +355,7 @@ export default function ModelDetail({
   const [busy, setBusy] = useState(false);
   const [showLogs, setShowLogs] = useState(false);
   const [health, setHealth] = useState<HealthReport | null>(null);
+  const [pi, setPi] = useState(false);
   const [testing, setTesting] = useState(false);
   const [tune, setTune] = useState<TuneReport | null>(null);
   const [speeds, setSpeeds] = useState<SpeedSummary | null>(null);
@@ -564,6 +566,9 @@ export default function ModelDetail({
               >
                 {testing ? "Testing…" : "Test model"}
               </button>
+              <button className="button" onClick={() => setPi(true)}>
+                Use in pi
+              </button>
             </span>
           </div>
           <TelemetryPanel
@@ -572,6 +577,7 @@ export default function ModelDetail({
             history={history.current}
           />
           {health && <HealthPanel report={health} />}
+          {pi && <PiPanel onClose={() => setPi(false)} />}
         </section>
       )}
 

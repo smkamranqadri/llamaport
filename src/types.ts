@@ -302,3 +302,19 @@ export interface SpeedSummary {
   beats: SpeedKey | null;
   beatsByPercent: number | null;
 }
+
+export interface PiFileChange {
+  path: string;
+  before: string | null;
+  after: string;
+  createsFile: boolean;
+}
+
+/// What pi's two files hold for us now, and what confirming would put there.
+export interface PiPreview {
+  provider: PiFileChange;
+  enabled: PiFileChange;
+  pruned: string[];
+  sharingPort: string[];
+  reasoning: boolean;
+}
