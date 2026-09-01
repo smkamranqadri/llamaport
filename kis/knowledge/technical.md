@@ -188,6 +188,15 @@ default. Sibling `.bak`, `.save` and `.backup` files already accumulate beside i
   the suite. Anything that puts prose next to a figure earns a look before it is
   called done.
 
+  **The running tally, because it is the argument: nineteen defects across five
+  phases, every one found by looking and none by the suite.** Eleven on
+  2026-08-31, five in Tune's panel on 2026-09-01, and three in the pi button on
+  2026-09-02 — a label that wrapped, a file mode read out of `ls -l`, and a
+  provider that turned out not to be selectable. **A twentieth was worse and took
+  five releases**: a bundle macOS refuses to open, which only a browser download
+  exposed ([intent/release.md](../intent/release.md)). A phase is not done when
+  the suite is green; it is done when somebody has looked.
+
 - **`--fit` is on by default, and this app suppresses it by naming every value.**
   It "adjusts unset arguments to fit in device memory" (`--fit [on|off]`,
   default `on`; `--fit-target` a per-device margin, default 1024 MiB;
