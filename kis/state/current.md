@@ -45,52 +45,23 @@ Next:     **Open `~/Downloads/Llamaport_0.5.0_aarch64.dmg`.** The app is already
 ```
 
 Run and verify commands: [knowledge/technical.md](../knowledge/technical.md).
-Plans and decisions: [intent/roadmap.md](../intent/roadmap.md).
+Where the project stands, and what is planned: [intent/roadmap.md](../intent/roadmap.md).
 What the app is for: [intent/direction.md](../intent/direction.md).
-
-## Where the project actually is
-
-The runner lists, launches, supervises and tests models; the downloader fetches
-from Hugging Face with resume that survives a kill, a queue and a rate limit.
-Both are done and specified — [docs/runner-spec.md](../../docs/runner-spec.md),
-[intent/downloader.md](../intent/downloader.md).
-
-Since 2026-08-31 the app sizes a launch against ceilings that are real. It reads
-the GPU working set from the build rather than assuming installed memory, can
-leave the context and layer offload unset for llama.cpp to fit, charges the cache
-only to layers that hold one, and agrees with Finder about file sizes. The model
-screen is four figures and a verdict where it was ten form fields and four lines
-of prose.
-
-Since 2026-09-01 it also measures. Every run that serves a request records what it
-got, at the settings that got it; a ladder measures on request; and the app has
-one opinion where it had none, offered rather than applied.
-
-That is four phases, each carrying its own decisions and proof:
-[figures.md](../intent/figures.md), [fitting.md](../intent/fitting.md),
-[screen.md](../intent/screen.md), [tune.md](../intent/tune.md). What the app is
-*for* was rewritten on 2026-08-31 by its only user, reversing two standing
-decisions ([direction.md](../intent/direction.md)).
-
-**Nothing has converted, and nobody has looked.** Stars, forks and watchers were
-0 after the 2026-08-08 distribution push and have not been checked since — two
-releases and a rewritten purpose later. Show HN is drafted and unposted,
-deferred by the author rather than blocked
-([intent/release.md](../intent/release.md)).
 
 ## Proof
 
 The four commands green at `v0.5.0`, each status captured on its own line and
 never after a pipe. **234 tests**, up from 202 at v0.4.0 and 180 at v0.3.1; the
-thirty-two are Tune's ([intent/tune.md](../intent/tune.md)). Two suites need the real machine:
-`real_launch` proves a run is recorded against the real binary and a real model,
+thirty-two are Tune's ([intent/tune.md](../intent/tune.md)). Two suites need the
+real machine: `real_launch` proves a run is recorded against the real binary and
+a real model,
 and `real_tune` checks the candidate picker against `tools/fits.py` on the file
 in the models directory, with the ladder itself behind `--ignored`.
 
 Proof sits with the work it belongs to, not here. Every phase file carries its
-own, including the mutation records: [figures.md](../intent/figures.md),
-[fitting.md](../intent/fitting.md), [screen.md](../intent/screen.md),
-[last-used.md](../intent/last-used.md),
+own, including the mutation records: [tune.md](../intent/tune.md),
+[figures.md](../intent/figures.md), [fitting.md](../intent/fitting.md),
+[screen.md](../intent/screen.md), [last-used.md](../intent/last-used.md),
 [downloader.md](../intent/downloader.md), and each release's artefact proof in
 [release.md](../intent/release.md).
 

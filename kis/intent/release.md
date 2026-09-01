@@ -499,6 +499,11 @@ Gatekeeper prompt (see the split above).
 
 Everything here is about being found. None of it changes the app.
 
+**Nothing has converted, and nobody has looked.** Stars, forks and watchers were
+0 after the 2026-08-08 push and have not been checked since — two releases and a
+rewritten purpose later. Show HN is drafted and unposted, deferred by the author
+rather than blocked.
+
 **`v0.3.0` is no longer a pre-release.** It is the Latest release, both `.dmg`s
 and their download counts intact, nothing rebuilt — the tag's code and HEAD's are
 identical. The badge was the only thing standing between a drive-by reader and a

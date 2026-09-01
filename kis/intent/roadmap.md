@@ -2,13 +2,29 @@
 
 Goal: a releasable macOS app that both runs and downloads local GGUF models.
 
-## Subsystems
+## Where this stands
 
-Two, each with its own spec, module and screen:
+Two subsystems, each with its own spec, module and screen, and both done. The
+**runner** lists, launches, supervises and tests models
+([docs/runner-spec.md](../../docs/runner-spec.md)). The **downloader** fetches
+from Hugging Face with resume that survives a kill, a queue and a rate limit
+([downloader.md](downloader.md)).
 
-- **Runner** — done. [docs/runner-spec.md](../../docs/runner-spec.md).
-- **Downloader** — engine and Downloads screen done.
-  [downloader.md](downloader.md).
+Since 2026-08-31 the app sizes a launch against ceilings that are real. It reads
+the GPU working set from the build rather than assuming installed memory, can
+leave the context and layer offload unset for llama.cpp to fit, charges the cache
+only to layers that hold one, and agrees with Finder about file sizes. The model
+screen is four figures and a verdict where it was ten form fields and four lines
+of prose.
+
+Since 2026-09-01 it also measures. Every run that serves a request records what it
+got, at the settings that got it; a ladder measures on request; and the app has
+one opinion where it had none, offered rather than applied.
+
+That is four phases, each carrying its own decisions and proof:
+[figures.md](figures.md), [fitting.md](fitting.md), [screen.md](screen.md),
+[tune.md](tune.md). What the app is *for* was rewritten on 2026-08-31 by its only
+user, reversing two standing decisions ([direction.md](direction.md)).
 
 ## Order
 
