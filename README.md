@@ -95,7 +95,7 @@ Developer certificate, so macOS quarantines it and refuses to open it. That is
 expected, and it is the price of a beta that costs nothing to publish. To open it
 anyway:
 
-1. Try to open Llamaport. macOS refuses and shows a warning.
+1. Try to open Llamaport. macOS refuses and says it cannot verify the developer.
 2. Open **System Settings → Privacy & Security**, scroll to **Security**.
 3. There is now a line about Llamaport with an **Open Anyway** button. Click it,
    then confirm.
@@ -108,6 +108,13 @@ xattr -dr com.apple.quarantine /Applications/Llamaport.app
 
 Only run that on software you meant to download. If being unsigned is a problem
 for you, build from source instead — the result is identical and locally signed.
+
+**On v0.6.0 and earlier, macOS says "Llamaport.app is damaged and can't be opened"
+instead.** It is not damaged. Those builds shipped without a bundle signature, so
+macOS could not check them at all and refused rather than asking. The steps above
+do not help, because no **Open Anyway** button appears for that message — use the
+`xattr` line, or download v0.6.1 or later, which are signed well enough for macOS
+to ask the ordinary question.
 
 ## Build from source
 
