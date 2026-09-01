@@ -1934,7 +1934,7 @@ checksum = "92daf443525c4cce67b150400bc2316076100ce0b3686209eb8cf3c31612e6f0"
 
 [[package]]
 name = "llamaport"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "libc",
  "serde",
