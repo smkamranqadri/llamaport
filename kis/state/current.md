@@ -37,8 +37,8 @@ Next:     **The same warning is owed on v0.5.0 and every release before it.**
           `xattr` line, and a link to v0.6.1, replacing an opening line that told
           readers to right-click Open, which never worked. But the defect goes
           back to v0.1.0, and five older releases still describe a flow that
-          cannot work. v0.6.1 is Latest, so the repository's download button is
-          safe; only someone browsing older tags is caught.
+          cannot work. v0.6.1 is the newest, so the repository's download
+          button is safe; only someone browsing older tags is caught.
 
           Then the README's screenshots, which are a release behind — they show a
           Running panel with no Use in pi button. The author's, per
@@ -71,13 +71,17 @@ Proof sits with the work it belongs to, not here. Every phase file carries its
 own, including the mutation records: [tune.md](../intent/tune.md),
 [figures.md](../intent/figures.md), [fitting.md](../intent/fitting.md),
 [screen.md](../intent/screen.md), [last-used.md](../intent/last-used.md),
-[downloader.md](../intent/downloader.md), and each release's artefact proof in
-[release.md](../intent/release.md).
+[downloader.md](../intent/downloader.md), [pi.md](../intent/pi.md), and each
+release's artefact proof in [release.md](../intent/release.md).
 
 **Two gaps, recorded rather than papered over.**
 [persistence.md](../intent/persistence.md) marks three parcels done in 2026-08-03
 with no proof section; it was not recorded at the time and inventing one now
-would be worse than the gap. And **sixteen defects across four phases** were found
-by looking at the built app, none by the suite — eleven on 2026-08-31 and five
-more in Tune's panel on 2026-09-01. A constraint now, in
+would be worse than the gap. And **nineteen defects across five phases** were found
+by looking at the built app, none by the suite — eleven on 2026-08-31, five more
+in Tune's panel on 2026-09-01, and three in the pi button on 2026-09-02: a label
+that wrapped, a file mode read out of `ls -l`, and a provider that turned out not
+to be selectable. **A twentieth was worse**: five releases shipped a bundle macOS
+refuses to open, and only downloading one through a browser exposed it
+([intent/release.md](../intent/release.md)). A constraint now, in
 [knowledge/technical.md](../knowledge/technical.md).

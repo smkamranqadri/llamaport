@@ -41,7 +41,8 @@ the published bytes rather than the local ones.
 **v0.6.0's notes carry a warning block from 2026-09-02**, naming the dialog, the
 `xattr` line and v0.6.1, and replacing an opening line that told readers to
 right-click Open. The five releases before it say the same wrong thing and have
-not been touched; v0.6.1 is Latest, so only someone browsing older tags meets it.
+not been touched; v0.6.1 is the newest, so only someone browsing older tags meets
+it.
 
 **Confirmed end to end, 2026-09-02.** v0.6.1 was downloaded through a browser and
 opened: macOS said it could not verify the developer, and **Open Anyway** let it
@@ -158,6 +159,182 @@ no shipped build had been clicked.
 
 **Gatekeeper is the last of the four owed against this release** that can be
 moved from here, and it still needs the `.dmg` in `~/Downloads` opened by hand.
+
+## v0.4.0 — shipped 2026-08-31
+
+https://github.com/smkamranqadri/llamaport/releases/tag/v0.4.0 — a full release,
+unsigned, both `.dmg`s attached. **A minor rather than a patch**: the context and
+layer offload can be left unset for llama.cpp to fit, which changes what a
+never-launched model opens on, and the model screen is reorganised. No schema
+change; the config stays at 7.
+
+`Llamaport_0.4.0_aarch64.dmg`, 4,226,049 bytes, sha256
+`2a0c661626ddbf05ffe99f4054649e43979b0afe416840e1507b710e2ba2c4f1`.
+`Llamaport_0.4.0_universal.dmg`, 8,489,627 bytes, sha256
+`3244261b5748c68e9e19167abd43161ff1dc474309dee3e684ec2e5e72b84d36`. Both
+downloaded back byte-identical. The universal one carries `x86_64 arm64`, and
+each of its slices holds the change once — the frontend digest and the Rust
+string both read twice there against once in the aarch64 build, which is what
+says the fat binary is not a stub half.
+
+Provable on both layers, as v0.3.2 established: the frontend bundle
+`index-Cm_QE7SR.js` is embedded, and `"list-devices"` is a string only this
+release's Rust introduces.
+
+**Three phases in one release** — Figures, Fitting and Screen. That is more than
+the cadence set on 2026-08-31 intends, and the reason is worth recording: the
+cadence was agreed at midday and the phases were finished the same afternoon,
+faster than a release was cut. Publishing after each would have been three
+releases in six hours, which is a different failure. The rule stays "publish when
+there is something worth installing"; the judgement is that three finished phases
+in an afternoon is one such moment, not three.
+
+Owed against the next release, unchanged and now three releases old: the
+five-launch check, the Dock click, and the browser download meeting a real
+Gatekeeper prompt (see the split above).
+
+## v0.3.2 — shipped 2026-08-31
+
+https://github.com/smkamranqadri/llamaport/releases/tag/v0.3.2 — a full release,
+unsigned, both `.dmg`s attached. Three corrected figures and one slider step; no
+schema change, the config stays at 7.
+
+`Llamaport_0.3.2_aarch64.dmg`, 4,222,157 bytes, sha256
+`5a4c2356dbd44c2f9406b6a410950fe4be52f949f52fee62d27d38c100943d3e`.
+`Llamaport_0.3.2_universal.dmg`, 8,472,231 bytes, sha256
+`e9b6fd5e4df1bb375cfd07514badee8fc43ff69fd1be473abd28ee982ab3f141`. Both
+downloaded back byte-identical. The universal one carries `x86_64 arm64`.
+
+**The artefact gap v0.3.1 recorded is closed here, rather than merely absent.**
+That release changed six lines of Rust with no new string, so `strings` could not
+find the fix and its presence had to be inferred. This one is provable on both
+layers independently: the frontend bundle `index-g7XWERza.js` is embedded, and
+the Rust string "does full attention" appears in the binary — twice in the
+universal, once per slice, which is also what says the fat binary is not a stub
+half.
+
+**Why it shipped now rather than at some later "end".** The plan had been to
+gather an audience first and build after. No audience arrived, and meanwhile the
+author is using the app daily and asking for things. Batching optimises for
+readers who are not there yet at the cost of the one user who is, and holding
+fixes repeats v0.3.0, which carried a known Dock bug through a whole release.
+The cadence is now: publish whenever there is something worth installing.
+
+Owed against the next release, and expected to be settled after this tag rather
+than before it (see the split above): the five-launch check, the Dock click, and
+the browser download meeting a real Gatekeeper prompt.
+
+## v0.3.1 — shipped 2026-08-08
+
+https://github.com/smkamranqadri/llamaport/releases/tag/v0.3.1 — the first
+release published as **Latest rather than pre-release**, unsigned, both `.dmg`s
+attached from the start. One fix, no schema change; the config stays at 7.
+
+`Llamaport_0.3.1_aarch64.dmg`, 4,221,604 bytes, sha256
+`848b8d837da822321262c14629547e2af253293e169a3ef5b3596f5f6e88063a`.
+`Llamaport_0.3.1_universal.dmg`, 8,469,496 bytes, sha256
+`bd73ca4a6182cb5df89c60c8748157c9fbf0d30fa9cc59efdac4e40954bb4a0d`. Both
+downloaded back byte-identical, as with every release here. The universal one
+carries `x86_64 arm64`. The account name appears 454 times in the aarch64 binary
+and 912 in the universal, all cargo and source paths; the only hit outside them
+is the bundle identifier itself, which is public.
+
+**The frontend digests are unchanged from v0.3.0** — `index-R_7rLVpB.js` and
+`index-BaiJagCa.css` — and that is the correct result rather than a stale build:
+this release changes six lines of Rust and no frontend at all. The v0.3.0
+technique proves a *frontend* change is present; it says nothing either way about
+a Rust one, which is the gap below.
+
+**Two closing conditions were not met, and it shipped anyway — a decision, not an
+oversight.** The author chose to publish rather than hold.
+
+- **That the fix is in the artefact was inferred, not seen.** The change adds no
+  new string, so `strings` cannot find it, and the behaviour needs a real Dock
+  click to demonstrate — a synthesized press cannot settle it (see Distribution).
+  What is known: the tree was proved in a dev build, and the `.dmg` was built
+  from the tagged commit.
+- **The five-launch condition was not run.** A fullscreen app owned the display,
+  which changes how a launched app gets a Space, and every reading taken in that
+  state was noise: v0.3.1 showed no window on 4 of 5 launches and **the published
+  v0.3.0 did the same on 3 of 3**, which is what proves the measurement rather
+  than the build was at fault. Do not read those numbers as a defect in either
+  build, and do not repeat a launch check while anything is fullscreen.
+
+Both are owed against the next release rather than closed here.
+
+## v0.3.0 — shipped 2026-08-08
+
+https://github.com/smkamranqadri/llamaport/releases/tag/v0.3.0 — pre-release,
+unsigned, Last used plus the row fixes it turned up. The published asset was
+downloaded back and is byte-identical to what was built, as with all three
+previous releases. The process from v0.2.0 worked unchanged.
+
+`Llamaport_0.3.0_aarch64.dmg`, 4,221,465 bytes, sha256
+`7bbb75f7479291031b3b86ad5c9122a71d8530c8ec554cf94ac29c81272babba`. Built with
+`CI=true`, mounted and checked, and installed over the 0.2.1 in `/Applications`.
+A minor rather than a patch because the config schema moves 6 -> 7.
+
+**The v0.2.1 way of proving a feature is in the artefact did not work here.**
+That release grepped the binary for a new string and for the string it replaced;
+this change is mostly frontend, and Tauri compresses the embedded assets, so
+`strings` finds neither. The replacement is better: Vite content-hashes its
+filenames, so the name is a digest of the contents. `index-R_7rLVpB.js` carries
+"Last launched" and no longer carries "before deleting it", `index-BaiJagCa.css`
+carries `row-action` and `.model-item.is-running`, and the shipped binary embeds
+exactly those two names and none from any earlier build. Use this for any release
+that is frontend-heavy.
+
+The account name appears 452 times in the binary, all cargo and source paths, the
+same count as v0.2.0. Installing by local copy sets no quarantine attribute, so
+Gatekeeper is still untested — as for every release so far.
+
+### A universal build, added to the same release 2026-08-08
+
+`Llamaport_0.3.0_universal.dmg`, 8,469,810 bytes, sha256
+`bf0ce9392bc9bb9b122cb042556744f209acd8394a13a378185adc0515725051`, attached
+alongside the `aarch64` one rather than replacing it. Same commit, same code, and
+the same frontend digests are embedded — `index-R_7rLVpB.js` and
+`index-BaiJagCa.css`, exactly the two the `aarch64` build carries — so this is
+the shipped build widened, not a rebuild of something else. Downloaded back and
+byte-identical, as with every release here.
+
+**"Apple Silicon only" was never true of the code**, only of the artefact. The
+platform coupling is Darwin's, itemised in
+[knowledge/technical.md](../knowledge/technical.md); no `cfg(target_arch)` exists
+anywhere in the source. Two lines of build recipe closed the gap:
+`rustup target add x86_64-apple-darwin`, then `--target universal-apple-darwin`.
+
+Both slices are present (`lipo -archs` on the mounted app: `x86_64 arm64`), and
+the account name count doubles to 912 from 453 for exactly that reason — same
+cargo and source paths, twice. Nothing names the account outside build paths.
+
+**The x86_64 half was run, not merely inspected.** Launched under Rosetta against
+a throwaway `HOME`, it registered with LaunchServices from the mounted volume as
+`com.mkamran.llamaport`, `type="Foreground"`, `Arch=x86_64` — a real GUI app, so
+the slice is not a stub. Rosetta is not Intel hardware and the README says so.
+An actual Intel Mac remains untested and nobody here has one.
+
+**The Intel audience is fixed and dated, which is the thing to weigh before
+building universal again.** macOS 26 Tahoe is the last major release for Intel
+Macs — macOS 27 is Apple Silicon only — so the reachable machines are four
+2019–2020 models frozen on Tahoe, with security updates until roughly 2028. The
+cost stays two lines of build recipe, so this is not an argument for stopping;
+it is the reason not to spend anything further on Intel beyond them.
+
+**Rosetta is a different subject and does not bear on this.** It translates Intel
+code on Apple Silicon; a universal binary runs natively on both, so nothing
+Llamaport ships ever invokes it. Rosetta was only reached here by forcing
+`arch -x86_64` for the proof above, which is also what raised the macOS 26.4
+"Intel app" notification on the author's machine — an artefact of the test, not
+something any user of this app will see. Rosetta is full through macOS 27 and cut
+back in macOS 28; neither date changes anything here.
+
+**The screenshots were the author's, and they closed the last of the UI proof.**
+Orca, the accessibility tooling this session had used all day, was uninstalled
+partway through, so nothing could read or capture the running app. Three captures
+from the built 0.3.0 settled what was owed: the weight distinction in the recency
+cell, the running row tinted end to end, its hover staying one colour, and its
+figures still flush with the rows above.
 
 ## v0.2.1 — shipped 2026-08-04
 
@@ -434,182 +611,6 @@ The window bug has never been reproduced on demand — it was seen twice in one
 session and not since. The fix is structural rather than a repair of a known
 cause, and the proof is repeated launches, which is weaker than this project
 normally accepts. The release notes should say so rather than claim it fixed.
-
-## v0.3.0 — shipped 2026-08-08
-
-https://github.com/smkamranqadri/llamaport/releases/tag/v0.3.0 — pre-release,
-unsigned, Last used plus the row fixes it turned up. The published asset was
-downloaded back and is byte-identical to what was built, as with all three
-previous releases. The process from v0.2.0 worked unchanged.
-
-`Llamaport_0.3.0_aarch64.dmg`, 4,221,465 bytes, sha256
-`7bbb75f7479291031b3b86ad5c9122a71d8530c8ec554cf94ac29c81272babba`. Built with
-`CI=true`, mounted and checked, and installed over the 0.2.1 in `/Applications`.
-A minor rather than a patch because the config schema moves 6 -> 7.
-
-**The v0.2.1 way of proving a feature is in the artefact did not work here.**
-That release grepped the binary for a new string and for the string it replaced;
-this change is mostly frontend, and Tauri compresses the embedded assets, so
-`strings` finds neither. The replacement is better: Vite content-hashes its
-filenames, so the name is a digest of the contents. `index-R_7rLVpB.js` carries
-"Last launched" and no longer carries "before deleting it", `index-BaiJagCa.css`
-carries `row-action` and `.model-item.is-running`, and the shipped binary embeds
-exactly those two names and none from any earlier build. Use this for any release
-that is frontend-heavy.
-
-The account name appears 452 times in the binary, all cargo and source paths, the
-same count as v0.2.0. Installing by local copy sets no quarantine attribute, so
-Gatekeeper is still untested — as for every release so far.
-
-### A universal build, added to the same release 2026-08-08
-
-`Llamaport_0.3.0_universal.dmg`, 8,469,810 bytes, sha256
-`bf0ce9392bc9bb9b122cb042556744f209acd8394a13a378185adc0515725051`, attached
-alongside the `aarch64` one rather than replacing it. Same commit, same code, and
-the same frontend digests are embedded — `index-R_7rLVpB.js` and
-`index-BaiJagCa.css`, exactly the two the `aarch64` build carries — so this is
-the shipped build widened, not a rebuild of something else. Downloaded back and
-byte-identical, as with every release here.
-
-**"Apple Silicon only" was never true of the code**, only of the artefact. The
-platform coupling is Darwin's, itemised in
-[knowledge/technical.md](../knowledge/technical.md); no `cfg(target_arch)` exists
-anywhere in the source. Two lines of build recipe closed the gap:
-`rustup target add x86_64-apple-darwin`, then `--target universal-apple-darwin`.
-
-Both slices are present (`lipo -archs` on the mounted app: `x86_64 arm64`), and
-the account name count doubles to 912 from 453 for exactly that reason — same
-cargo and source paths, twice. Nothing names the account outside build paths.
-
-**The x86_64 half was run, not merely inspected.** Launched under Rosetta against
-a throwaway `HOME`, it registered with LaunchServices from the mounted volume as
-`com.mkamran.llamaport`, `type="Foreground"`, `Arch=x86_64` — a real GUI app, so
-the slice is not a stub. Rosetta is not Intel hardware and the README says so.
-An actual Intel Mac remains untested and nobody here has one.
-
-**The Intel audience is fixed and dated, which is the thing to weigh before
-building universal again.** macOS 26 Tahoe is the last major release for Intel
-Macs — macOS 27 is Apple Silicon only — so the reachable machines are four
-2019–2020 models frozen on Tahoe, with security updates until roughly 2028. The
-cost stays two lines of build recipe, so this is not an argument for stopping;
-it is the reason not to spend anything further on Intel beyond them.
-
-**Rosetta is a different subject and does not bear on this.** It translates Intel
-code on Apple Silicon; a universal binary runs natively on both, so nothing
-Llamaport ships ever invokes it. Rosetta was only reached here by forcing
-`arch -x86_64` for the proof above, which is also what raised the macOS 26.4
-"Intel app" notification on the author's machine — an artefact of the test, not
-something any user of this app will see. Rosetta is full through macOS 27 and cut
-back in macOS 28; neither date changes anything here.
-
-**The screenshots were the author's, and they closed the last of the UI proof.**
-Orca, the accessibility tooling this session had used all day, was uninstalled
-partway through, so nothing could read or capture the running app. Three captures
-from the built 0.3.0 settled what was owed: the weight distinction in the recency
-cell, the running row tinted end to end, its hover staying one colour, and its
-figures still flush with the rows above.
-
-## v0.3.1 — shipped 2026-08-08
-
-https://github.com/smkamranqadri/llamaport/releases/tag/v0.3.1 — the first
-release published as **Latest rather than pre-release**, unsigned, both `.dmg`s
-attached from the start. One fix, no schema change; the config stays at 7.
-
-`Llamaport_0.3.1_aarch64.dmg`, 4,221,604 bytes, sha256
-`848b8d837da822321262c14629547e2af253293e169a3ef5b3596f5f6e88063a`.
-`Llamaport_0.3.1_universal.dmg`, 8,469,496 bytes, sha256
-`bd73ca4a6182cb5df89c60c8748157c9fbf0d30fa9cc59efdac4e40954bb4a0d`. Both
-downloaded back byte-identical, as with every release here. The universal one
-carries `x86_64 arm64`. The account name appears 454 times in the aarch64 binary
-and 912 in the universal, all cargo and source paths; the only hit outside them
-is the bundle identifier itself, which is public.
-
-**The frontend digests are unchanged from v0.3.0** — `index-R_7rLVpB.js` and
-`index-BaiJagCa.css` — and that is the correct result rather than a stale build:
-this release changes six lines of Rust and no frontend at all. The v0.3.0
-technique proves a *frontend* change is present; it says nothing either way about
-a Rust one, which is the gap below.
-
-**Two closing conditions were not met, and it shipped anyway — a decision, not an
-oversight.** The author chose to publish rather than hold.
-
-- **That the fix is in the artefact was inferred, not seen.** The change adds no
-  new string, so `strings` cannot find it, and the behaviour needs a real Dock
-  click to demonstrate — a synthesized press cannot settle it (see Distribution).
-  What is known: the tree was proved in a dev build, and the `.dmg` was built
-  from the tagged commit.
-- **The five-launch condition was not run.** A fullscreen app owned the display,
-  which changes how a launched app gets a Space, and every reading taken in that
-  state was noise: v0.3.1 showed no window on 4 of 5 launches and **the published
-  v0.3.0 did the same on 3 of 3**, which is what proves the measurement rather
-  than the build was at fault. Do not read those numbers as a defect in either
-  build, and do not repeat a launch check while anything is fullscreen.
-
-Both are owed against the next release rather than closed here.
-
-## v0.3.2 — shipped 2026-08-31
-
-https://github.com/smkamranqadri/llamaport/releases/tag/v0.3.2 — a full release,
-unsigned, both `.dmg`s attached. Three corrected figures and one slider step; no
-schema change, the config stays at 7.
-
-`Llamaport_0.3.2_aarch64.dmg`, 4,222,157 bytes, sha256
-`5a4c2356dbd44c2f9406b6a410950fe4be52f949f52fee62d27d38c100943d3e`.
-`Llamaport_0.3.2_universal.dmg`, 8,472,231 bytes, sha256
-`e9b6fd5e4df1bb375cfd07514badee8fc43ff69fd1be473abd28ee982ab3f141`. Both
-downloaded back byte-identical. The universal one carries `x86_64 arm64`.
-
-**The artefact gap v0.3.1 recorded is closed here, rather than merely absent.**
-That release changed six lines of Rust with no new string, so `strings` could not
-find the fix and its presence had to be inferred. This one is provable on both
-layers independently: the frontend bundle `index-g7XWERza.js` is embedded, and
-the Rust string "does full attention" appears in the binary — twice in the
-universal, once per slice, which is also what says the fat binary is not a stub
-half.
-
-**Why it shipped now rather than at some later "end".** The plan had been to
-gather an audience first and build after. No audience arrived, and meanwhile the
-author is using the app daily and asking for things. Batching optimises for
-readers who are not there yet at the cost of the one user who is, and holding
-fixes repeats v0.3.0, which carried a known Dock bug through a whole release.
-The cadence is now: publish whenever there is something worth installing.
-
-Owed against the next release, and expected to be settled after this tag rather
-than before it (see the split above): the five-launch check, the Dock click, and
-the browser download meeting a real Gatekeeper prompt.
-
-## v0.4.0 — shipped 2026-08-31
-
-https://github.com/smkamranqadri/llamaport/releases/tag/v0.4.0 — a full release,
-unsigned, both `.dmg`s attached. **A minor rather than a patch**: the context and
-layer offload can be left unset for llama.cpp to fit, which changes what a
-never-launched model opens on, and the model screen is reorganised. No schema
-change; the config stays at 7.
-
-`Llamaport_0.4.0_aarch64.dmg`, 4,226,049 bytes, sha256
-`2a0c661626ddbf05ffe99f4054649e43979b0afe416840e1507b710e2ba2c4f1`.
-`Llamaport_0.4.0_universal.dmg`, 8,489,627 bytes, sha256
-`3244261b5748c68e9e19167abd43161ff1dc474309dee3e684ec2e5e72b84d36`. Both
-downloaded back byte-identical. The universal one carries `x86_64 arm64`, and
-each of its slices holds the change once — the frontend digest and the Rust
-string both read twice there against once in the aarch64 build, which is what
-says the fat binary is not a stub half.
-
-Provable on both layers, as v0.3.2 established: the frontend bundle
-`index-Cm_QE7SR.js` is embedded, and `"list-devices"` is a string only this
-release's Rust introduces.
-
-**Three phases in one release** — Figures, Fitting and Screen. That is more than
-the cadence set on 2026-08-31 intends, and the reason is worth recording: the
-cadence was agreed at midday and the phases were finished the same afternoon,
-faster than a release was cut. Publishing after each would have been three
-releases in six hours, which is a different failure. The rule stays "publish when
-there is something worth installing"; the judgement is that three finished phases
-in an afternoon is one such moment, not three.
-
-Owed against the next release, unchanged and now three releases old: the
-five-launch check, the Dock click, and the browser download meeting a real
-Gatekeeper prompt (see the split above).
 
 ## Distribution — from 2026-08-08
 

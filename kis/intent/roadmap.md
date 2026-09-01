@@ -70,9 +70,10 @@ user, reversing two standing decisions ([direction.md](direction.md)).
    [release.md](release.md). Unlike steps 3, 5 and 6 this came from nobody using
    the app — it came from the app having no readers.
 
-8. **Two live actions, no feature work.** Show HN is drafted and unposted, and is
+8. **One live action, no feature work.** Show HN is drafted and unposted, and is
    the only launch channel open today; r/LocalLLaMA needs karma this account does
-   not have. And issue 1 below is worth fixing before more people arrive.
+   not have. (Issue 1 was the second action; it was fixed 2026-08-08 and shipped
+   in v0.3.0 — see Risks below.)
 
    Three things owed rather than planned, all older than this release. **The
    first is now done — it took two runs on 2026-09-02, and the first one
