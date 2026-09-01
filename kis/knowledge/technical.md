@@ -202,6 +202,16 @@ failing check. Export it first: `export PATH="$HOME/.cargo/bin:$PATH"`.
   bash's name for it. It expands to nothing, `echo "x: ${PIPESTATUS[0]}"` prints
   an empty status, and the command reads as though it reported success. zsh's own
   is `$pipestatus` (lowercase). The rule below is the reliable answer either way.
+- **Tag a release with `git tag -a`.** `git tag` alone makes a lightweight tag,
+  and `git describe --exact-match` only considers annotated ones — so the check
+  that guards against building something other than the tag fails while nothing
+  is wrong. Every tag in this repository is annotated; v0.5.0 was created
+  lightweight, caught by that check, and recreated.
+- **A tag at the release commit is not a tag at HEAD.** Memory commits land after
+  it, so `git describe --exact-match` on HEAD is expected to find nothing once
+  syncing has happened. Before building an artefact, check out the tag or verify
+  the distance — assuming they were identical is what put a build of HEAD in the
+  v0.3.0 release ([intent/release.md](../intent/release.md)).
 - Capture a command's exit status directly. `cmd | tail -3; echo $?` reports
   `tail`'s status, which reported a failing clippy as clean twice in one session.
 - **A new test is not trusted until the code it covers has been gutted and the

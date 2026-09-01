@@ -1,14 +1,11 @@
 # Current
 
 ```text
-Branch:   `main`, clean and pushed. **`v0.5.0` is tagged there and published**,
-          and for once the tag and the artefacts agree by check rather than by
-          assumption: `git describe --exact-match` ran before the build, and both
-          `.dmg`s were downloaded back from the release and `cmp`-ed, exit 0 on
-          each. **Tag with `git tag -a`** — `git tag` alone makes a lightweight
-          tag, which `describe` ignores, so the check fails while nothing is
-          wrong. That is what it caught on its first real outing
-          ([intent/release.md](../intent/release.md)).
+Branch:   `main`, clean and pushed. **`v0.5.0` is tagged at `551b44b`, three
+          memory commits behind HEAD** — the artefacts were built from the tag.
+          Check the distance before building a release artefact; assuming tag and
+          HEAD were identical is what put a build of HEAD in the v0.3.0 release
+          ([knowledge/technical.md](../knowledge/technical.md)).
 Task:     **Tune is built, seen, committed and released as `v0.5.0`**
           ([intent/tune.md](../intent/tune.md)). The suite no longer writes into
           `~/Library/Application Support/llamaport`; `speeds.json` has a store;
@@ -17,39 +14,31 @@ Task:     **Tune is built, seen, committed and released as `v0.5.0`**
           has one opinion, offered rather than applied.
 Mode:     none in progress.
 Blocker:  none. **Four standing items, all of one kind — something nobody has
-          looked at.** Two are owed against the release and two are older.
+          looked at.** Two owed against the release, two older. What each proves
+          and why a shortcut would not is in
+          [intent/release.md](../intent/release.md).
 
-          Owed, and both needing a human at the machine. The **Gatekeeper
-          prompt**: `~/Downloads/Llamaport_0.5.0_aarch64.dmg` is sitting there
-          **with quarantine set for the first time**, downloaded through Chrome,
-          but macOS denies this agent's shell any access to that folder, so
-          opening it is the author's. Installing from anywhere else sets no
-          quarantine and proves nothing. And the **Dock click**, because a
-          synthesized press cannot settle it.
+          Owed, both needing a human at the machine: the **Gatekeeper prompt**,
+          and the **Dock click**.
 
           Older: a queued download row with nothing on disk behind it has never
           been seen coming back from a restart, and no Intel Mac has run the
           universal build.
 
-          **Two things stopped being owed on 2026-09-01.** `/Applications` holds
-          v0.5.0, where it had held v0.3.1 for three releases — which was the
-          mechanical reason the rest kept going unmet. And five launches gave five
-          usable windows, `1060x720` each, read from the window server rather than
-          judged by eye: strong evidence the window bug is absent rather than the
-          check as written, since `open -a` is not a Finder double-click and
-          nothing confirmed no other app was fullscreen
-          ([intent/release.md](../intent/release.md)).
+          **Two stopped being owed on 2026-09-01**: `/Applications` holds v0.5.0
+          where it had held v0.3.1 for three releases, and five launches gave five
+          usable windows.
 
           **`benchmarks.json` is left alone.** This app had a benchmark store
           once, deleted by `31031b2` as scope discipline and never recorded in
           KIS. The author decided 2026-08-31 to start clean, so `speeds.json` is
-          new and that file stays where it sits. Now written down in
-          [intent/roadmap.md](../intent/roadmap.md) and
-          [intent/tune.md](../intent/tune.md), which is the part that was missing.
-Next:     **Open `~/Downloads/Llamaport_0.5.0_aarch64.dmg`** and install from it,
-          following only what the README says. That is the Gatekeeper check, owed
-          since v0.1.0 and now a double-click. Then close the window and click the
-          Dock icon.
+          new and that file stays where it sits
+          ([intent/tune.md](../intent/tune.md)).
+Next:     **Open `~/Downloads/Llamaport_0.5.0_aarch64.dmg`.** The app is already
+          installed, so this is not for the install — it is the only copy on this
+          machine carrying a quarantine attribute, and opening it is the only way
+          to meet the Gatekeeper prompt a downloader meets. Owed since v0.1.0.
+          Then close the window and click the Dock icon.
 
           After that, the rest of [intent/direction.md](../intent/direction.md):
           the pi button, and search. Neither is planned.
