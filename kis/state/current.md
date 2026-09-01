@@ -1,69 +1,47 @@
 # Current
 
 ```text
-Branch:   `main`, clean and pushed. **`v0.5.0` is tagged at `551b44b`, five
-          memory commits behind HEAD** — the artefacts were built from the tag.
-          Check the distance before building a release artefact; assuming tag and
-          HEAD were identical is what put a build of HEAD in the v0.3.0 release
+Branch:   `main`, clean and pushed. **`v0.6.0` is tagged at HEAD** — annotated,
+          and both artefacts were built from it, so there is no distance to
+          check this time. That will stop being true the moment a memory commit
+          lands on top; check it before building anything
           ([knowledge/technical.md](../knowledge/technical.md)).
-Task:     **Tune is built, seen, committed and released as `v0.5.0`**
-          ([intent/tune.md](../intent/tune.md)). The suite no longer writes into
-          `~/Library/Application Support/llamaport`; `speeds.json` has a store;
-          the runner records a run when it settles; Tune measures a ladder that
-          reproduces `tools/fits.py --run`'s ordering on Ornith; and the app now
-          has one opinion, offered rather than applied.
-Mode:     **Standard — the pi button is built, seen, proved and unreleased**
-          ([intent/pi.md](../intent/pi.md)). Planned, built and corrected on the
-          screen 2026-09-02. A button in the Running panel beside Web UI and Test
-          model shows a diff of one `llamaport` provider, then writes it into
-          `~/.pi/agent/models.json` on confirm, leaving the other five providers
-          and their keys alone.
+Task:     **The pi button is built, proved and released as `v0.6.0`**
+          ([intent/pi.md](../intent/pi.md)). The app reaches outside itself for
+          the first time: it writes the provider and the enabled entry pi needs,
+          diffing both files before it touches either. Item 6 of what was asked
+          for is one click.
+Mode:     none in progress.
+Blocker:  none. **v0.6.0 inherits the whole after-the-tag list**
+          ([intent/release.md](../intent/release.md)), and the evidence gathered
+          on 2026-09-01 was against v0.5.0 — a different build, so it does not
+          carry. `/Applications` still holds v0.5.0.
 
-          **Looking at it found both of its defects**, as always here: the label
-          wrapped onto three lines in the sidebar it was first built into, and
-          the write took the file from `600` to `644` — five API keys made
-          world-readable, found in `ls -l` and not by any test.
+          Owed against this release, all needing a human at the machine: the
+          **Gatekeeper prompt** (never met, on any release), **five launches from
+          Finder** with nothing fullscreen, and the **Dock click** — met by hand
+          on v0.5.0, which is what says the fix works, not that this build has it.
 
-          **pi answered a prompt through the entry on 2026-09-02**, which is the
-          one check nothing in this repository could run. Using it found the
-          feature was half of item 6: a provider is not enough, and the model had
-          to be enabled by hand. The button now writes `enabledModels` in pi's
-          settings too, prunes the dead entries of ours it had been leaving
-          behind, and shows a line diff of both files rather than two blobs.
-Blocker:  none. **Three standing items, all of one kind — something nobody has
-          looked at.** One owed against the release, two older. What each proves
-          and why a shortcut would not is in
-          [intent/release.md](../intent/release.md).
+          Older, and unchanged: a queued download row with nothing on disk behind
+          it has never been seen coming back from a restart, and no Intel Mac has
+          run the universal build. The second is newly worth something: v0.6.0's
+          x86_64 slice was proved to carry this release's code rather than
+          assumed.
 
-          Owed, and needing a human at the machine: the **Gatekeeper prompt**.
+Next:     **Open `~/Downloads/Llamaport_0.6.0_aarch64.dmg` once it is downloaded
+          through a browser.** The Gatekeeper prompt is the one check owed
+          against every release since v0.1.0, and v0.6.0 inherits it. Nothing
+          here can reach it: macOS denies the agent's shell `~/Downloads`
+          entirely.
 
-          Older: a queued download row with nothing on disk behind it has never
-          been seen coming back from a restart, and no Intel Mac has run the
-          universal build.
+          Then the two older ones: a queued download row with nothing on disk
+          coming back from a restart, and an Intel Mac running the universal
+          build — the second is newly worth something, since v0.6.0's universal
+          slice was proved present rather than assumed.
 
-          **Three stopped being owed on 2026-09-01**: `/Applications` holds
-          v0.5.0 where it had held v0.3.1 for three releases, five launches gave
-          five usable windows, and the **Dock click was made by hand on the
-          installed v0.5.0** — window closed, icon pressed, window back. Owed
-          since the fix shipped in v0.3.0, and the first hand click on a release
-          build rather than a dev one.
-Next:     **Decide whether this ships.** The pi button is built, seen and proved
-          — every acceptance check is met, including the two only a human could
-          run — and it is unreleased, like Tune was for a day. Nothing depends on
-          it going out today, and nothing is committed yet.
-
-          **Nothing about it is open.** The diff panel was used, both
-          files were written with pi running, and the model was selectable
-          straight away — no hand-enabling, no restart. Item 6 is one click.
-
-          Still owed, and unchanged by this work:
-          **open `~/Downloads/Llamaport_0.5.0_aarch64.dmg`.** The app is already
-          installed, so this is not for the install — it is the only copy on this
-          machine carrying a quarantine attribute, and opening it is the only way
-          to meet the Gatekeeper prompt a downloader meets. Owed since v0.1.0,
-          and the last of this release's checks that a human at the machine can
-          settle. Nothing here can reach it: macOS denies the agent's shell
-          `~/Downloads` entirely.
+          **The README's screenshots are now a release behind.** They show a
+          Running panel without the Use in pi button. Retaking them is the
+          author's, per [release.md](../intent/release.md) phase 3.
 
           After that, what is left of [intent/direction.md](../intent/direction.md):
           the launch form shrinking behind named choices, per-field override, and

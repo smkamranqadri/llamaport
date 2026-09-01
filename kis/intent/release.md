@@ -1,5 +1,38 @@
 # Releases
 
+## v0.6.0 — shipped 2026-09-02
+
+https://github.com/smkamranqadri/llamaport/releases/tag/v0.6.0 — Latest,
+unsigned, both `.dmg`s attached. **The pi button** ([pi.md](pi.md)): the app
+reaches outside itself for the first time, writing the provider and the enabled
+entry pi needs to talk to the model this app is serving. A minor rather than a
+patch — it is a new capability, and the first time this app writes a file it does
+not own. No schema change; the config stays at 7.
+
+`Llamaport_0.6.0_aarch64.dmg`, 4,315,842 bytes, sha256
+`7d77375594a5696bb032ca9c94a6f282b905a85a6c35d4da2e22bb41e65929f8`.
+`Llamaport_0.6.0_universal.dmg`, 8,663,516 bytes, sha256
+`d5b1b9a89a4b59ae21f7378a130ce285af8dbf5f13384ae4a9c720d53f545e3d`. Both
+downloaded back from the published release and compared with `cmp`, exit 0 on
+each. The universal one carries `x86_64 arm64`.
+
+Provable on both layers: the frontend bundle `index-Cdq2l2nV.js` is embedded, and
+`enabledModels` and `pi_apply` are strings only this release's Rust introduces —
+**zero** occurrences of either in the 0.5.0 binary in `/Applications`, once each
+in the aarch64 build, and once in *each slice* of the universal one, which is
+what says the fat binary is not a stub half.
+
+**A third string was checked and did not behave, and the reason is worth
+keeping.** `llamaport.bak` appears in the arm64 slice and **not at all** in the
+x86_64 one. Not a defective build: a 14-byte literal can be emitted as immediate
+stores on x86_64 rather than as a rodata reference, which puts it beyond
+`strings`. So a string missing from one slice is not by itself evidence of a
+stub — prove the fat binary with more than one string, and prefer longer ones.
+
+The `git describe --exact-match --tags HEAD` check passed on its second outing,
+against the annotated tag the v0.5.0 lesson requires. Tag and HEAD were the same
+commit, so both artefacts were built from the tag with no distance to check.
+
 ## v0.5.0 — shipped 2026-09-01
 
 https://github.com/smkamranqadri/llamaport/releases/tag/v0.5.0 — Latest,

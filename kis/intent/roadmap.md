@@ -17,6 +17,10 @@ only to layers that hold one, and agrees with Finder about file sizes. The model
 screen is four figures and a verdict where it was ten form fields and four lines
 of prose.
 
+Since 2026-09-02 it also reaches outside itself: one click writes the provider and
+the enabled entry pi needs to talk to the model this app is serving, after showing
+what would change in both files.
+
 Since 2026-09-01 it also measures. Every run that serves a request records what it
 got, at the settings that got it; a ladder measures on request; and the app has
 one opinion where it had none, offered rather than applied.
@@ -135,7 +139,7 @@ user, reversing two standing decisions ([direction.md](direction.md)).
    screen was then looked at, and five defects came out of it that the suite could
    not see — which is where this project finds its defects, every time.**
 
-13. ~~**The pi button**~~ — built and proved 2026-09-02, unreleased. It writes
+13. ~~**The pi button**~~ — built and proved 2026-09-02, shipped in v0.6.0. It writes
    the provider *and* enables the model, because a provider alone is not
    selectable; pi answered a prompt through the entry the app wrote, picked up
    live with no restart. [pi.md](pi.md). Item 6 of
