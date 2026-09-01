@@ -57,8 +57,9 @@ Two, each with its own spec, module and screen:
    Three things owed rather than planned, all older than this release: the
    README's "Open Anyway" steps have never met a real Gatekeeper prompt, a queued
    row with nothing on disk behind it has never been seen coming back from a
-   restart, and no Intel Mac has run the universal build. Now that v0.3.0 is
-   public, the first is five minutes of downloading the `.dmg` through a browser.
+   restart, and no Intel Mac has run the universal build. **The first is now a
+   double-click** — v0.5.0's `.dmg` sits in `~/Downloads` with quarantine set
+   ([release.md](release.md)).
 
 9. ~~**Figures**~~ — done 2026-08-31, shipped in v0.4.0.
    [figures.md](figures.md). Two numbers the app printed were wrong: the KV term
@@ -91,7 +92,7 @@ Two, each with its own spec, module and screen:
    **Deliberately smaller than the mockup that was approved.** The app deciding
    the settings needs a measurement to be honest: the only rule available
    without one picks the slowest of three candidates on the model the author
-   runs. That waits for Tune.
+   runs. Tune supplied that measurement and shipped in v0.5.0.
 
 12. **Tune** — built 2026-08-31, seen and corrected on screen 2026-09-01,
    unreleased.
@@ -187,7 +188,8 @@ unplanned.
   Fixed 2026-08-08, issue 1: the run loop matched only `ExitRequested` and `Exit`,
   so the hide-on-close decision ([knowledge/project.md](../knowledge/project.md))
   had no way back but the tray. One `RunEvent::Reopen` arm calling the
-  `show_main_window` the tray already used. **Live in v0.3.0 and not yet
-  released** — every public build still has it.
+  `show_main_window` the tray already used. Shipped in v0.3.0, so every public
+  build from then on carries it. The Dock click that would confirm it is still
+  owed — it needs a real press.
 - ~~The runner spec has no "known gaps" section, but `README.md:50` sends readers
   to one.~~ Resolved by the phase 3 README rewrite; no such reference remains.

@@ -25,6 +25,7 @@ src-tauri/src/
   downloads.rs the job manager the commands drive; admission and settling
   store.rs     the single JSON config under Application Support
   speeds.rs    what a model did, and the settings it did it under
+  tune.rs      the candidate ladder, the shared prompt, the measurement
   sysmem.rs    machine memory readings via libc
   profile.rs   launch settings -> argv
 src/
@@ -102,9 +103,10 @@ between them is a finding rather than a nuisance. Checked 2026-08-31 and they
 agree: 204 MiB for `qwen2.5-0.5b` at 32,768 with all 24 layers charged, 680 MiB
 for Ornith at 65,536 with 10 of 40 charged.
 
-It also reads the two ceilings correctly, which the app does not yet do —
-`llama-server --list-devices` for the GPU working set, `vm_stat` for what is
-free. `--run` launches the winner and reports real tokens per second.
+It reads the two ceilings the same way the app now does — `llama-server
+--list-devices` for the GPU working set, `vm_stat` for what is free — so a
+disagreement there is a finding too. `--run` launches the winner and reports real
+tokens per second, which `tune.rs` is the Rust port of and is checked against.
 
 
 Also in the README. Both copies are deliberate: the session anchor loads this

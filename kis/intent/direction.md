@@ -165,50 +165,58 @@ https://claude.ai/code/artifact/8d38ec5a-18fe-49ed-bf46-cdc7bf58620c — approve
 by the author on 2026-08-31. Two tabs, and every figure in it measured against
 Ornith on this machine rather than invented.
 
-**Half of it has shipped and half is Tune.** The memory panel, the collapsed
-Advanced and the real ceiling landed in v0.4.0
-([screen.md](screen.md)). What has not: the app stating a chosen setting, the
-"chosen" labels, and the Tune button with its comparison table. Its "Before
-launch" tab shows a suggestion marked *never measured*; its "After Tune" tab
-shows measurement overruling arithmetic by 27%. That disagreement is the mockup's
-argument, and it is the argument for Tune.
+**All of it has now shipped, in two releases.** The memory panel, the collapsed
+Advanced and the real ceiling landed in v0.4.0 ([screen.md](screen.md)); the
+Tune button, its comparison table and the app stating a chosen setting landed in
+v0.5.0 ([tune.md](tune.md)). Its "After Tune" tab shows measurement overruling
+arithmetic by 27%; the app shipped showing 22% on the same model, measured on a
+machine that was busier. That disagreement is the mockup's argument, and it
+survived being measured again.
 
-Three details in it are already superseded. Its "Before launch" tab shows the app
-suggesting before anything has measured, which [tune.md](tune.md) decided
-against — that tab now reads as a model nobody has run does: what fits, and no
-opinion. Advanced is drawn with a per-field override marker, which v0.4.0 ships
-without — the fields are editable but nothing marks one as the user's, because
-nothing suggests values yet. And its speed panel reports generation only; the
-prompt figures it once showed came from a 36-token prompt and were withdrawn as
-meaningless.
+Three details in it were superseded rather than built. Its "Before launch" tab
+shows the app suggesting before anything has measured, which [tune.md](tune.md)
+decided against — that tab now reads as a model nobody has run does: what fits,
+and no opinion. Advanced is drawn with a per-field override marker, which nothing
+ships — the fields are editable but nothing marks one as the user's. And its
+speed panel reports generation only; the prompt figures it once showed came from
+a 36-token prompt and were withdrawn as meaningless. The shipped table reports
+both, because prompt eval is the number that matters to an agent sending long
+context.
 
 ## The shape this implies
 
-Not a plan. The pieces, so the plan has something to cut up.
+Not a plan. The pieces, so the plan has something to cut up. **Four of the seven
+are now built** — everything below marked shipped landed in v0.4.0 or v0.5.0.
+What is left is the launch form shrinking behind named choices, the pi button,
+and per-field override.
 
 - **The launch form shrinks** to what the author actually varies — a name, a
   port, and a context — plus one named choice that owns the rest.
-- **The optimizer has an opinion the moment a model is opened**, worked out from
-  the file and the machine. A **Tune** button measures for real, keeps the
-  fastest, and remembers it for that model. Nobody waits minutes on a model they
-  are about to discard.
+- **The optimizer has an opinion the moment a model is opened.** *Shipped in
+  v0.5.0, and half-reversed on the way*: the opinion comes from measurement
+  rather than from the file and the machine, because arithmetic alone picks the
+  slowest candidate. A model nobody has run gets no opinion. The **Tune** button
+  measures for real and remembers it, so nobody waits minutes on a model they are
+  about to discard.
 - **pi gets a button.** Not automatic: the file is hand-edited and shared with
   four other providers, so writing behind the author's back is wrong. It should
   follow the conventions already in that file rather than invent one, and it
   has to deal with the 8080 collision.
-- **Tune is the script's `--run`, rewritten in Rust.** Not a shell-out: a
-  shipped app cannot depend on python3 being present. `fits.py` stays the oracle
-  the Rust is checked against, the same relationship it has with `estimate.rs`.
+- **Tune is the script's `--run`, rewritten in Rust.** *Shipped in v0.5.0.* Not a
+  shell-out: a shipped app cannot depend on python3 being present. `fits.py`
+  stays the oracle the Rust is checked against, and it agrees with it on both the
+  candidates and the ordering for a real 21 GB file.
 - **Advanced is per-field override, not a form behind a toggle.** Each decided
   value is editable in place; touching one marks it the user's and the optimizer
   stops deciding that field for that model, with a way back to the suggestion.
   The existing rule carries it — a model opens on its last successful launch —
   so an override persists like a hand-set context does today.
-- **The app should read the ceiling the way `tools/fits.py` does.** One call to
-  `llama-server --list-devices` gives `MTL0: Apple M2 Pro (25559 MiB, 25558 MiB
-  free)` with no model loaded. Until it does, the memory panel is comparing
-  against installed RAM, which is the bug this direction started from.
-- **Memory is a glance.** The current panel explains itself in four lines of
+- **The app should read the ceiling the way `tools/fits.py` does.** *Shipped in
+  v0.4.0.* One call to `llama-server --list-devices` gives `MTL0: Apple M2 Pro
+  (25559 MiB, 25558 MiB free)` with no model loaded, and the panel compares
+  against that rather than against installed RAM — the bug this direction started
+  from.
+- **Memory is a glance.** *Shipped in v0.4.0.* The current panel explains itself in four lines of
   prose. It should be a number, a bar, and nothing to read.
 
 ## Still out of scope
@@ -220,6 +228,8 @@ revisit next.
 
 ## Not settled
 
-- What "best model" means, which item 7 cannot be built without.
+- What "best model" means, which item 7 cannot be built without. Tune answers
+  half of it for a model already on disk — what this machine gets out of it — and
+  none of it for a model that is not.
 - Whether hunting and working are two screens or one.
 - What the named choices are called, and how many there are.
