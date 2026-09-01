@@ -34,20 +34,29 @@ Blocker:  none. **The Speed panel was looked at on 2026-09-01, five defects came
 
           Five standing items, all of one kind — something nobody has looked at.
 
-          Three are owed against v0.5.0 and want ten minutes with the display
-          free and nothing fullscreen: five launches of the installed build,
-          closing the window and clicking the Dock icon, and downloading a `.dmg`
-          through a browser to meet a real Gatekeeper prompt. **`/Applications`
-          still holds v0.3.1**, so the machine used daily is three releases
-          behind the repository — the mechanical reason these keep going unmet.
+          **`/Applications` now holds v0.5.0**, and with it the reason the
+          other three kept going unmet is gone
+          ([intent/release.md](../intent/release.md)).
+
+          Five launches gave five usable windows, `1060x720` each, checked
+          through the window server rather than by eye — strong evidence rather
+          than the check as written, since `open -a` is not a Finder double-click
+          and nothing confirmed no other app was fullscreen.
+
+          Two remain and both need a human. The Dock click, because a synthesized
+          press cannot settle it. And the Gatekeeper prompt: the `.dmg` is sitting
+          in `~/Downloads` **with quarantine set for the first time**, downloaded
+          through Chrome — but macOS denies this agent's shell any access to that
+          folder, so opening it is yours. Installing from anywhere else sets no
+          quarantine and proves nothing.
 
           Two are unrelated and older: a queued download row with nothing on disk
           behind it has never been seen coming back from a restart, and no Intel
           Mac has run the universal build.
-Next:     **Install v0.5.0 and clear the three owed checks**, which are now four
-          releases old and are the whole reason `/Applications` sits three
-          releases behind. The Gatekeeper one is finally cheap: the `.dmg` is
-          published, so downloading it through a browser is five minutes.
+Next:     **Open `~/Downloads/Llamaport_0.5.0_aarch64.dmg`** and install from it,
+          following only what the README says. That is the Gatekeeper check, owed
+          since v0.1.0, and it is now a double-click. Then close the window and
+          click the Dock icon.
 
           After that, the rest of [intent/direction.md](../intent/direction.md):
           the pi button, and search. Neither is planned. After

@@ -36,10 +36,32 @@ the same cargo and source paths counted once per slice. The only one outside a
 build path is the bundle identifier `com.mkamran.llamaport`, as in every release
 here.
 
-Owed against the next release, unchanged and now four releases old: the
-five-launch check, the Dock click, and the browser download meeting a real
-Gatekeeper prompt (see the split above). `/Applications` still holds **v0.3.1**,
-which is now three releases behind.
+### Installed, and two of the three owed checks moved — 2026-09-01
+
+**`/Applications` holds v0.5.0**, replacing the v0.3.1 that had sat there for
+three releases. Installed from the asset downloaded back from the published
+release, byte-identical to the build. The installed binary carries
+`speeds.json`, `tune:report` and `index-DsHm8385.js`, so what is installed is
+what was published, checked rather than assumed.
+
+**Five launches, five usable windows**, each `1060x720` at the same position,
+onscreen and opaque, verified through `CGWindowListCopyWindowInfo` rather than by
+eye. *Not* the check exactly as written: `open -a` goes through LaunchServices as
+a Finder double-click does, but it is not a double-click, and nothing verified
+that no other app was fullscreen — the condition that made the v0.3.1 attempt
+noise. Call it strong evidence that the window bug is not present, not the check
+discharged.
+
+**The Gatekeeper one is now one double-click away and still owed.** The `.dmg`
+was downloaded through Chrome and is in `~/Downloads` with its quarantine
+attribute set — the first time that has been true here. It could not be carried
+further from this side: macOS denies the agent's shell any access to
+`~/Downloads` (`Operation not permitted` on `ls`, `xattr` and `shasum`, while
+`test -e` still finds the file). Opening *that* copy is what meets a real prompt;
+installing from anywhere else sets no quarantine and proves nothing.
+
+**The Dock click is unchanged and needs a human** — a synthesized press cannot
+settle it, which is why it says so.
 
 ## v0.2.1 — shipped 2026-08-04
 
