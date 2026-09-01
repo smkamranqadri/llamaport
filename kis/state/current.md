@@ -1,10 +1,12 @@
 # Current
 
 ```text
-Branch:   `main`, clean and pushed. **`v0.6.1` is tagged at HEAD** — annotated,
-          and both artefacts were built from it, so there is no distance to
-          check this time. That will stop being true the moment a memory commit
-          lands on top; check it before building anything
+Branch:   `main`, clean and pushed. **`v0.6.1` is tagged at `5d8957d`, four
+          memory commits behind HEAD** — the artefacts were built from the tag,
+          when the two were the same commit. Check the distance with
+          `git rev-list --count v0.6.1..HEAD` before building a release
+          artefact; assuming tag and HEAD are identical is what put a build of
+          HEAD in the v0.3.0 release
           ([knowledge/technical.md](../knowledge/technical.md)).
 Task:     **The pi button shipped as `v0.6.0`; `v0.6.1` fixed the packaging it
           exposed** ([intent/pi.md](../intent/pi.md),

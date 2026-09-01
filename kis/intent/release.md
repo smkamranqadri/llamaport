@@ -52,7 +52,7 @@ fix, which is what a check that had never been run was always going to cost.
 
 ## v0.6.0 — shipped 2026-09-02
 
-https://github.com/smkamranqadri/llamaport/releases/tag/v0.6.0 — Latest,
+https://github.com/smkamranqadri/llamaport/releases/tag/v0.6.0 — a full release,
 unsigned, both `.dmg`s attached. **The pi button** ([pi.md](pi.md)): the app
 reaches outside itself for the first time, writing the provider and the enabled
 entry pi needs to talk to the model this app is serving. A minor rather than a
@@ -85,7 +85,7 @@ commit, so both artefacts were built from the tag with no distance to check.
 
 ## v0.5.0 — shipped 2026-09-01
 
-https://github.com/smkamranqadri/llamaport/releases/tag/v0.5.0 — Latest,
+https://github.com/smkamranqadri/llamaport/releases/tag/v0.5.0 — a full release,
 unsigned, both `.dmg`s attached. **Tune**, the whole phase in one release
 ([tune.md](tune.md)): every run records what it did, a ladder measures on
 request, and the app has one opinion where it had none. A minor rather than a
@@ -230,10 +230,19 @@ All four phases closed. What is left is not part of this plan: the README's
 verification download used `curl`, which sets no quarantine attribute. Proof and
 its limits are in [state/current.md](../state/current.md).
 
+**That sentence stood for five releases and cost them all.** The steps were
+finally met on 2026-09-02 and were wrong — see v0.6.1 at the top of this file.
+
 A public, unsigned, MIT-licensed macOS beta on GitHub, tagged `v0.1.0` and
 marked pre-release.
 
 ## Decisions
+
+**Do not write "Latest" into a release entry.** It is a state GitHub owns and
+moves on the next release, not a fact about the release being described. Four
+entries here claimed it at once before the 2026-09-02 sweep. Record what is
+durable — full release or pre-release — and let `gh release list` answer which
+one is current.
 
 - **Public GitHub release, not a private handout.** Chosen over sending a `.dmg`
   to a few people directly, accepting that it pulls in a licence, a README for
@@ -540,7 +549,7 @@ Both are owed against the next release rather than closed here.
 
 ## v0.3.2 — shipped 2026-08-31
 
-https://github.com/smkamranqadri/llamaport/releases/tag/v0.3.2 — Latest,
+https://github.com/smkamranqadri/llamaport/releases/tag/v0.3.2 — a full release,
 unsigned, both `.dmg`s attached. Three corrected figures and one slider step; no
 schema change, the config stays at 7.
 
@@ -571,7 +580,7 @@ the browser download meeting a real Gatekeeper prompt.
 
 ## v0.4.0 — shipped 2026-08-31
 
-https://github.com/smkamranqadri/llamaport/releases/tag/v0.4.0 — Latest,
+https://github.com/smkamranqadri/llamaport/releases/tag/v0.4.0 — a full release,
 unsigned, both `.dmg`s attached. **A minor rather than a patch**: the context and
 layer offload can be left unset for llama.cpp to fit, which changes what a
 never-launched model opens on, and the model screen is reorganised. No schema

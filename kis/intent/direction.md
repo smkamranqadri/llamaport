@@ -187,7 +187,7 @@ context.
 
 Not a plan. The pieces, so the plan has something to cut up. **Five of the seven
 are now built** — everything below marked shipped landed in v0.4.0 or v0.5.0,
-except the pi button, which is built and unreleased. What is left is the launch
+except the pi button, which shipped in v0.6.0. What is left is the launch
 form shrinking behind named choices, and per-field override.
 
 - **The launch form shrinks** to what the author actually varies — a name, a
@@ -198,7 +198,7 @@ form shrinking behind named choices, and per-field override.
   slowest candidate. A model nobody has run gets no opinion. The **Tune** button
   measures for real and remembers it, so nobody waits minutes on a model they are
   about to discard.
-- **pi gets a button.** *Built 2026-09-02, unreleased* ([pi.md](pi.md)). Not
+- **pi gets a button.** *Shipped in v0.6.0* ([pi.md](pi.md)). Not
   automatic: the file is hand-edited and shared with four other providers, so
   writing behind the author's back is wrong — it shows a diff and writes on
   confirm. It follows the conventions already in that file rather than inventing

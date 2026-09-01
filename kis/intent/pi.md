@@ -1,7 +1,8 @@
 # pi
 
 Item 6 of what was asked for ([direction.md](direction.md)): **one click to point
-pi at the running model.** Planned and built 2026-09-02, unreleased. The last of the three
+pi at the running model.** Planned, built and shipped in `v0.6.0` on 2026-09-02.
+The last of the three
 remaining pieces of the shape direction implies that could be planned at all —
 search is blocked on what "best model" means, and the launch form is blocked on
 what the named choices are called.
