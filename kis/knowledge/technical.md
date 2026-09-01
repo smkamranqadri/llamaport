@@ -214,6 +214,28 @@ default. Sibling `.bak`, `.save` and `.backup` files already accumulate beside i
   says 1.0 was the model's choice rather than a fallback, and a `--temp` typed
   into extra arguments silently replaces it with no indication.
 
+- **Tauri does not sign the bundle unless an identity is configured, and an unsigned
+  bundle is not "unsigned" to macOS — it is broken.** Without
+  `bundle.macOS.signingIdentity`, the `.app` carries only the ad-hoc signature the
+  linker puts on the arm64 executable: `flags=0x20002(adhoc,linker-signed)`,
+  `Info.plist=not bound`, `Sealed Resources=none`. `codesign --verify` then says
+  *code has no resources but signature indicates they must be present*, and a
+  quarantined copy is refused outright as **"is damaged and can't be opened. You
+  should move it to the Trash"** — with no **Open Anyway** button anywhere, because
+  macOS never got far enough to ask. Every release from v0.1.0 to v0.6.0 shipped
+  this, and the README documented a flow that could not work.
+
+  `"signingIdentity": "-"` fixes it: `flags=0x10002(adhoc,runtime)`, `Info.plist
+  entries=14`, `Sealed Resources version=2`, and `codesign --verify --deep --strict`
+  reports valid on disk. `spctl` still rejects it, which is correct — ad-hoc is not
+  notarization, so the user meets the ordinary unidentified-developer dialog, and
+  that one **Open Anyway** does dismiss.
+
+  **Check the artefact with `codesign --verify --deep --strict`, not by eye.** The
+  `.dmg` mounts, the app looks fine, and it launches perfectly from a local copy —
+  quarantine is the only thing that exposes it, which is why five releases went out
+  with it.
+
 - **`write_atomic` does not carry a file's mode across.** It renames a fresh temporary
   into place, and a fresh file is born at the process umask rather than at the mode of
   the file it replaces. Writing pi's `models.json` this way took it from `600` to `644` —

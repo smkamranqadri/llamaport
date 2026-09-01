@@ -74,12 +74,14 @@ user, reversing two standing decisions ([direction.md](direction.md)).
    the only launch channel open today; r/LocalLLaMA needs karma this account does
    not have. And issue 1 below is worth fixing before more people arrive.
 
-   Three things owed rather than planned, all older than this release: the
-   README's "Open Anyway" steps have never met a real Gatekeeper prompt, a queued
-   row with nothing on disk behind it has never been seen coming back from a
-   restart, and no Intel Mac has run the universal build. **The first is now a
-   double-click** — v0.5.0's `.dmg` sits in `~/Downloads` with quarantine set
-   ([release.md](release.md)).
+   Three things owed rather than planned, all older than this release. **The
+   first was finally done on 2026-09-02 and it failed**: the README's "Open
+   Anyway" steps met a real Gatekeeper prompt for the first time, and the prompt
+   was "is damaged and can't be opened" — a message those steps cannot answer.
+   Five releases had shipped an unsealed bundle. Fixed in v0.6.1
+   ([release.md](release.md)). The other two stand: a queued row with nothing on
+   disk behind it has never been seen coming back from a restart, and no Intel
+   Mac has run the universal build.
 
    Two of this release's after-tag checks came off the list on 2026-09-01: the
    installed build is v0.5.0, and the Dock click was made by hand on it. Neither

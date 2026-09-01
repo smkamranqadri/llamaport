@@ -1,5 +1,48 @@
 # Releases
 
+## v0.6.1 — shipped 2026-09-02
+
+https://github.com/smkamranqadri/llamaport/releases/tag/v0.6.1 — Latest,
+unsigned by Apple but now signed well enough for macOS to check. **Packaging
+only**, no functional change from v0.6.0.
+
+**The Gatekeeper check finally ran, and it failed.** Owed since v0.1.0 and never
+performed, it was run for real on 2026-09-02: the author downloaded v0.6.0
+through a browser, installed it, clicked it, and got **"Llamaport.app is damaged
+and can't be opened. You should move it to the Trash."** Not the
+unidentified-developer prompt the README has described for five releases, and
+there is no **Open Anyway** button for that message — so the documented steps
+could never have worked, on any release this project has published.
+
+The cause was diagnosed rather than guessed. The shipped bundle carried only the
+ad-hoc signature the linker puts on the arm64 executable — `flags=0x20002(adhoc,
+linker-signed)`, `Info.plist=not bound`, `Sealed Resources=none` — because Tauri
+runs `codesign` only when an identity is configured. `codesign --verify` on the
+installed copy: *code has no resources but signature indicates they must be
+present*. macOS could not check the app at all, so it refused instead of asking.
+The rule is in [knowledge/technical.md](../knowledge/technical.md).
+
+**Fixed and verified before shipping**, on a copy of the v0.6.0 build: ad-hoc
+signing takes the flags to `0x2(adhoc)`, binds the Info.plist and seals the
+resources, and `codesign --verify --deep --strict` then reports valid on disk and
+satisfying its designated requirement. `"signingIdentity": "-"` makes the build
+do it. The shipped v0.6.1 bundles verify the same way, at
+`flags=0x10002(adhoc,runtime)`.
+
+`Llamaport_0.6.1_aarch64.dmg`, 4,252,086 bytes, sha256
+`6b7b8ae3f9ceaaed388c2aa6563575c678d1a9aa6ec5cb8db84d0fb5fb839749`.
+`Llamaport_0.6.1_universal.dmg`, 8,714,320 bytes, sha256
+`34baad55cd5e6bc08c31e88c46d4e10289859663aa1f9cf8961b9692afde384c`. Both
+downloaded back and compared with `cmp`, exit 0 on each; the universal one carries
+`x86_64 arm64`. **And the aarch64 `.dmg` was mounted from the downloaded file and
+the app inside verified** — the artefact check this release exists for, done on
+the published bytes rather than the local ones.
+
+**Still unproved, and it is the same check again.** Nothing here can produce the
+dialog: that needs a browser download with quarantine set. What is proved is that
+the bundle now verifies, and that a verifying-but-unnotarized app is the case
+**Open Anyway** handles. Downloading v0.6.1 through a browser is what closes it.
+
 ## v0.6.0 — shipped 2026-09-02
 
 https://github.com/smkamranqadri/llamaport/releases/tag/v0.6.0 — Latest,
@@ -322,6 +365,9 @@ rather than before it.
 - The change is demonstrable **in the artefact**, not inferred from the tree. A
   frontend change is proved by its new bundle digest, a Rust change by a string
   only it introduces. v0.3.1 could do neither and had to infer; v0.3.2 has both.
+- `codesign --verify --deep --strict` on the built `.app` reports **valid on
+  disk**. Added 2026-09-02, after five releases shipped a bundle macOS refused to
+  open as damaged.
 
 ### After the tag — these need a published asset or a human at the machine
 
@@ -339,6 +385,13 @@ than quietly carried.
   the README says. Copying the file locally does not count: quarantine is set by
   the download, and without it the test does not reproduce what a tester meets.
   **This one is why the list was split** — it needs a published release.
+
+  **Run 2026-09-02 for the first time, and it caught what five releases of
+  reasoning had not: the app was refused as damaged, not offered an Open Anyway.**
+  See v0.6.1. A local copy launches perfectly and proves nothing; quarantine is
+  the only thing that exposes an unsealed bundle. Add
+  `codesign --verify --deep --strict` on the built `.app` to the before-the-tag
+  list so the next one cannot ship the same way.
 
 ## Verification
 

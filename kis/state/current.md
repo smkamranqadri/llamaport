@@ -1,47 +1,48 @@
 # Current
 
 ```text
-Branch:   `main`, clean and pushed. **`v0.6.0` is tagged at HEAD** — annotated,
+Branch:   `main`, clean and pushed. **`v0.6.1` is tagged at HEAD** — annotated,
           and both artefacts were built from it, so there is no distance to
           check this time. That will stop being true the moment a memory commit
           lands on top; check it before building anything
           ([knowledge/technical.md](../knowledge/technical.md)).
-Task:     **The pi button is built, proved and released as `v0.6.0`**
-          ([intent/pi.md](../intent/pi.md)). The app reaches outside itself for
-          the first time: it writes the provider and the enabled entry pi needs,
-          diffing both files before it touches either. Item 6 of what was asked
-          for is one click.
+Task:     **The pi button shipped as `v0.6.0`; `v0.6.1` fixed the packaging it
+          exposed** ([intent/pi.md](../intent/pi.md),
+          [intent/release.md](../intent/release.md)). The app writes the provider
+          and the enabled entry pi needs, diffing both files first — item 6 is one
+          click.
 Mode:     none in progress.
-Blocker:  none. **v0.6.0 inherits the whole after-the-tag list**
-          ([intent/release.md](../intent/release.md)), and the evidence gathered
-          on 2026-09-01 was against v0.5.0 — a different build, so it does not
-          carry. `/Applications` still holds v0.5.0.
+Blocker:  none. **The Gatekeeper check ran on 2026-09-02, for the first time
+          since v0.1.0, and it failed** — the app was refused as *damaged*, not
+          offered an Open Anyway. Five releases had shipped a bundle carrying no
+          seal, and a README describing a flow that could not work. Diagnosed,
+          fixed and shipped as v0.6.1 the same day
+          ([intent/release.md](../intent/release.md)); the rule is in
+          [knowledge/technical.md](../knowledge/technical.md).
 
-          Owed against this release, all needing a human at the machine: the
-          **Gatekeeper prompt** (never met, on any release), **five launches from
-          Finder** with nothing fullscreen, and the **Dock click** — met by hand
-          on v0.5.0, which is what says the fix works, not that this build has it.
+          **The same check is owed again**, now against v0.6.1, and only a browser
+          download can run it: the fix is proved as far as `codesign --verify`
+          goes, and nothing here can produce the dialog.
+
+          Also owed against v0.6.1, both needing a human: **five launches from
+          Finder** with nothing fullscreen, and the **Dock click**. The evidence
+          from 2026-09-01 was against v0.5.0 and does not carry.
+          `/Applications` holds v0.6.0, with its quarantine removed by hand.
 
           Older, and unchanged: a queued download row with nothing on disk behind
           it has never been seen coming back from a restart, and no Intel Mac has
-          run the universal build. The second is newly worth something: v0.6.0's
-          x86_64 slice was proved to carry this release's code rather than
-          assumed.
+          run the universal build.
 
-Next:     **Open `~/Downloads/Llamaport_0.6.0_aarch64.dmg` once it is downloaded
-          through a browser.** The Gatekeeper prompt is the one check owed
-          against every release since v0.1.0, and v0.6.0 inherits it. Nothing
-          here can reach it: macOS denies the agent's shell `~/Downloads`
-          entirely.
+Next:     **Download `Llamaport_0.6.1_aarch64.dmg` through a browser and open
+          it.** If macOS says it cannot verify the developer rather than calling
+          the app damaged, the fix is confirmed end to end and the README is
+          accurate for the first time. If it still says damaged, ad-hoc signing
+          is not enough and the answer is notarization, which costs $99/yr and
+          was deliberately deferred ([intent/roadmap.md](../intent/roadmap.md)).
 
-          Then the two older ones: a queued download row with nothing on disk
-          coming back from a restart, and an Intel Mac running the universal
-          build — the second is newly worth something, since v0.6.0's universal
-          slice was proved present rather than assumed.
-
-          **The README's screenshots are now a release behind.** They show a
-          Running panel without the Use in pi button. Retaking them is the
-          author's, per [release.md](../intent/release.md) phase 3.
+          The README's screenshots are a release behind — they show a Running
+          panel with no Use in pi button. The author's, per
+          [release.md](../intent/release.md) phase 3.
 
           After that, what is left of [intent/direction.md](../intent/direction.md):
           the launch form shrinking behind named choices, per-field override, and
