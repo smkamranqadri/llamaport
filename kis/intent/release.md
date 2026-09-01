@@ -38,6 +38,11 @@ downloaded back and compared with `cmp`, exit 0 on each; the universal one carri
 the app inside verified** — the artefact check this release exists for, done on
 the published bytes rather than the local ones.
 
+**v0.6.0's notes carry a warning block from 2026-09-02**, naming the dialog, the
+`xattr` line and v0.6.1, and replacing an opening line that told readers to
+right-click Open. The five releases before it say the same wrong thing and have
+not been touched; v0.6.1 is Latest, so only someone browsing older tags meets it.
+
 **Confirmed end to end, 2026-09-02.** v0.6.1 was downloaded through a browser and
 opened: macOS said it could not verify the developer, and **Open Anyway** let it
 through. The ordinary dialog, answered by the steps the README has always

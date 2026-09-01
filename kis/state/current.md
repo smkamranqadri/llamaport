@@ -30,10 +30,13 @@ Blocker:  none. **The Gatekeeper check is met.** Owed since v0.1.0, run twice on
           from Finder** with nothing fullscreen, and the **Dock click**. The
           evidence from 2026-09-01 was against v0.5.0 and does not carry.
 
-Next:     **v0.6.0 is still published and still refuses to open**, with release
-          notes that say nothing about it. Anyone landing on it meets the dialog
-          that started this. Adding a line pointing at v0.6.1 is the smallest
-          thing that stops that, and it is not yet done.
+Next:     **The same warning is owed on v0.5.0 and every release before it.**
+          v0.6.0's notes now carry one — a warning block naming the dialog, the
+          `xattr` line, and a link to v0.6.1, replacing an opening line that told
+          readers to right-click Open, which never worked. But the defect goes
+          back to v0.1.0, and five older releases still describe a flow that
+          cannot work. v0.6.1 is Latest, so the repository's download button is
+          safe; only someone browsing older tags is caught.
 
           Then the README's screenshots, which are a release behind — they show a
           Running panel with no Use in pi button. The author's, per
