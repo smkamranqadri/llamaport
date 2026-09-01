@@ -1,22 +1,24 @@
 # Current
 
 ```text
-Branch:   **`tune`**, one commit ahead of `main` at `58e8fa7` and unpushed — the
-          whole phase in one commit, on a branch because the session that made it
-          was not to commit to `main` directly. `main` can fast-forward.
-          `main` itself is clean and pushed. `v0.4.0` is tagged at `6735316`, **four memory
+Branch:   `main`, clean and pushed. **`v0.5.0` is tagged at HEAD's release commit
+          and published**, and for once the tag and the artefacts agree by check
+          rather than by assumption: `git describe --exact-match` was run before
+          the build and both `.dmg`s were downloaded back and `cmp`-ed, exit 0.
+          Tag with `git tag -a` — a lightweight tag makes that check fail while
+          nothing is wrong ([intent/release.md](../intent/release.md)). `v0.4.0` is tagged at `6735316`, **four memory
           commits behind HEAD** — both `.dmg`s were built from the tag, not from
           HEAD. Check `git describe --exact-match` before building a release
           artefact: State claiming tag and HEAD were identical is what let a build
           of HEAD reach the v0.3.0 release
           ([intent/release.md](../intent/release.md)).
-Task:     **Tune is built, seen and committed — all five parcels**
+Task:     **Tune is built, seen, committed and released as `v0.5.0`**
           ([intent/tune.md](../intent/tune.md)). The suite no longer writes into
           `~/Library/Application Support/llamaport`; `speeds.json` has a store;
           the runner records a run when it settles; Tune measures a ladder that
           reproduces `tools/fits.py --run`'s ordering on Ornith; and the app now
           has one opinion, offered rather than applied.
-Mode:     Phase, complete. One commit, 20 files, 6 of them new.
+Mode:     none in progress.
 Blocker:  none. **The Speed panel was looked at on 2026-09-01, five defects came
           out of it, and the fixes were confirmed on screen by the author**
           ([intent/tune.md](../intent/tune.md)). None of the five was visible to
@@ -32,19 +34,23 @@ Blocker:  none. **The Speed panel was looked at on 2026-09-01, five defects came
 
           Five standing items, all of one kind — something nobody has looked at.
 
-          Three are owed against v0.4.0 and want ten minutes with the display
+          Three are owed against v0.5.0 and want ten minutes with the display
           free and nothing fullscreen: five launches of the installed build,
           closing the window and clicking the Dock icon, and downloading a `.dmg`
           through a browser to meet a real Gatekeeper prompt. **`/Applications`
-          still holds v0.3.1**, so the machine used daily is two releases behind
-          the repository — the mechanical reason these keep going unmet.
+          still holds v0.3.1**, so the machine used daily is three releases
+          behind the repository — the mechanical reason these keep going unmet.
 
           Two are unrelated and older: a queued download row with nothing on disk
           behind it has never been seen coming back from a restart, and no Intel
           Mac has run the universal build.
-Next:     **Decide Tune's release** — whether `tune` merges to `main` and ships as
-          `v0.5.0`. `v0.4.0` is tagged well behind HEAD and `/Applications` still
-          holds `v0.3.1`, so the machine used daily is two releases behind. After
+Next:     **Install v0.5.0 and clear the three owed checks**, which are now four
+          releases old and are the whole reason `/Applications` sits three
+          releases behind. The Gatekeeper one is finally cheap: the `.dmg` is
+          published, so downloading it through a browser is five minutes.
+
+          After that, the rest of [intent/direction.md](../intent/direction.md):
+          the pi button, and search. Neither is planned. After
           that, the rest of [intent/direction.md](../intent/direction.md): the pi
           button, and search. Neither is planned.
 

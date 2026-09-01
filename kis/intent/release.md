@@ -1,5 +1,46 @@
 # Releases
 
+## v0.5.0 — shipped 2026-09-01
+
+https://github.com/smkamranqadri/llamaport/releases/tag/v0.5.0 — Latest,
+unsigned, both `.dmg`s attached. **Tune**, the whole phase in one release
+([tune.md](tune.md)): every run records what it did, a ladder measures on
+request, and the app has one opinion where it had none. A minor rather than a
+patch — the model screen now tells you something it never told you. No schema
+change; the config stays at 7 and `speeds.json` is a file of its own.
+
+`Llamaport_0.5.0_aarch64.dmg`, 4,292,416 bytes, sha256
+`0eff24e7886f8d9698f2c33be8a896b6a6e3f04f099eea17599c6c30a95dd009`.
+`Llamaport_0.5.0_universal.dmg`, 8,608,076 bytes, sha256
+`b3706b05805790945a249408ca275ea9c8aaaac4ffe7ee4b5e1d73411c0a50c7`. Both
+downloaded back from the published release and compared with `cmp`, exit 0 on
+each. The universal one carries `x86_64 arm64`.
+
+Provable on both layers: the frontend bundle `index-DsHm8385.js` is embedded, and
+`speeds.json` and `tune:report` are strings only this release's Rust introduces —
+each appears **twice** in the universal build against once in the aarch64 one,
+which is what says the fat binary is not a stub half, and **zero** times in the
+0.3.1 binary still sitting in `/Applications`.
+
+**The `git describe --exact-match` check caught something on its first real
+outing.** `git tag v0.5.0` makes a *lightweight* tag, and `describe` without
+`--tags` only considers annotated ones — so the check failed while the tag was
+sitting on HEAD exactly as intended. Every earlier tag here is annotated
+(`git tag -l v0.4.0 --format='%(objecttype)'` says `tag`, a lightweight one says
+`commit`). The tag was recreated with `-a`. Left as it was, this release would
+have shipped a tag unlike every other and the check would have read as a failure
+on every future release. **Tag with `git tag -a`.**
+
+Account name: 455 occurrences in the aarch64 binary and 916 in the universal,
+the same cargo and source paths counted once per slice. The only one outside a
+build path is the bundle identifier `com.mkamran.llamaport`, as in every release
+here.
+
+Owed against the next release, unchanged and now four releases old: the
+five-launch check, the Dock click, and the browser download meeting a real
+Gatekeeper prompt (see the split above). `/Applications` still holds **v0.3.1**,
+which is now three releases behind.
+
 ## v0.2.1 — shipped 2026-08-04
 
 https://github.com/smkamranqadri/llamaport/releases/tag/v0.2.1 — pre-release,
