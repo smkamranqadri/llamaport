@@ -203,7 +203,7 @@ than dressed up as coverage.
 whole file per run. At one row per launch that is nothing for years, and a cap
 would still be a number nobody has evidence for.
 
-## Parcel 2 — the passive half — WRITING DONE 2026-08-31, screen still to come
+## Parcel 2 — the passive half — DONE 2026-08-31, seen on screen 2026-09-01
 
 The runner keeps the last totals each telemetry tick reported and writes one row
 when the run settles. A run that generated nothing writes nothing.
@@ -361,7 +361,7 @@ Screenshots were being taken of the whole display and the next one caught the
 author's own window rather than the app, so capturing stopped there; the images
 were deleted. Those three want a look before the phase is called done.
 
-## Parcel 4 — the suggestion — DONE 2026-08-31, unseen on screen
+## Parcel 4 — the suggestion — DONE 2026-08-31, seen and corrected 2026-09-01
 
 `speeds::summarise` turns the rows into one opinion; `speeds_for` serves it;
 the Speed panel shows it above the ladder's table and a history of what the model

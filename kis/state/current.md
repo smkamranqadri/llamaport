@@ -1,12 +1,14 @@
 # Current
 
 ```text
-Branch:   `main`, clean and pushed. **`v0.6.1` is tagged at `5d8957d`, four
-          memory commits behind HEAD** — the artefacts were built from the tag,
-          when the two were the same commit. Check the distance with
-          `git rev-list --count v0.6.1..HEAD` before building a release
-          artefact; assuming tag and HEAD are identical is what put a build of
-          HEAD in the v0.3.0 release
+Branch:   `main`, clean and pushed. **`v0.6.1` is tagged at `5d8957d`, behind
+          HEAD by however many memory commits have landed since** — the
+          artefacts were built from the tag, when the two were the same commit.
+          **Run `git rev-list --count v0.6.1..HEAD` before building a release
+          artefact**; the count is deliberately not written here, because
+          recording it once made it wrong three times in one day — the commit
+          that writes the number increments it. Assuming tag and HEAD are
+          identical is what put a build of HEAD in the v0.3.0 release
           ([knowledge/technical.md](../knowledge/technical.md)).
 Task:     **The pi button shipped as `v0.6.0`; `v0.6.1` fixed the packaging it
           exposed** ([intent/pi.md](../intent/pi.md),
