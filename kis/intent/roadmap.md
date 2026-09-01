@@ -75,7 +75,8 @@ user, reversing two standing decisions ([direction.md](direction.md)).
    not have. And issue 1 below is worth fixing before more people arrive.
 
    Three things owed rather than planned, all older than this release. **The
-   first was finally done on 2026-09-02 and it failed**: the README's "Open
+   first is now done — it took two runs on 2026-09-02, and the first one
+   failed**: the README's "Open
    Anyway" steps met a real Gatekeeper prompt for the first time, and the prompt
    was "is damaged and can't be opened" — a message those steps cannot answer.
    Five releases had shipped an unsealed bundle. Fixed in v0.6.1

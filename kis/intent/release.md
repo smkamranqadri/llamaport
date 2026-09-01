@@ -38,10 +38,12 @@ downloaded back and compared with `cmp`, exit 0 on each; the universal one carri
 the app inside verified** — the artefact check this release exists for, done on
 the published bytes rather than the local ones.
 
-**Still unproved, and it is the same check again.** Nothing here can produce the
-dialog: that needs a browser download with quarantine set. What is proved is that
-the bundle now verifies, and that a verifying-but-unnotarized app is the case
-**Open Anyway** handles. Downloading v0.6.1 through a browser is what closes it.
+**Confirmed end to end, 2026-09-02.** v0.6.1 was downloaded through a browser and
+opened: macOS said it could not verify the developer, and **Open Anyway** let it
+through. The ordinary dialog, answered by the steps the README has always
+described. **So the check owed since v0.1.0 is met** — it took two runs on one
+day, the first to find that five releases were broken and the second to prove the
+fix, which is what a check that had never been run was always going to cost.
 
 ## v0.6.0 — shipped 2026-09-02
 
@@ -386,12 +388,13 @@ than quietly carried.
   the download, and without it the test does not reproduce what a tester meets.
   **This one is why the list was split** — it needs a published release.
 
-  **Run 2026-09-02 for the first time, and it caught what five releases of
-  reasoning had not: the app was refused as damaged, not offered an Open Anyway.**
-  See v0.6.1. A local copy launches perfectly and proves nothing; quarantine is
-  the only thing that exposes an unsealed bundle. Add
-  `codesign --verify --deep --strict` on the built `.app` to the before-the-tag
-  list so the next one cannot ship the same way.
+  ~~**Owed since v0.1.0.**~~ **Run 2026-09-02, twice, and now met.** The first run
+  caught what five releases of reasoning had not: the app was refused as damaged,
+  not offered an Open Anyway. The second, against v0.6.1, got the ordinary
+  unidentified-developer dialog and **Open Anyway** worked. See v0.6.1. A local
+  copy launches perfectly and proves nothing; quarantine is the only thing that
+  exposes an unsealed bundle, which is why `codesign --verify --deep --strict` on
+  the built `.app` is now a before-the-tag gate.
 
 ## Verification
 

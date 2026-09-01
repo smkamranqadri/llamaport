@@ -12,36 +12,31 @@ Task:     **The pi button shipped as `v0.6.0`; `v0.6.1` fixed the packaging it
           and the enabled entry pi needs, diffing both files first — item 6 is one
           click.
 Mode:     none in progress.
-Blocker:  none. **The Gatekeeper check ran on 2026-09-02, for the first time
-          since v0.1.0, and it failed** — the app was refused as *damaged*, not
-          offered an Open Anyway. Five releases had shipped a bundle carrying no
-          seal, and a README describing a flow that could not work. Diagnosed,
-          fixed and shipped as v0.6.1 the same day
-          ([intent/release.md](../intent/release.md)); the rule is in
+Blocker:  none. **The Gatekeeper check is met.** Owed since v0.1.0, run twice on
+          2026-09-02: the first run refused v0.6.0 as *damaged* and exposed five
+          releases shipping an unsealed bundle behind a README that could not
+          work; the second, against v0.6.1, got the ordinary
+          unidentified-developer dialog and **Open Anyway** let it through
+          ([intent/release.md](../intent/release.md)). The rule that would have
+          caught it at v0.1.0 is now a before-the-tag gate and a fact in
           [knowledge/technical.md](../knowledge/technical.md).
 
-          **The same check is owed again**, now against v0.6.1, and only a browser
-          download can run it: the fix is proved as far as `codesign --verify`
-          goes, and nothing here can produce the dialog.
+          **Two standing items, both older, both something nobody has looked at:**
+          a queued download row with nothing on disk behind it has never been seen
+          coming back from a restart, and no Intel Mac has run the universal
+          build.
 
-          Also owed against v0.6.1, both needing a human: **five launches from
-          Finder** with nothing fullscreen, and the **Dock click**. The evidence
-          from 2026-09-01 was against v0.5.0 and does not carry.
-          `/Applications` holds v0.6.0, with its quarantine removed by hand.
+          Owed against v0.6.1 and needing a human at the machine: **five launches
+          from Finder** with nothing fullscreen, and the **Dock click**. The
+          evidence from 2026-09-01 was against v0.5.0 and does not carry.
 
-          Older, and unchanged: a queued download row with nothing on disk behind
-          it has never been seen coming back from a restart, and no Intel Mac has
-          run the universal build.
+Next:     **v0.6.0 is still published and still refuses to open**, with release
+          notes that say nothing about it. Anyone landing on it meets the dialog
+          that started this. Adding a line pointing at v0.6.1 is the smallest
+          thing that stops that, and it is not yet done.
 
-Next:     **Download `Llamaport_0.6.1_aarch64.dmg` through a browser and open
-          it.** If macOS says it cannot verify the developer rather than calling
-          the app damaged, the fix is confirmed end to end and the README is
-          accurate for the first time. If it still says damaged, ad-hoc signing
-          is not enough and the answer is notarization, which costs $99/yr and
-          was deliberately deferred ([intent/roadmap.md](../intent/roadmap.md)).
-
-          The README's screenshots are a release behind — they show a Running
-          panel with no Use in pi button. The author's, per
+          Then the README's screenshots, which are a release behind — they show a
+          Running panel with no Use in pi button. The author's, per
           [release.md](../intent/release.md) phase 3.
 
           After that, what is left of [intent/direction.md](../intent/direction.md):
