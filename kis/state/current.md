@@ -24,13 +24,7 @@ Blocker:  none. The **Gatekeeper check is met**, twice over on 2026-09-02 — th
           was against v0.5.0 and does not carry. Two older: a queued download row
           with nothing on disk behind it coming back from a restart, and an Intel
           Mac running the universal build.
-Next:     **Warn the older releases.** v0.5.0 and every release before it still
-          tell readers to right-click Open, which cannot answer the dialog those
-          builds produce. v0.6.0's notes were fixed on 2026-09-02; the rest were
-          not. v0.6.1 is the newest, so the repository's download button is safe
-          and only someone browsing older tags is caught.
-
-          Then the README's screenshots, a release behind — they show a Running
+Next:     **The README's screenshots**, a release behind — they show a Running
           panel with no Use in pi button. The author's, per
           [release.md](../intent/release.md) phase 3.
 
