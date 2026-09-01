@@ -36,7 +36,7 @@ the same cargo and source paths counted once per slice. The only one outside a
 build path is the bundle identifier `com.mkamran.llamaport`, as in every release
 here.
 
-### Installed, and two of the three owed checks moved — 2026-09-01
+### Installed, and only Gatekeeper still owed — 2026-09-01
 
 **`/Applications` holds v0.5.0**, replacing the v0.3.1 that had sat there for
 three releases. Installed from the asset downloaded back from the published
@@ -60,8 +60,21 @@ further from this side: macOS denies the agent's shell any access to
 `test -e` still finds the file). Opening *that* copy is what meets a real prompt;
 installing from anywhere else sets no quarantine and proves nothing.
 
-**The Dock click is unchanged and needs a human** — a synthesized press cannot
-settle it, which is why it says so.
+**The Dock click is met — 2026-09-01.** The author, at the machine, ran the
+installed v0.5.0 (`/Applications/Llamaport.app`, `CFBundleShortVersionString`
+0.5.0), closed its window, clicked the Dock icon, and the window came back. A
+real press, which is the only kind that settles this: a synthesized one reaches
+only "activate" and is a no-op while the app is already frontmost, so it never
+reaches the delegate.
+
+This is the second hand click on the fix and the first on a release build. The
+one on 2026-08-08 was against a dev build the same day the missing
+`RunEvent::Reopen` arm landed (below). The arm carries no test — the run loop
+closure has no seam the harness reaches — so the app is the proof, and until now
+no shipped build had been clicked.
+
+**Gatekeeper is the last of the four owed against this release** that can be
+moved from here, and it still needs the `.dmg` in `~/Downloads` opened by hand.
 
 ## v0.2.1 — shipped 2026-08-04
 

@@ -77,6 +77,10 @@ user, reversing two standing decisions ([direction.md](direction.md)).
    double-click** — v0.5.0's `.dmg` sits in `~/Downloads` with quarantine set
    ([release.md](release.md)).
 
+   Two of this release's after-tag checks came off the list on 2026-09-01: the
+   installed build is v0.5.0, and the Dock click was made by hand on it. Neither
+   was one of the three above, which are older and stand.
+
 9. ~~**Figures**~~ — done 2026-08-31, shipped in v0.4.0.
    [figures.md](figures.md). Two numbers the app printed were wrong: the KV term
    charged every layer a full-context cache, over-counting roughly fourfold on
@@ -110,8 +114,8 @@ user, reversing two standing decisions ([direction.md](direction.md)).
    without one picks the slowest of three candidates on the model the author
    runs. Tune supplied that measurement and shipped in v0.5.0.
 
-12. **Tune** — built 2026-08-31, seen and corrected on screen 2026-09-01,
-   unreleased.
+12. ~~**Tune**~~ — built 2026-08-31, seen and corrected on screen 2026-09-01,
+   shipped in v0.5.0 the same day.
    [tune.md](tune.md). The second
    phase from [direction.md](direction.md) and the one the approved mockup waits
    for: the app measures rather than guesses, and only then has an opinion. Five
@@ -129,7 +133,23 @@ user, reversing two standing decisions ([direction.md](direction.md)).
    two full-precision rungs are within noise of each other, so the app suggests the
    widest of what it cannot tell apart rather than the fastest reading. **The
    screen was then looked at, and five defects came out of it that the suite could
-   not see — which is where this project finds its defects, every time.
+   not see — which is where this project finds its defects, every time.**
+
+13. ~~**The pi button**~~ — built and proved 2026-09-02, unreleased. It writes
+   the provider *and* enables the model, because a provider alone is not
+   selectable; pi answered a prompt through the entry the app wrote, picked up
+   live with no restart. [pi.md](pi.md). Item 6 of
+   what was asked for, and the third phase cut from
+   [direction.md](direction.md). The app knows the port, the alias and the
+   context the server accepted; pi's hand-maintained file had fallen behind on
+   all three and could reach 2 of the 19 models this app has launched. A diff and
+   a confirm rather than a write on the click, because the file is not the app's.
+
+   **Both of its defects came from looking at it**, and one of them was a
+   security defect the suite could not have seen: the write took a file holding
+   five API keys from `600` to `644`. The rule that came out of it is in
+   [knowledge/technical.md](../knowledge/technical.md) and applies to every
+   writer of a file the app does not own.
 
 ## Gaps
 
@@ -205,7 +225,9 @@ unplanned.
   so the hide-on-close decision ([knowledge/project.md](../knowledge/project.md))
   had no way back but the tray. One `RunEvent::Reopen` arm calling the
   `show_main_window` the tray already used. Shipped in v0.3.0, so every public
-  build from then on carries it. The Dock click that would confirm it is still
-  owed — it needs a real press.
+  build from then on carries it. **Confirmed on the installed v0.5.0 on
+  2026-09-01** by a hand click — window closed, Dock icon pressed, window back.
+  The 2026-08-08 click was on a dev build; this is the first on a shipped one
+  ([release.md](release.md)).
 - ~~The runner spec has no "known gaps" section, but `README.md:50` sends readers
   to one.~~ Resolved by the phase 3 README rewrite; no such reference remains.

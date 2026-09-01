@@ -124,6 +124,39 @@ cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
 commands exit **127**, which is "command not found" wearing the shape of a
 failing check. Export it first: `export PATH="$HOME/.cargo/bin:$PATH"`.
 
+## pi
+
+The app's only outward integration, read off the author's own config 2026-09-02.
+
+`~/.pi/agent/models.json` is hand-maintained and has exactly one top-level key,
+`"providers"`. Each provider is `{ baseUrl, api, apiKey, models[] }`, optionally
+with `compat` or `authHeader`; each model is `{ id, name, contextWindow,
+maxTokens, reasoning, input[], cost{} }`. Five local providers: `local-llama` and
+`unsloth` on 8888, `mlx-lm` and `omlx` on 8080, `ollama` on 11434. `omlx` is the
+default. Sibling `.bak`, `.save` and `.backup` files already accumulate beside it.
+
+- **A provider is not enough to reach a model.** `~/.pi/agent/settings.json` holds
+  `enabledModels`, a list of `"<provider>/<model id>"` strings, and pi will not offer
+  a model until it is named there. That file also holds `defaultModel`,
+  `defaultProvider`, `theme` and the rest of pi's settings. Established 2026-09-02
+  by the author, who wrote a provider and still had to enable it by hand.
+- **pi re-reads both files live.** A write to `models.json` or `settings.json` while pi
+  is running is picked up with no restart: proved 2026-09-02 by writing both from the
+  app with pi open and finding the model immediately selectable. So nothing the app
+  writes here needs to tell the user to restart anything.
+- **A provider carries exactly one `baseUrl`, shared by every model under it.**
+  So models cannot be accumulated under one provider without redirecting the
+  older ones wherever the newest points.
+- **A `baseUrl` is a declaration, not evidence that anything is bound there.**
+  Only one server can hold a port; whoever holds it answers to every provider
+  entry naming it. Two entries on 8080 are a naming ambiguity, not a conflict.
+- **`--alias` is the id an OpenAI-compatible client addresses.** `default_alias`
+  turns a display name into it, and already produces `qwen3.6-35b-a3b` — the id
+  the author wrote by hand under `local-llama`.
+- **Anything the app writes outside its own directory needs the taken-once
+  override** that `store::use_config_dir` gives Application Support, and a test
+  that cannot run without it. The file at risk here belongs to another tool.
+
 ## Constraints
 
 - **Installed memory is the wrong ceiling, and "fits" is not "works".** On this
@@ -180,6 +213,13 @@ failing check. Export it first: `export PATH="$HOME/.cargo/bin:$PATH"`.
   What the app is missing is not the values but the display: nothing on screen
   says 1.0 was the model's choice rather than a fallback, and a `--temp` typed
   into extra arguments silently replaces it with no indication.
+
+- **`write_atomic` does not carry a file's mode across.** It renames a fresh temporary
+  into place, and a fresh file is born at the process umask rather than at the mode of
+  the file it replaces. Writing pi's `models.json` this way took it from `600` to `644` —
+  a file holding five API keys, made world-readable on the author's own machine, and
+  found by looking at `ls -l` after the first real write rather than by any test. Any
+  writer of a file the app does not own must read the mode first and set it back.
 
 - **`write_atomic` cannot take two writers at once.** Its temporary is
   `path.with_extension("tmp")` — one name per destination, not per writer — so two
