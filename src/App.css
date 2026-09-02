@@ -444,12 +444,6 @@ body,
   color: var(--accent);
 }
 
-.badge-quiet {
-  color: var(--text-muted);
-  background: none;
-  border: 1px solid var(--border);
-}
-
 /* States */
 
 .empty {
@@ -517,22 +511,6 @@ body,
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--text-muted);
-}
-
-.panel-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-/* Restores the 12px the h2 gives up so the buttons can sit on its line. Skipped when
-   the head is alone in the panel, which is the Logs panel with its output hidden. */
-.panel-head:not(:last-child) {
-  margin-bottom: 12px;
-}
-
-.panel-head h2 {
-  margin-bottom: 0;
 }
 
 .panel-actions {
@@ -1074,10 +1052,6 @@ input[type="range"] {
   margin-top: 14px;
 }
 
-.preview-block .panel-head {
-  margin-bottom: 6px;
-}
-
 .preview-block code {
   font-family: ui-monospace, "SF Mono", monospace;
 }
@@ -1142,39 +1116,6 @@ input[type="range"] {
 
 [data-mode="dark"] .badge-warn {
   color: #e0aa4a;
-}
-
-/* Downloads */
-
-.download-row {
-  padding: 11px 14px;
-  border-bottom: 1px solid var(--border);
-}
-
-.download-row:last-child {
-  border-bottom: none;
-}
-
-.download-head {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
-  align-items: center;
-  gap: 16px;
-}
-
-.download-progress {
-  margin-top: 10px;
-}
-
-.download-row .model-error,
-.download-row .field-hint {
-  display: block;
-  margin: 6px 0 0;
-  white-space: normal;
-}
-
-.kv-bar.is-verifying span {
-  background: #7c5cff;
 }
 
 /* Library rows are cards in a gapped column; each carries a star and its actions either
@@ -2108,4 +2049,145 @@ input[type="range"] {
   width: 12px;
   height: 12px;
   border-radius: 3px;
+}
+
+/* Downloads */
+
+.get-row {
+  display: flex;
+  flex: none;
+  gap: 8px;
+  margin-left: auto;
+}
+
+/* The status line carries a control, so it is a row and not a sentence that may wrap
+   through the middle of it. */
+.status-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.get-field {
+  width: 320px;
+}
+
+/* The limit is a named choice on the status line rather than a panel of its own: it is
+   read as part of "what is happening right now", and it is the only setting on this
+   screen that changes the transfer already running. */
+.limit-select {
+  padding: 1px 4px;
+  font: inherit;
+  color: var(--text-muted);
+  background: none;
+  border: 0;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.limit-select:hover {
+  color: var(--text);
+  background: var(--bg-hover);
+}
+
+.download-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.download-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 11px;
+}
+
+.download-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.download-name {
+  overflow: hidden;
+  font-weight: 550;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.download-head .actions {
+  margin-left: auto;
+}
+
+.download-bar {
+  height: 6px;
+  margin: 0;
+  border-radius: 3px;
+}
+
+.download-bar span {
+  border-radius: 3px;
+}
+
+.download-bar.is-verifying span {
+  background: var(--running);
+}
+
+.download-url {
+  overflow: hidden;
+  font-family: ui-monospace, "SF Mono", monospace;
+  font-size: 11px;
+  color: var(--text-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.download-note {
+  padding: 0 2px;
+  margin: 10px 0 0;
+}
+
+.finished-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 14px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+}
+
+.finished-tick {
+  display: inline-flex;
+  flex: none;
+  color: var(--running);
+}
+
+.finished-stat {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.button-link {
+  padding: 6px 8px;
+  color: var(--accent);
+  background: none;
+  border-color: transparent;
+}
+
+.load-more {
+  margin-top: 10px;
+}
+
+.clear-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 14px;
 }

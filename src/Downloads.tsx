@@ -9,16 +9,19 @@ import {
   downloadStatus,
   getDirInfo,
   getSettings,
+  listModels,
   onDownloadProgress,
   onDownloadState,
   setDownloadOptions,
 } from "./api";
 import { formatDuration, formatFileSize, formatRate, MB } from "./format";
+import { CheckIcon, CloseIcon, DownloadIcon, SearchIcon } from "./icons";
 import type {
   DirInfo,
   DownloadJob,
   DownloadOptions,
   DownloadPhase,
+  ModelEntry,
 } from "./types";
 
 type Recovery = "resume" | "restart" | "none";
@@ -46,16 +49,6 @@ interface Smoothed {
   samples: number;
 }
 
-/// The engine charges a buffer at a time, so anything slower parks a segment for longer
-/// than a second and is raised to this on the way in.
-const FLOOR = 64 * 1024;
-
-const PHASE_LABEL: Record<DownloadPhase, string> = {
-  resolving: "resolving",
-  transferring: "transferring",
-  verifying: "verifying",
-};
-
 const RETRY_LABEL: Record<Recovery, string> = {
   resume: "Resume",
   restart: "Start over",
@@ -79,6 +72,35 @@ function recovery(job: DownloadJob): Recovery {
   if (UNRESUMABLE.some((marker) => cause.includes(marker))) return "none";
   if (cause.includes("digest mismatch")) return "restart";
   return "resume";
+}
+
+/// The named limits, because a limit is chosen and not measured: nobody types 37 MB/s.
+/// A figure already in the config that is not one of these joins the list rather than
+/// being rounded away.
+const LIMITS_MB = [5, 10, 25, 50, 100];
+
+function isQuantToken(token: string): boolean {
+  if (["F16", "BF16", "F32", "F64"].includes(token)) return true;
+  const rest = token.replace(/^(IQ|TQ|Q)/, "");
+  return rest !== token && /^\d/.test(rest);
+}
+
+/// The same rule `catalog.rs` uses on a file that has landed, applied to one that has
+/// not: a row in flight has no GGUF to read, and the badge beside its name has to come
+/// from somewhere.
+function quantOf(fileName: string): string | null {
+  const tokens = fileName.replace(/\.gguf$/i, "").split(/[-.]/);
+  for (let i = 0; i < tokens.length; i += 1) {
+    const upper = tokens[i].toUpperCase();
+    if (!isQuantToken(upper)) continue;
+    if (i > 0 && tokens[i - 1].toUpperCase() === "UD") return `UD-${upper}`;
+    return upper;
+  }
+  return null;
+}
+
+function stem(fileName: string) {
+  return fileName.replace(/\.gguf$/i, "");
 }
 
 function percent(job: DownloadJob): number | null {
@@ -124,23 +146,8 @@ function smooth(
   };
 }
 
-function badgeFor(job: DownloadJob): { text: string; className: string } {
-  if (job.state === "active") {
-    if (job.phase == null) return { text: "starting", className: "badge" };
-    return { text: PHASE_LABEL[job.phase], className: "badge badge-moe" };
-  }
-  if (job.state === "complete") return { text: "complete", className: "badge" };
-  if (job.state === "queued") {
-    return { text: "queued", className: "badge badge-quiet" };
-  }
-  if (job.state === "paused") {
-    return { text: "paused", className: "badge badge-quiet" };
-  }
-  return { text: "failed", className: "badge badge-warn" };
-}
-
-/// `place` is where this job sits in the queue, counting from one, and zero for a job that
-/// is not in it.
+/// The one line of figures under a transfer. `place` is where this job sits in the
+/// queue, counting from one, and zero for a job that is not in it.
 function detail(
   job: DownloadJob,
   smoothed: Smoothed | undefined,
@@ -152,9 +159,6 @@ function detail(
     }
     const ahead = place - 1;
     return `Waiting its turn — ${ahead} download${ahead === 1 ? "" : "s"} ahead of it.`;
-  }
-  if (job.state === "complete") {
-    return `In the models directory · ${formatFileSize(job.completed)}`;
   }
   if (job.state === "active") {
     if (job.phase == null) return "Starting…";
@@ -184,8 +188,6 @@ function detail(
 
   const mode = recovery(job);
   if (mode === "resume") {
-    // `completed` counts the phase, not the transfer: one stopped mid-verify has every
-    // byte on disk already, and reporting the digest's read position as progress lies.
     if (job.phase === "verifying") {
       return "Stopped while the digest was being checked — the bytes are all here, so resuming re-checks them.";
     }
@@ -200,29 +202,29 @@ function detail(
   return "Nothing to resume — another attempt would fail the same way.";
 }
 
-function Row({
+/// A transfer, as the artboard draws it: the name it will have, what it is, the two
+/// actions, a bar, and one line of figures. Everything else this screen used to print
+/// about a healthy download is in that line.
+function Downloading({
   job,
+  name,
   smoothed,
   place,
   busy,
   onPause,
   onResume,
   onDiscard,
-  onRetry,
-  onShow,
 }: {
   job: DownloadJob;
+  name: string;
   smoothed: Smoothed | undefined;
   place: number;
   busy: boolean;
   onPause: (id: string) => void;
   onResume: (id: string) => void;
   onDiscard: (id: string) => void;
-  onRetry: (url: string) => void;
-  onShow: (path: string) => void;
 }) {
-  const badge = badgeFor(job);
-  const mode = recovery(job);
+  const quant = quantOf(job.fileName);
   const done = percent(job);
   const bar =
     job.state === "active" &&
@@ -234,105 +236,148 @@ function Row({
   if (job.state === "queued") discardHint = "Take this out of the queue";
 
   return (
-    <li className="download-row">
+    <div className="download-card">
       <div className="download-head">
-        <span className="model-identity">
-          <span className="model-name">{job.fileName}</span>
-          <span className="model-file" title={job.url}>
-            {job.url}
-          </span>
-        </span>
-
-        <span className="badges">
-          <span className={badge.className}>{badge.text}</span>
-        </span>
-
+        <span className="download-name">{name}</span>
+        {quant && <span className="badge">{quant}</span>}
         <span className="actions">
           {job.state === "active" && (
-            <button className="button" onClick={() => onPause(job.id)}>
+            <button className="button button-plain" onClick={() => onPause(job.id)}>
               Pause
             </button>
           )}
           {job.state === "paused" && job.resumable && (
             <button
-              className="button button-primary"
+              className="button button-plain"
               disabled={busy}
               onClick={() => onResume(job.id)}
             >
               Resume
             </button>
           )}
-          {job.state !== "complete" && (
-            <button
-              className="button button-danger"
-              title={discardHint}
-              onClick={() => onDiscard(job.id)}
-            >
-              Discard
-            </button>
-          )}
+          <button
+            className="button button-plain button-danger"
+            title={discardHint}
+            onClick={() => onDiscard(job.id)}
+          >
+            <CloseIcon />
+            Cancel
+          </button>
+        </span>
+      </div>
+
+      {bar && (
+        <div className={`bar download-bar${job.phase === "verifying" ? " is-verifying" : ""}`}>
+          <span style={{ width: `${done}%` }} />
+        </div>
+      )}
+
+      <span className="card-sub">{detail(job, smoothed, place)}</span>
+    </div>
+  );
+}
+
+/// One that did not make it. The URL is printed here and nowhere else on this screen:
+/// a failure is the one moment somebody needs to read the address they asked for.
+function Failed({
+  job,
+  name,
+  busy,
+  onDiscard,
+  onRetry,
+}: {
+  job: DownloadJob;
+  name: string;
+  busy: boolean;
+  onDiscard: (id: string) => void;
+  onRetry: (url: string) => void;
+}) {
+  const mode = recovery(job);
+
+  return (
+    <div className="download-card">
+      <div className="download-head">
+        <span className="dot tone-bad" />
+        <span className="download-name">{name}</span>
+        <span className="actions">
           {mode !== "none" && (
             <button
-              className="button"
+              className="button button-plain"
               disabled={busy}
               onClick={() => onRetry(job.url)}
             >
               {RETRY_LABEL[mode]}
             </button>
           )}
-          {job.state === "complete" && (
-            <button className="button" onClick={() => onShow(job.path)}>
-              Show in Library
-            </button>
-          )}
+          <button
+            className="button button-plain button-danger"
+            onClick={() => onDiscard(job.id)}
+          >
+            <CloseIcon />
+            Discard
+          </button>
         </span>
       </div>
-
-      {bar && (
-        <div className="telemetry-row download-progress">
-          <div
-            className={`kv-bar${job.phase === "verifying" ? " is-verifying" : ""}`}
-          >
-            <span style={{ width: `${done}%` }} />
-          </div>
-          <span className="telemetry-value">{done}%</span>
-        </div>
-      )}
-
+      <span className="download-url" title={job.url}>
+        {job.url}
+      </span>
       {job.error && <p className="model-error">{job.error}</p>}
-      <p className="field-hint">{detail(job, smoothed, place)}</p>
-    </li>
+      <span className="card-sub">{detail(job, undefined, 0)}</span>
+    </div>
   );
 }
 
-/// The field holds MB/s because that is how a limit is thought about; the engine holds
-/// bytes per second. It divides by what `formatRate` divides by, or a limit typed as 10
-/// reads back as something else.
-function toField(bytesPerSecond: number | null): string {
-  if (bytesPerSecond == null) return "";
-  return String(Math.round((bytesPerSecond / MB) * 100) / 100);
+/// A file that landed. Its name is the Library's own once the catalog has seen it, so
+/// the two screens cannot call the same file different things.
+function Finished({
+  job,
+  name,
+  inLibrary,
+  onShow,
+}: {
+  job: DownloadJob;
+  name: string;
+  inLibrary: boolean;
+  onShow: (path: string) => void;
+}) {
+  let stat = `In your Library · ${formatFileSize(job.completed)}`;
+  if (!inLibrary) {
+    stat = `No longer in the models directory · ${formatFileSize(job.completed)}`;
+  }
+
+  return (
+    <div className="finished-row">
+      <span className="finished-tick">
+        <CheckIcon />
+      </span>
+      <span className="download-name" title={job.fileName}>
+        {name}
+      </span>
+      <span className="finished-stat">{stat}</span>
+      {inLibrary && (
+        <button className="button button-link" onClick={() => onShow(job.path)}>
+          Show
+        </button>
+      )}
+    </div>
+  );
 }
 
-/// `null` for no limit, `undefined` for something that is not a limit at all.
-function toRate(typed: string): number | null | undefined {
-  const trimmed = typed.trim();
-  if (trimmed === "") return null;
-
-  const megabytes = Number(trimmed);
-  if (!Number.isFinite(megabytes) || megabytes < 0) return undefined;
-  if (megabytes === 0) return null;
-  return Math.round(megabytes * MB);
+/// What the menu offers, as bytes per second, with the stored figure folded in if it is
+/// not one of the named ones — a limit set by an older build must not vanish because this
+/// list does not name it.
+function limitChoices(applied: number | null): (number | null)[] {
+  const named = LIMITS_MB.map((mb) => mb * MB);
+  if (applied != null && !named.includes(applied)) {
+    named.push(applied);
+    named.sort((a, b) => a - b);
+  }
+  return [null, ...named];
 }
 
-function limitHint(typed: string, applied: number | null): string {
-  const asked = toRate(typed);
-  if (asked !== undefined && asked !== null && asked < FLOOR) {
-    return `Below ${formatRate(FLOOR)}, which is the slowest the engine transfers at — it will use that instead.`;
-  }
-  if (applied == null) {
-    return "No limit. A change applies to the download running now, not only the next one.";
-  }
-  return `Limited to ${formatRate(applied)}. A change applies to the download running now, not only the next one.`;
+function limitLabel(rate: number | null): string {
+  if (rate == null) return "No speed limit";
+  return formatRate(rate);
 }
 
 export default function Downloads({
@@ -346,7 +391,7 @@ export default function Downloads({
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
   const [options, setOptions] = useState<DownloadOptions | null>(null);
-  const [limit, setLimit] = useState("");
+  const [models, setModels] = useState<ModelEntry[]>([]);
   const [rates, setRates] = useState<Record<string, Smoothed>>({});
   const [page, setPage] = useState(PAGE);
 
@@ -356,17 +401,18 @@ export default function Downloads({
       .then(setJobs)
       .catch((e) => setFailure(String(e)));
     getSettings()
-      .then((settings) => {
-        setOptions(settings.downloads);
-        setLimit(toField(settings.downloads.rateLimit));
-      })
+      .then((settings) => setOptions(settings.downloads))
       .catch((e) => setFailure(String(e)));
+    // A finished row is named by the catalog, so the catalog is re-read when one lands.
+    const readModels = () => listModels().then(setModels).catch(() => {});
     readDir();
+    readModels();
 
     const unlisten = [
       onDownloadState((next) => {
         setJobs(next);
         readDir();
+        readModels();
       }),
       onDownloadProgress((progress) => {
         setJobs((prev) =>
@@ -433,22 +479,11 @@ export default function Downloads({
   const resume = useMemo(() => act(downloadResume), [act]);
   const discard = useMemo(() => act(downloadDiscard), [act]);
 
-  const applyLimit = (event: FormEvent) => {
-    event.preventDefault();
+  const applyLimit = (rateLimit: number | null) => {
     if (!options) return;
-
-    const rateLimit = toRate(limit);
-    if (rateLimit === undefined) {
-      setFailure("a speed limit is a number of MB/s, or empty for no limit");
-      return;
-    }
-
     setFailure(null);
     setDownloadOptions({ ...options, rateLimit })
-      .then((settings) => {
-        setOptions(settings.downloads);
-        setLimit(toField(settings.downloads.rateLimit));
-      })
+      .then((settings) => setOptions(settings.downloads))
       .catch((e) => setFailure(String(e)));
   };
 
@@ -462,70 +497,75 @@ export default function Downloads({
   // The list is the queue's order, so a job's place in it is where it appears among the
   // rows waiting. `indexOf` answers -1 for everything else, which reads as no place.
   const queue = unfinished.filter((job) => job.state === "queued");
+  const failed = jobs.filter((job) => job.state === "failed").reverse();
   // Newest first, and never trimmed — only ever shown a page at a time.
-  const history = jobs.filter((job) => !unfinished.includes(job)).reverse();
-  const shown = history.slice(0, page);
+  const finished = jobs.filter((job) => job.state === "complete").reverse();
+  const shown = finished.slice(0, page);
+
+  // A finished file is named by the catalog, which reads the GGUF's own name; one still
+  // in flight has no GGUF to read, so its file name stands in until it lands.
+  const nameOf = (job: DownloadJob) => {
+    const model = models.find((entry) => entry.path === job.path);
+    return model?.displayName ?? stem(job.fileName);
+  };
+  const inLibrary = (job: DownloadJob) =>
+    models.some((entry) => entry.path === job.path);
+
+  let status = "Nothing downloading";
+  if (unfinished.length === 1) status = "1 downloading";
+  if (unfinished.length > 1) status = `${unfinished.length} downloading`;
 
   return (
     <>
       <header className="screen-header">
         <div>
           <h1>Downloads</h1>
-          <p className="screen-subtitle">
-            {dir?.path ?? "…"}
-            {dir?.freeBytes != null && ` · ${formatFileSize(dir.freeBytes)} free`}
+          <p className="screen-subtitle status-line">
+            <span>{status}</span>
+            {dir?.freeBytes != null && (
+              <>
+                <span>·</span>
+                <span>{formatFileSize(dir.freeBytes)} free</span>
+              </>
+            )}
+            {options && (
+              <>
+                <span>·</span>
+                <select
+                  className="limit-select"
+                  value={String(options.rateLimit ?? "")}
+                  title="How fast a transfer is allowed to go. A change applies to the download running now, not only the next one."
+                  onChange={(e) => {
+                    const chosen = e.currentTarget.value;
+                    applyLimit(chosen === "" ? null : Number(chosen));
+                  }}
+                >
+                  {limitChoices(options.rateLimit).map((rate) => (
+                    <option key={String(rate ?? "")} value={String(rate ?? "")}>
+                      {limitLabel(rate)}
+                    </option>
+                  ))}
+                </select>
+              </>
+            )}
           </p>
         </div>
-        {history.length > 0 && (
-          <button
-            className="button"
-            onClick={() =>
-              downloadClear()
-                .then(setJobs)
-                .catch((e) => setFailure(String(e)))
-            }
-          >
-            Clear finished
-          </button>
-        )}
-      </header>
 
-      <section className="panel">
-        <h2>Fetch a model</h2>
-        <form className="row-input" onSubmit={submit}>
-          <input
-            value={url}
-            placeholder="https://huggingface.co/{repo}/resolve/main/{file}.gguf"
-            onChange={(e) => setUrl(e.currentTarget.value)}
-          />
+        <form className="get-row" onSubmit={submit}>
+          <span className="search-field get-field">
+            <SearchIcon />
+            <input
+              value={url}
+              placeholder="Paste a Hugging Face link"
+              onChange={(e) => setUrl(e.currentTarget.value)}
+            />
+          </span>
           <button className="button button-primary" type="submit" disabled={busy}>
-            Download
+            <DownloadIcon />
+            Get
           </button>
         </form>
-        {active && (
-          <p className="field-hint">
-            One file at a time — {active.fileName} is downloading, and anything
-            you add now waits its turn.
-          </p>
-        )}
-      </section>
-
-      {options && (
-        <section className="panel">
-          <h2>Speed limit</h2>
-          <form className="row-input" onSubmit={applyLimit}>
-            <input
-              value={limit}
-              placeholder="MB/s — leave empty for no limit"
-              onChange={(e) => setLimit(e.currentTarget.value)}
-            />
-            <button className="button" type="submit">
-              Apply
-            </button>
-          </form>
-          <p className="field-hint">{limitHint(limit, options.rateLimit)}</p>
-        </section>
-      )}
+      </header>
 
       {failure && <p className="notice notice-error">{failure}</p>}
 
@@ -533,62 +573,102 @@ export default function Downloads({
         <div className="empty">
           <p className="empty-title">Nothing downloaded yet</p>
           <p className="empty-detail">
-            Paste the URL of a .gguf file on Hugging Face to fetch it into the
-            models directory.
+            Paste the link to a .gguf file on Hugging Face and press Get. It
+            lands in {dir?.path ?? "the models directory"} and appears in your
+            Library.
           </p>
         </div>
       )}
 
       {unfinished.length > 0 && (
-        <ul className="model-list">
-          {unfinished.map((job) => (
-            <Row
-              key={job.id}
-              job={job}
-              smoothed={rates[job.id]}
-              place={queue.indexOf(job) + 1}
-              busy={busy}
-              onPause={pause}
-              onResume={resume}
-              onDiscard={discard}
-              onRetry={(target) => void request(target)}
-              onShow={onShowInLibrary}
-            />
-          ))}
-        </ul>
-      )}
-
-      {history.length > 0 && (
         <>
-          <h2 className="panel-head">
-            History · {history.length} download
-            {history.length === 1 ? "" : "s"}
-          </h2>
-          <ul className="model-list">
-            {shown.map((job) => (
-              <Row
+          <h2 className="group-label">Downloading</h2>
+          <div className="download-list">
+            {unfinished.map((job) => (
+              <Downloading
                 key={job.id}
                 job={job}
+                name={nameOf(job)}
                 smoothed={rates[job.id]}
-                place={0}
+                place={queue.indexOf(job) + 1}
                 busy={busy}
                 onPause={pause}
                 onResume={resume}
                 onDiscard={discard}
+              />
+            ))}
+          </div>
+          <p className="field-hint download-note">
+            Downloads survive quitting the app — they come back paused, ready to
+            pick up where they left off.
+          </p>
+          {active && unfinished.length > 1 && (
+            <p className="field-hint download-note">
+              One file at a time: the rest start when {nameOf(active)} stops.
+            </p>
+          )}
+        </>
+      )}
+
+      {failed.length > 0 && (
+        <>
+          <h2 className="group-label">Did not finish</h2>
+          <div className="download-list">
+            {failed.map((job) => (
+              <Failed
+                key={job.id}
+                job={job}
+                name={nameOf(job)}
+                busy={busy}
+                onDiscard={discard}
                 onRetry={(target) => void request(target)}
+              />
+            ))}
+          </div>
+        </>
+      )}
+
+      {finished.length > 0 && (
+        <>
+          <h2 className="group-label">Finished</h2>
+          <div className="download-list">
+            {shown.map((job) => (
+              <Finished
+                key={job.id}
+                job={job}
+                name={nameOf(job)}
+                inLibrary={inLibrary(job)}
                 onShow={onShowInLibrary}
               />
             ))}
-          </ul>
-          {shown.length < history.length && (
+          </div>
+          {shown.length < finished.length && (
             <button
-              className="button"
+              className="button load-more"
               onClick={() => setPage((seen) => seen + PAGE)}
             >
-              Load more ({history.length - shown.length} older)
+              Load more ({finished.length - shown.length} older)
             </button>
           )}
         </>
+      )}
+
+      {/* Below everything it removes, because it removes both lists: the engine counts a
+          failure as finished, and a Clear sitting under one group would say otherwise. */}
+      {finished.length + failed.length > 0 && (
+        <div className="clear-row">
+          <button
+            className="button button-plain"
+            title="Removes every finished and failed row from this list. The files already downloaded are not touched."
+            onClick={() =>
+              downloadClear()
+                .then(setJobs)
+                .catch((e) => setFailure(String(e)))
+            }
+          >
+            Clear history
+          </button>
+        </div>
       )}
     </>
   );
