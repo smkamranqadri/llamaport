@@ -100,17 +100,6 @@
   color-scheme: dark;
 }
 
-[data-theme="nous-light"] {
-  --bg: #f8faf8;
-  --text: #16315f;
-  --text-muted: rgba(22, 49, 95, 0.6);
-  --border: rgba(30, 74, 92, 0.18);
-  --accent: #2557b7;
-  --running: #4f7c64;
-  --danger: #b3403a;
-  color-scheme: light;
-}
-
 [data-theme="bronze"] {
   --bg: #0d0f12;
   --text: #eceff4;
@@ -132,17 +121,6 @@
   --on-accent: #0d1117;
   --running: #63d0a6;
   --danger: #f47067;
-  color-scheme: dark;
-}
-
-[data-theme="hermes"] {
-  --bg: #0a0e1a;
-  --text: #e6eaf2;
-  --text-muted: #9aa5bd;
-  --border: #24304a;
-  --accent: #6366f1;
-  --running: #34d399;
-  --danger: #f87171;
   color-scheme: dark;
 }
 

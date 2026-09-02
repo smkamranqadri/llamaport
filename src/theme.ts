@@ -13,7 +13,7 @@ export interface Theme {
   fixed: "light" | "dark" | null;
 }
 
-/// The built-in palette plus the six from hermes-hq, whose ids, names and descriptions
+/// The built-in palette plus four from hermes-hq, whose ids, names and descriptions
 /// are that project's own (`frontend/src/theme.ts`). Their values live in `App.css`.
 export const THEMES: Theme[] = [
   {
@@ -38,13 +38,6 @@ export const THEMES: Theme[] = [
     fixed: "dark",
   },
   {
-    id: "nous-light",
-    label: "Nous Light",
-    desc: "Light — off-white with navy and blue",
-    swatch: ["#f8faf8", "#16315f", "#2557b7"],
-    fixed: "light",
-  },
-  {
     id: "bronze",
     label: "Bronze",
     desc: "Charcoal with bronze accents",
@@ -56,13 +49,6 @@ export const THEMES: Theme[] = [
     label: "Slate",
     desc: "Cool grey-blue, GitHub-like",
     swatch: ["#0d1117", "#7eb8f6", "#63d0a6"],
-    fixed: "dark",
-  },
-  {
-    id: "hermes",
-    label: "Hermes",
-    desc: "Indigo-navy with indigo accent",
-    swatch: ["#0a0e1a", "#6366f1", "#818cf8"],
     fixed: "dark",
   },
 ];
