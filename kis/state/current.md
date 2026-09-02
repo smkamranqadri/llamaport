@@ -6,30 +6,35 @@ Branch:   `main`, working tree clean. **`v0.6.1` is tagged at `5d8957d` and HEAD
           building a release artefact** — the distance is deliberately not
           written here, because the commit that records it increments it. Why
           it matters is in [knowledge/technical.md](../knowledge/technical.md).
-Task:     **Redesign phases 2 and 3 are built and committed, and of the five
-          things that did not match the artboards, four are done and signed
-          off** — the stopped model screen (`e5e9f31`), the empty Library, the
-          Library rows and the stray-server banner. The only look still marked
-          owed is **phase 3's running view**, which the author's own five-item
-          list never named — so it is probably closed and is not written down as
-          such. Only **item 4, the Measure screen**, is unbuilt
-          ([intent/redesign.md](../intent/redesign.md)). Phase 1 landed as
-          `c6ac59f`.
+Task:     **The redesign's five-item list is closed.** All five things that did
+          not match the artboards are done and signed off — the stopped model
+          screen (`e5e9f31`), the empty Library, the Library rows, the
+          stray-server banner, and now **item 4, Measure** (`295ea04`,
+          `02b1c1a`), built **inside the model screen** on the author's ruling
+          rather than as the artboard's own screen
+          ([intent/redesign.md](../intent/redesign.md)). The only look still
+          written as owed anywhere is phase 3's running view, which the author's
+          own list never named — so it is probably closed and is not written
+          down as such. Phase 1 landed as `c6ac59f`.
 
-          **One screen per task, each finished by the capture** — artboard
-          rendered out of the canvas artifact, app captured, the two side by
-          side ([knowledge/technical.md](../knowledge/technical.md)). Four
-          screens have been signed off that way, against six wasted passes for
-          one screen before the rule existed. **Ask the author to take the app
-          half whenever they are at the machine**: it costs them a keystroke,
-          costs the session nothing, and their eye is the acceptance test
-          anyway.
-Mode:     Phase — redesign, one item from the end of it.
-Blocker:  none for the redesign. **The unusable-window bug has escalated and
-          now wants its own task**: eight sightings on 2026-09-02, one of them
-          with nobody touching the window. It is no longer one launch in three. **The recovery is scriptable after all**
-          — an `osascript` clicking the tray's Show window restored it three
-          times from the session, so it does not need a human at the machine.
+          **One screen per task, each finished by a comparison, and the app half
+          is the author's.** Five screens have been signed off that way, against
+          six wasted passes for one screen before the rule existed. The rule
+          hardened on 2026-09-02: **never launch, capture or drive the app** —
+          ask the author for the screenshot. What can be rendered without it —
+          the panel's own DOM against `App.css` in headless Chrome — is rendered
+          first and costs him nothing
+          ([knowledge/technical.md](../knowledge/technical.md) Verify).
+
+Mode:     Standard. The redesign phase has nothing left in it that is named.
+
+Blocker:  none. **The unusable-window bug has escalated and now wants its own
+          task**: eight sightings on 2026-09-02, one of them with nobody touching the
+          window. It is no longer one launch in three. **The recovery is
+          scriptable** — an `osascript` clicking the tray's Show window restored
+          it three times from the session, so it does not need a human at the
+          machine, and it is the one thing that may touch the window under the
+          ruling above, because it is a recovery rather than a capture.
           Two traps that cost time are recorded with it
           ([intent/roadmap.md](../intent/roadmap.md) risks): never resize the
           window through System Events, which collapses it outright, and never
@@ -43,18 +48,17 @@ Blocker:  none for the redesign. **The unusable-window bug has escalated and
           **Four checks nobody has run**, each needing a human at the machine,
           listed in [intent/release.md](../intent/release.md) under "Unverified
           against v0.6.1".
-Next:     **Item 4 of "What still does not match"** — the Measure screen, the
-          last one. The artboard `Tune.dc.html` gives it a whole screen:
-          "Measuring best speed", the four tries with their verdicts, Cancel
-          and Use fastest so far. It was never built; the app runs the ladder
-          inside a Speed row on the stopped model screen, which item 1 left
-          showing only while a measurement runs, on purpose, for this
-          ([intent/redesign.md](../intent/redesign.md)).
+Next:     **The author's call between three, because nothing is now blocked by
+          the redesign:**
 
-          The README's screenshots wait behind the whole redesign on the
-          author's decision: every phase would invalidate them again, so they
-          are done once, against the finished UI
-          ([release.md](../intent/release.md) phase 3).
+          - **The README's screenshots**, which have waited behind the whole
+            redesign precisely so they are taken once against the finished UI
+            ([release.md](../intent/release.md) phase 3). They are a release
+            behind. They need the author at the machine, like every capture now.
+          - **The unusable-window bug**, which wants its own task: eight
+            sightings on 2026-09-02, one with nobody touching the window.
+          - **The four checks nobody has run** against v0.6.1
+            ([intent/release.md](../intent/release.md)).
 
           Still unplanned: per-field override, search — blocked on what "best
           model" means — and **MoE launches**
@@ -70,8 +74,10 @@ What the app is for: [intent/direction.md](../intent/direction.md).
 
 The four commands green, each status captured on its own line and never after a
 pipe. **257 tests**, the newest being the orphan banner's alias, watched to fail
-against a mutation ([intent/redesign.md](../intent/redesign.md)). Each phase file
-carries the count it left behind, so the history is not repeated here.
+against a mutation ([intent/redesign.md](../intent/redesign.md)). Item 4 added
+none: it is a screen, and `tune::Report`'s new `candidates` field is a copy of
+the list the ladder is already given. Each phase file carries the count it left
+behind, so the history is not repeated here.
 
 Two suites need the real machine: `real_launch` proves a run is recorded against
 the real binary and a real model, and `real_tune` checks the candidate picker

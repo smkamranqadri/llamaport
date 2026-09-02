@@ -92,10 +92,10 @@ made the first four passes worthless.
    after two rounds of his own corrections. Proof below.
 3. ~~**The stray-server banner**~~ — done 2026-09-02, and it was hiding a
    defect rather than only a layout. Proof below.
-4. **Measure** — the artboard gives it a **whole screen** ("Measuring best
-   speed", the four tries with their verdicts, Cancel, Use fastest so far).
-   The app runs it inside the Speed row, which is why the author says the
-   measure screen does not match: it was never built.
+4. ~~**Measure**~~ — done 2026-09-02, the author signing off after one round of
+   his own corrections. **Built in the model screen rather than as its own
+   screen**, on the author's ruling: "I don't mind to do in current screen
+   instead of new screen but should be same design". Proof below.
 5. ~~**Empty Library**~~ — done 2026-09-02, pulled forward out of phase 4 by
    the author, who put the artboard and the app side by side and said to fix
    this one first. Proof below.
@@ -616,3 +616,61 @@ capture and stopped afterwards.
 stopped the author's twice in this session. And **the unusable-window bug fired
 four more times**, three on consecutive launches, which is an escalation the
 roadmap now carries.
+
+### Item 4 — Measure, done 2026-09-02
+
+Files: `src/TunePanel.tsx`, `src/ModelDetail.tsx`, `src/Disclosure.tsx` (new),
+`src/App.css`, `src/icons.tsx`, `src/types.ts`, `src-tauri/src/tune.rs`.
+Commits `295ea04` and `02b1c1a`.
+
+The artboard's whole screen is drawn inside the Speed row instead, which the
+author allowed and which cost nothing: what the drawing is, is a list of tries
+and one button, and the row already had a header with a place for Cancel.
+
+Four decisions, all put to the author before anything was written:
+
+- **The history stays, folded.** The artboard draws only the tries; `speeds.json`
+  has no other route in the app, so "What this model has done" is a folded row
+  under the list. Same argument that kept Model details and the memory chevron.
+- **A try is named in words with its arguments beside it** — `16k context ·
+  full precision`, then `16,384 · f16 — the largest that fits`. The words are
+  what the person choosing reads and the arguments are what anyone checking a
+  launch needs, so neither replaces the other.
+- **The caveats fold.** One verdict line stays; the 10% tie rule, the
+  observed-not-measured warning and the shared-prompt note went behind "Why
+  this one".
+- **The row folds itself when the ladder ends, and applies the answer** — the
+  author's correction on the first look: it had been pinned open, leaving four
+  tries and their prose on screen while the one preset they were measured for
+  sat unchanged above. Closing now selects Best speed, and Use these settings
+  closes the row too.
+
+Two things the drawing could not be built from:
+
+- **The report never named the tries it had not run yet**, so a waiting row was
+  not expressible. `tune::Report` now carries `candidates` from the moment the
+  ladder starts. A list that grows from nothing cannot say how far it has to go.
+- **The marked row is the one the button applies, not always the quickest
+  reading.** Once the ladder is over that is the suggestion, which prefers the
+  widest context among readings too close to separate. Marking the fastest while
+  the sentence underneath named another setting is the screen contradicting
+  itself, which is what the mock render showed.
+
+**Found on the way**: `.tune-head`, `.tune-note` and `.tune-row.is-unranked`
+were painted with `--muted`, and `.tune-row.is-fastest` with
+`--surface-raised` — neither has ever been a token in this stylesheet, so three
+greys rendered as body text and a highlight as nothing. Recorded in the defect
+tally ([knowledge/technical.md](../knowledge/technical.md)).
+
+```text
+build: 0
+cargo test status: 0        (257 passed, 5 ignored — unchanged)
+clippy status: 0
+fmt status: 0
+```
+
+**Verified by the author, and by rendering the new markup rather than the app.**
+The app is his and stays his ([knowledge/technical.md](../knowledge/technical.md)
+under Verify): the panel's own DOM was rendered against `App.css` in headless
+Chrome, in both appearances and in all three states — running, finished, folded
+— and put beside the artboard. His word on it: "all good".

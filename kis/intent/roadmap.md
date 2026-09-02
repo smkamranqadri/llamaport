@@ -167,6 +167,11 @@ user, reversing two standing decisions ([direction.md](direction.md)).
    of someone who is not an expert. The README screenshots, previously Next,
    wait behind it — they are done once, against the finished redesign.
 
+   **Phases 1 to 3 are built, and the five screens the author listed as not
+   matching are all signed off as of 2026-09-02**, the last being the
+   measurement. Phase 4 keeps Downloads, Settings and Activity; the first run
+   left it early on the author's ask.
+
 15. **MoE launches** — written up 2026-09-02, **unplanned and blocked on a
    measurement**, in [moe.md](moe.md). Every launch the app builds is fully
    offloaded, so a 35B-A3B costs its whole 22.1 GB of the Metal working set

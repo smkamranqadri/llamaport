@@ -137,11 +137,19 @@ takes their window, so ask before doing it while they are at the machine:
   `CGWindowListCopyWindowInfo` until the size repeats, then take the shot. And
   **never resize the window through System Events** — `set size of window 1`
   collapses it rather than resizing it ([intent/roadmap.md](../intent/roadmap.md)).
-- **The cheapest capture is the author's own**, whenever they are at the
-  machine. Everything above steals focus or the window from a person who may be
-  working; asking for a screenshot costs them one keystroke, costs the session
-  nothing, and their eye is the acceptance test regardless. Ask first, and only
-  drive the window when nobody is there.
+- **The app is the author's. Never drive it.** Ruled 2026-09-02: do not launch
+  it, capture it, restore it from the tray or touch it with `osascript` — ask
+  the author for the screenshot and wait. Everything above steals focus or the
+  window from a person who is using the machine, one stray click has already
+  landed in their browser, and their eye is the acceptance test regardless. The
+  window half of the method stays written down because it is how the app half
+  was taken before the ruling, not because it is the route to take now.
+- **What can be rendered without the app, render.** The panel's own DOM against
+  `src/App.css` in headless Chrome is a real check of metrics, tokens and both
+  appearances, and it costs the author nothing: item 4's mock render caught a
+  green row marked "fastest" over a sentence naming a different setting. It is
+  not a substitute for the author's look — it renders what the code was meant
+  to emit, not what React emitted — so it goes before the ask, not instead.
 - **Reaching a screen behind a click.** The webview forgets its React state on
   every hot reload, so the model screen cannot be photographed by opening it
   by hand and then editing. Patch a temporary `useEffect` into `App.tsx` that
@@ -240,22 +248,29 @@ default. Sibling `.bak`, `.save` and `.backup` files already accumulate beside i
   the suite. Anything that puts prose next to a figure earns a look before it is
   called done.
 
-  **The running tally, because it is the argument: twenty-one defects across six
-  phases, every one found by looking and none by the suite.** Eleven on
+  **The running tally, because it is the argument: twenty-three defects across
+  six phases, every one found by looking and none by the suite.** Eleven on
   2026-08-31, five in Tune's panel on 2026-09-01, three in the pi button on
   2026-09-02 — a label that wrapped, a file mode read out of `ls -l`, and a
   provider that turned out not to be selectable — and two in the redesign on
   2026-09-02: every stray-server banner the app had ever shown named an unknown
   model on an unknown port, and it took the author photographing one to notice;
   and the sidebar unlit itself on a model screen, so a screen with no back
-  button said nothing about where you were. **A twenty-second was worse and took
-  five releases**: a bundle macOS refuses to open, which only a browser download
+  button said nothing about where you were. Two more in the redesign's last
+  item: the measurement row was pinned open, so a ladder that had answered kept
+  four tries on screen while the one preset it was measured for sat unchanged
+  above it — the author found it on the first look; and `.tune-head`,
+  `.tune-note` and `.tune-row.is-unranked` were painted with `--muted` and
+  `.tune-row.is-fastest` with `--surface-raised`, neither of which this
+  stylesheet has ever defined, so three greys rendered as body text and a
+  highlight as nothing. **A twenty-fourth was worse and took five releases**: a bundle macOS refuses to open, which only a browser download
   exposed ([intent/release.md](../intent/release.md)). A phase is not done when
   the suite is green; it is done when somebody has looked.
 
-  The sidebar one is the only entry the *method* caught rather than the author:
-  it fell out of rendering the artboard and putting it beside the app, before
-  anything was changed. That is the argument for doing the comparison first
+  The sidebar one and the dead CSS tokens are the only entries the *method*
+  caught rather than the author: one fell out of rendering the artboard and
+  putting it beside the app before anything was changed, the other out of
+  reading the artboard's stylesheet against `App.css`. That is the argument for doing the comparison first
   rather than after a round of corrections.
 
 - **`--fit` is on by default, and this app suppresses it by naming every value.**
