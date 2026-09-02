@@ -13,6 +13,13 @@ import {
   runnerStop,
 } from "./api";
 import Downloads from "./Downloads";
+import {
+  ChartIcon,
+  CompassIcon,
+  DownloadIcon,
+  SlidersIcon,
+  StackIcon,
+} from "./icons";
 import Library from "./Library";
 import ModelDetail from "./ModelDetail";
 import SettingsScreen from "./SettingsScreen";
@@ -21,11 +28,34 @@ import "./App.css";
 
 type Screen = "library" | "downloads" | "settings";
 
-const NAV: { id: Screen; label: string }[] = [
-  { id: "library", label: "Library" },
-  { id: "downloads", label: "Downloads" },
-  { id: "settings", label: "Settings" },
-];
+function NavItem({
+  label,
+  icon,
+  active,
+  disabled,
+  extra,
+  onClick,
+}: {
+  label: string;
+  icon: React.ReactNode;
+  active?: boolean;
+  disabled?: boolean;
+  extra?: React.ReactNode;
+  onClick?: () => void;
+}) {
+  return (
+    <button
+      className={`nav-item${active ? " is-active" : ""}`}
+      disabled={disabled}
+      title={disabled ? "Coming soon" : undefined}
+      onClick={onClick}
+    >
+      {icon}
+      <span className="nav-label">{label}</span>
+      {extra}
+    </button>
+  );
+}
 
 const IDLE: RunnerSnapshot = {
   state: "idle",
@@ -41,40 +71,52 @@ const IDLE: RunnerSnapshot = {
   serverCtx: null,
 };
 
-function NowRunning({
-  runner,
-  telemetry,
-  onStop,
+function OrphanBanner({
+  orphans,
+  onStopped,
+  onIgnore,
 }: {
-  runner: RunnerSnapshot;
-  telemetry: Telemetry | null;
-  onStop: () => void;
+  orphans: Orphan[];
+  onStopped: (remaining: Orphan[]) => void;
+  onIgnore: () => void;
 }) {
-  const active = runner.state === "starting" || runner.state === "ready";
-  const kv = telemetry?.kvCacheUsage;
-
   return (
-    <div className="now-running">
-      <span className={`dot state-${runner.state}`} />
-      <span className="now-running-text">
-        {active ? (
-          <>
-            <strong>{runner.alias ?? runner.modelName}</strong>
-            <span className="now-running-meta">
-              {runner.state === "starting"
-                ? "starting…"
-                : `:${runner.port}${kv != null ? ` · KV ${Math.round(kv * 100)}%` : ""}`}
-            </span>
-          </>
-        ) : (
-          "No model running"
-        )}
-      </span>
-      {active && (
-        <button className="link-stop" onClick={onStop}>
-          Stop
-        </button>
-      )}
+    <div className="banner">
+      <div className="banner-body">
+        <span className="banner-title">
+          {orphans.length === 1
+            ? "A llama-server is running that Llamaport did not start"
+            : `${orphans.length} llama-servers are running that Llamaport did not start`}
+        </span>
+        <span className="banner-detail">
+          Probably left over from a previous session, or started from the
+          terminal.
+        </span>
+        <ul className="orphan-list">
+          {orphans.map((orphan) => (
+            <li key={orphan.pid}>
+              <span>
+                {orphan.model ?? "unknown model"}
+                {orphan.port != null && ` · port ${orphan.port}`} · pid{" "}
+                {orphan.pid}
+              </span>
+              <button
+                className="button"
+                onClick={() =>
+                  orphanStop(orphan.pid)
+                    .then(onStopped)
+                    .catch(() => {})
+                }
+              >
+                Stop it
+              </button>
+            </li>
+          ))}
+        </ul>
+      </div>
+      <button className="button button-plain" onClick={onIgnore}>
+        Ignore
+      </button>
     </div>
   );
 }
@@ -86,6 +128,7 @@ export default function App() {
   const [telemetry, setTelemetry] = useState<Telemetry | null>(null);
   const [logs, setLogs] = useState<string[]>([]);
   const [orphans, setOrphans] = useState<Orphan[]>([]);
+  const [ignoredOrphans, setIgnoredOrphans] = useState<number[]>([]);
   const [catalogVersion, setCatalogVersion] = useState(0);
   const [version, setVersion] = useState("");
 
@@ -130,6 +173,16 @@ export default function App() {
       .catch(() => {});
   }, []);
 
+  const go = (next: Screen) => {
+    setSelected(null);
+    setScreen(next);
+  };
+
+  const running = runner.state === "starting" || runner.state === "ready";
+  const visibleOrphans = orphans.filter(
+    (orphan) => !ignoredOrphans.includes(orphan.pid),
+  );
+
   const content = () => {
     if (selected) {
       return (
@@ -159,6 +212,7 @@ export default function App() {
         runner={runner}
         onSelect={setSelected}
         onStop={stop}
+        onRunnerChange={setRunner}
       />
     );
   };
@@ -166,56 +220,42 @@ export default function App() {
   return (
     <div className="app">
       <nav className="sidebar">
-        <div className="sidebar-title">
-          Llamaport
-          {version && <span className="sidebar-version">{version}</span>}
-        </div>
-        <ul className="nav">
-          {NAV.map((item) => (
-            <li key={item.id}>
-              <button
-                className={`nav-item${item.id === screen && !selected ? " is-active" : ""}`}
-                onClick={() => {
-                  setSelected(null);
-                  setScreen(item.id);
-                }}
-              >
-                {item.label}
-              </button>
-            </li>
-          ))}
-        </ul>
-        <NowRunning runner={runner} telemetry={telemetry} onStop={stop} />
+        <div className="side-section">Models</div>
+        <NavItem
+          label="Library"
+          icon={<StackIcon />}
+          active={screen === "library" && !selected}
+          extra={running ? <span className="side-run-dot" /> : undefined}
+          onClick={() => go("library")}
+        />
+        <NavItem label="Discover" icon={<CompassIcon />} disabled />
+        <NavItem
+          label="Downloads"
+          icon={<DownloadIcon />}
+          active={screen === "downloads" && !selected}
+          onClick={() => go("downloads")}
+        />
+        <div className="side-section">General</div>
+        <NavItem label="Activity Monitor" icon={<ChartIcon />} disabled />
+        <div className="side-spacer" />
+        <NavItem
+          label="Settings"
+          icon={<SlidersIcon />}
+          active={screen === "settings" && !selected}
+          onClick={() => go("settings")}
+        />
+        <div className="side-version">Llamaport {version}</div>
       </nav>
 
       <main className="content">
-        {orphans.length > 0 && (
-          <div className="notice">
-            {orphans.length === 1
-              ? "A llama-server is running that this window did not start:"
-              : `${orphans.length} llama-servers are running that this window did not start:`}
-            <ul className="orphan-list">
-              {orphans.map((orphan) => (
-                <li key={orphan.pid}>
-                  <span>
-                    {orphan.model ?? "unknown model"}
-                    {orphan.port != null && ` · port ${orphan.port}`} · pid{" "}
-                    {orphan.pid}
-                  </span>
-                  <button
-                    className="button"
-                    onClick={() =>
-                      orphanStop(orphan.pid)
-                        .then(setOrphans)
-                        .catch(() => {})
-                    }
-                  >
-                    Stop
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
+        {visibleOrphans.length > 0 && (
+          <OrphanBanner
+            orphans={visibleOrphans}
+            onStopped={setOrphans}
+            onIgnore={() =>
+              setIgnoredOrphans(orphans.map((orphan) => orphan.pid))
+            }
+          />
         )}
         {content()}
       </main>

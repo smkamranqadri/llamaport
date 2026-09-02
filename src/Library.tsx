@@ -1,6 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
-import { deleteModel, getDirInfo, listModels, setFavourite } from "./api";
+import {
+  deleteModel,
+  getDirInfo,
+  listModels,
+  runnerStart,
+  setFavourite,
+} from "./api";
 import { formatContext, formatFileSize, formatRelative } from "./format";
+import { PlayIcon, StopIcon } from "./icons";
 import type { DirInfo, ModelEntry, RunnerSnapshot } from "./types";
 
 function Badges({ model }: { model: ModelEntry }) {
@@ -53,38 +60,61 @@ function deleteScope(model: ModelEntry): string {
   return `${files} · ${formatFileSize(model.sizeBytes)}`;
 }
 
-/// A running model offers Stop where every other row offers Delete. Deleting it is refused
-/// anyway, so the slot was spent on a disabled button explaining that; this spends it on
-/// the thing you would have gone looking for instead.
+/// A running model offers Stop where every other row offers Run, with Delete kept but
+/// quiet: deleting is rare, and a running model refuses it anyway. Run sends no draft,
+/// so the backend launches on the same remembered profile the model's own screen opens
+/// with.
 function RowAction({
   isRunning,
+  launchable,
+  onRun,
   onStop,
   onConfirmDelete,
 }: {
   isRunning: boolean;
+  launchable: boolean;
+  onRun: () => void;
   onStop: () => void;
   onConfirmDelete: () => void;
 }) {
   if (isRunning) {
     return (
-      <button
-        className="button row-action"
-        title="Stop this model"
-        onClick={onStop}
-      >
-        Stop
-      </button>
+      <span className="row-actions">
+        <button
+          className="button row-action"
+          title="Stop this model"
+          onClick={onStop}
+        >
+          <StopIcon />
+          Stop
+        </button>
+      </span>
     );
   }
 
   return (
-    <button
-      className="button button-danger button-quiet row-action"
-      title="Move this model to the Trash"
-      onClick={onConfirmDelete}
-    >
-      Delete
-    </button>
+    <span className="row-actions">
+      <button
+        className="button button-danger button-quiet"
+        title="Move this model to the Trash"
+        onClick={onConfirmDelete}
+      >
+        Delete
+      </button>
+      <button
+        className="button row-action"
+        title={
+          launchable
+            ? "Run with its last settings"
+            : "Stop the running model first — Llamaport runs one at a time"
+        }
+        disabled={!launchable}
+        onClick={onRun}
+      >
+        <PlayIcon />
+        Run
+      </button>
+    </span>
   );
 }
 
@@ -94,6 +124,7 @@ function ModelRow({
   onSelect,
   onFavourite,
   onDelete,
+  onRun,
   onStop,
 }: {
   model: ModelEntry;
@@ -101,6 +132,7 @@ function ModelRow({
   onSelect: (model: ModelEntry) => void;
   onFavourite: (model: ModelEntry) => void;
   onDelete: (model: ModelEntry) => void;
+  onRun: (model: ModelEntry) => void;
   onStop: () => void;
 }) {
   const md = model.metadata;
@@ -108,6 +140,9 @@ function ModelRow({
   const isRunning =
     runner.modelId === model.id &&
     (runner.state === "starting" || runner.state === "ready");
+  const anyRunning = runner.state === "starting" || runner.state === "ready";
+  const launchable =
+    !anyRunning && !model.error && !incomplete;
   const [confirming, setConfirming] = useState(false);
 
   // Asked in the row rather than through `window.confirm`: that returns no usable answer
@@ -185,6 +220,8 @@ function ModelRow({
 
       <RowAction
         isRunning={isRunning}
+        launchable={launchable}
+        onRun={() => onRun(model)}
         onStop={onStop}
         onConfirmDelete={() => setConfirming(true)}
       />
@@ -196,10 +233,12 @@ export default function Library({
   runner,
   onSelect,
   onStop,
+  onRunnerChange,
 }: {
   runner: RunnerSnapshot;
   onSelect: (model: ModelEntry) => void;
   onStop: () => void;
+  onRunnerChange: (snapshot: RunnerSnapshot) => void;
 }) {
   const [models, setModels] = useState<ModelEntry[]>([]);
   const [dir, setDir] = useState<DirInfo | null>(null);
@@ -236,6 +275,31 @@ export default function Library({
       .then(setModels)
       .catch((e) => setFailure(String(e)));
   }, []);
+
+  const run = useCallback(
+    (model: ModelEntry) => {
+      setFailure(null);
+      runnerStart(model.id)
+        .then(onRunnerChange)
+        .catch((e) => setFailure(String(e)));
+    },
+    [onRunnerChange],
+  );
+
+  const active =
+    runner.state === "starting" || runner.state === "ready"
+      ? models.filter((model) => model.id === runner.modelId)
+      : [];
+  const rest = models.filter(
+    (model) => !active.some((r) => r.id === model.id),
+  );
+  const groups: { label: string | null; entries: ModelEntry[] }[] =
+    active.length > 0
+      ? [
+          { label: "Running", entries: active },
+          { label: "Stopped", entries: rest },
+        ]
+      : [{ label: null, entries: models }];
 
   const empty = {
     title: "Models directory not found",
@@ -274,21 +338,25 @@ export default function Library({
         </div>
       )}
 
-      {models.length > 0 && (
-        <ul className="model-list">
-          {models.map((model) => (
-            <ModelRow
-              key={model.id}
-              model={model}
-              runner={runner}
-              onSelect={onSelect}
-              onFavourite={favourite}
-              onDelete={remove}
-              onStop={onStop}
-            />
-          ))}
-        </ul>
-      )}
+      {models.length > 0 && groups.map(({ label, entries }) => (
+        <section key={label ?? "all"}>
+          {label && <h2 className="group-label">{label}</h2>}
+          <ul className="model-cards">
+            {entries.map((model) => (
+              <ModelRow
+                key={model.id}
+                model={model}
+                runner={runner}
+                onSelect={onSelect}
+                onFavourite={favourite}
+                onDelete={remove}
+                onRun={run}
+                onStop={onStop}
+              />
+            ))}
+          </ul>
+        </section>
+      ))}
     </>
   );
 }

@@ -10,12 +10,14 @@ Branch:   `main`, clean and pushed. **`v0.6.1` is tagged at `5d8957d`, behind
           that writes the number increments it. Assuming tag and HEAD are
           identical is what put a build of HEAD in the v0.3.0 release
           ([knowledge/technical.md](../knowledge/technical.md)).
-Task:     **The redesign is planned and not started**
-          ([intent/redesign.md](../intent/redesign.md)): four phases moving the
-          whole UI to a sidebar-plus-pane layout against mockups the author
-          approved 2026-09-02. The pi button remains the last shipped work
-          ([intent/pi.md](../intent/pi.md)).
-Mode:     none in progress.
+Task:     **Redesign phase 1 (shell and Library) landed 2026-09-02**, proof in
+          [intent/redesign.md](../intent/redesign.md): four commands green and
+          the dev app's window captured showing the new shell. Uncommitted.
+          Three of its states are owed to the author's look before phase 2:
+          Run pressed from a row, the Running group forming, the orphan
+          banner and its Ignore.
+Mode:     Phase — redesign, between phases 1 and 2
+          ([intent/redesign.md](../intent/redesign.md)).
 Blocker:  none. The **Gatekeeper check is met**, twice over on 2026-09-02 — the
           run that failed is why v0.6.1 exists
           ([intent/release.md](../intent/release.md)).
@@ -26,7 +28,8 @@ Blocker:  none. The **Gatekeeper check is met**, twice over on 2026-09-02 — th
           was against v0.5.0 and does not carry. Two older: a queued download row
           with nothing on disk behind it coming back from a restart, and an Intel
           Mac running the universal build.
-Next:     **Redesign phase 1 — shell and Library**
+Next:     **The author's look at phase 1 in the built app**, then redesign
+          phase 2 — the launch presets
           ([intent/redesign.md](../intent/redesign.md)). The README's
           screenshots, previously here, wait behind the whole redesign on the
           author's decision: every phase would invalidate them again, so they

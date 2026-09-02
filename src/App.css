@@ -2,11 +2,13 @@
   --bg: #ffffff;
   --bg-sidebar: #f4f4f6;
   --bg-hover: #f7f7f9;
+  --bg-card: #f9f9fa;
   --badge-bg: #ebedf1;
   --text: #1c1c1e;
   --text-muted: #6e6e73;
   --border: #e2e2e6;
   --accent: #0a6cff;
+  --running: #2eb872;
   --danger: #c0392b;
 
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui,
@@ -22,11 +24,13 @@
     --bg: #1c1c1e;
     --bg-sidebar: #232326;
     --bg-hover: #2a2a2e;
+    --bg-card: #232326;
     --badge-bg: #34343a;
     --text: #f2f2f7;
     --text-muted: #98989f;
     --border: #34343a;
     --accent: #4a9bff;
+    --running: #32d74b;
     --danger: #ff6b5e;
   }
 }
@@ -53,55 +57,49 @@ body,
 .sidebar {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 12px 10px;
+  gap: 2px;
+  padding: 10px 10px 12px;
   background: var(--bg-sidebar);
   border-right: 1px solid var(--border);
 }
 
-.sidebar-title {
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
-  padding: 20px 8px 12px;
-  font-size: 12px;
+.side-section {
+  padding: 14px 9px 5px;
+  font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
   color: var(--text-muted);
 }
 
-.sidebar-version {
-  font-size: 11px;
-  font-weight: 400;
-  letter-spacing: 0;
-  text-transform: none;
-  opacity: 0.7;
-}
-
-.nav {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
 .nav-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
   width: 100%;
-  padding: 6px 10px;
+  padding: 7px 9px;
   font: inherit;
   font-weight: 500;
   text-align: left;
   color: var(--text);
   background: none;
   border: none;
-  border-radius: 6px;
+  border-radius: 7px;
   cursor: pointer;
 }
 
-.nav-item:hover {
+.nav-item svg {
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
+.nav-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nav-item:hover:not(:disabled):not(.is-active) {
   background: var(--bg-hover);
 }
 
@@ -110,15 +108,33 @@ body,
   background: var(--accent);
 }
 
-.now-running {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  margin-top: auto;
-  padding: 10px 10px 6px;
-  font-size: 12px;
+.nav-item.is-active svg {
+  color: #fff;
+}
+
+.nav-item:disabled {
   color: var(--text-muted);
-  border-top: 1px solid var(--border);
+  cursor: default;
+  opacity: 0.5;
+}
+
+.side-run-dot {
+  flex-shrink: 0;
+  width: 7px;
+  height: 7px;
+  margin-left: auto;
+  background: var(--running);
+  border-radius: 50%;
+}
+
+.side-spacer {
+  flex: 1;
+}
+
+.side-version {
+  padding: 8px 9px 0;
+  font-size: 11px;
+  color: var(--text-muted);
 }
 
 .dot {
@@ -161,6 +177,9 @@ body,
 }
 
 .button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   padding: 5px 12px;
   font: inherit;
   font-weight: 500;
@@ -169,6 +188,11 @@ body,
   border: 1px solid var(--border);
   border-radius: 6px;
   cursor: pointer;
+}
+
+.button-plain {
+  background: none;
+  border-color: transparent;
 }
 
 .button:hover:not(:disabled) {
@@ -322,42 +346,16 @@ body,
   opacity: 1;
 }
 
-.now-running-text {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  overflow: hidden;
-}
-
-.now-running-text strong {
-  overflow: hidden;
-  color: var(--text);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.now-running-meta {
-  font-size: 11px;
-}
-
-.link-stop,
 .link-back {
+  display: block;
   padding: 0;
+  margin-bottom: 6px;
   font: inherit;
+  font-size: 12px;
   color: var(--accent);
   background: none;
   border: none;
   cursor: pointer;
-}
-
-.link-stop {
-  margin-left: auto;
-}
-
-.link-back {
-  display: block;
-  margin-bottom: 6px;
-  font-size: 12px;
 }
 
 .model-name .dot {
@@ -957,6 +955,34 @@ input[type="range"] {
   background: var(--danger);
 }
 
+.banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-top: 16px;
+  padding: 12px 14px;
+  background: color-mix(in srgb, #d99b28 10%, transparent);
+  border: 1px solid color-mix(in srgb, #d99b28 35%, transparent);
+  border-radius: 9px;
+}
+
+.banner-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.banner-title {
+  font-weight: 600;
+}
+
+.banner-detail {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
 .orphan-list {
   margin: 8px 0 0;
   padding: 0;
@@ -1016,16 +1042,30 @@ input[type="range"] {
   background: #7c5cff;
 }
 
-/* Library rows carry a star and a delete either side of the row button, so the row's
-   own border moves out to the item that now spans the full width. */
+/* Library rows are cards in a gapped column; each carries a star and its actions either
+   side of the row button, so borders and tint live on the item spanning the full width. */
+.model-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.group-label {
+  margin: 16px 0 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
 .model-item {
   display: flex;
   align-items: center;
-  border-bottom: 1px solid var(--border);
-}
-
-.model-item:last-child {
-  border-bottom: none;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 9px;
 }
 
 .model-item .model-row {
@@ -1038,11 +1078,12 @@ input[type="range"] {
   background: var(--bg-hover);
 }
 
-/* On the item, not the row button: the star and the delete are its siblings, so tinting
+/* On the item, not the row button: the star and the actions are its siblings, so tinting
    the button alone leaves the running model highlighted across the middle of its row and
    plain at both ends. Last, so hovering a running row does not take the tint away. */
 .model-item.is-running {
-  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  background: color-mix(in srgb, var(--running) 9%, transparent);
+  border-color: color-mix(in srgb, var(--running) 30%, var(--border));
 }
 
 .star {
@@ -1064,13 +1105,20 @@ input[type="range"] {
   color: var(--accent);
 }
 
+.row-actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  margin-right: 10px;
+}
+
 /* One width for whichever button the row ends on. The row button beside it is `flex: 1`,
    so a narrower word here widens the grid and pushes that row's right-aligned figures out
    of line with every other row — which is what swapping Delete for Stop did. */
 .row-action {
-  flex: none;
   min-width: 72px;
-  margin-right: 10px;
+  justify-content: center;
 }
 
 /* Present but not shouting: deleting is rare, and a row of loud red buttons reads as a

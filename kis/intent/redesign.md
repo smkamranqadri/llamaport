@@ -47,10 +47,17 @@ Four, in order, with the author using the built app between each — the
 project's own tally says that is where defects come from
 ([knowledge/technical.md](../knowledge/technical.md)).
 
-1. **Shell and Library.** The new sidebar (Discover disabled), the visual
-   system (tokens, rows, buttons, cards), the Library grouped Running /
-   Stopped with inline Run and Stop, the orphan banner restyled. No behavior
-   changes.
+1. ~~**Shell and Library.**~~ Done 2026-09-02. The new sidebar (Discover
+   disabled), the visual system (tokens, rows, buttons, cards), the Library
+   grouped Running / Stopped with inline Run and Stop, the orphan banner
+   restyled. No behavior changes. Four resolutions made at the keyboard:
+   **Activity Monitor ships disabled too** — its screen is phase 4, and the
+   author chose disabled entries over absent ones; **the sidebar's Now
+   Running strip is gone**, replaced by the mockup's green dot on Library,
+   so Stop lives on the running row and the model screen; **the row's Run
+   sends no draft**, so `runner_start` resolves the same remembered profile
+   the model's own screen opens with — no new machinery; **the native title
+   bar stays** — the mockup's traffic lights are the real ones.
 2. **Launch.** The three presets over the machinery that already exists:
    Default is the launch defaults, Best speed is the measured `speeds.json`
    row, Model suggested is the offered-not-applied opinion from fitting. A
@@ -75,4 +82,28 @@ project's own tally says that is where defects come from
 
 ## Proof
 
-None yet. Each phase records its own here when it lands.
+### Phase 1 — 2026-09-02
+
+Files: `src/App.tsx`, `src/Library.tsx`, `src/App.css`, `src/icons.tsx` (new).
+The Library's list class became `.model-cards` so Downloads, which shares
+`.model-list`, keeps its current look until its own phase.
+
+```text
+bun run build
+build: 0
+cargo test --manifest-path src-tauri/Cargo.toml
+cargo test status: 0        (256 passed, 5 ignored — unchanged)
+cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
+clippy status: 0
+cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
+fmt status: 0
+```
+
+The built app was looked at, not only compiled: the dev app's window was
+captured by window id with nothing running — sidebar sections, disabled
+Discover and Activity entries, Settings at the bottom, card rows with
+badges and a visible Run each, no group headers when nothing runs.
+
+**Owed to the author's look before phase 2**: pressing Run from a row and
+watching the Running group form with its tint and Stop; the orphan banner
+(none existed to photograph); Ignore dismissing it.
