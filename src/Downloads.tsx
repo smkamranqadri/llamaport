@@ -74,10 +74,14 @@ function recovery(job: DownloadJob): Recovery {
   return "resume";
 }
 
-/// The named limits, because a limit is chosen and not measured: nobody types 37 MB/s.
-/// A figure already in the config that is not one of these joins the list rather than
-/// being rounded away.
-const LIMITS_MB = [5, 10, 25, 50, 100];
+/// The named limits: half a megabyte a second up to two, which is the range a person
+/// throttles a background download into. Anything else is typed, because past two the
+/// useful figure depends on the line and there is no ladder worth guessing.
+const LIMITS_MB = [0.5, 1, 1.5, 2];
+
+/// The engine charges a buffer at a time, so anything slower parks a segment for longer
+/// than a second and is raised to this on the way in. Only a typed limit can be under it.
+const FLOOR = 64 * 1024;
 
 function isQuantToken(token: string): boolean {
   if (["F16", "BF16", "F32", "F64"].includes(token)) return true;
@@ -363,6 +367,11 @@ function Finished({
   );
 }
 
+function toField(bytesPerSecond: number | null): string {
+  if (bytesPerSecond == null) return "";
+  return String(Math.round((bytesPerSecond / MB) * 100) / 100);
+}
+
 /// What the menu offers, as bytes per second, with the stored figure folded in if it is
 /// not one of the named ones — a limit set by an older build must not vanish because this
 /// list does not name it.
@@ -377,7 +386,24 @@ function limitChoices(applied: number | null): (number | null)[] {
 
 function limitLabel(rate: number | null): string {
   if (rate == null) return "No speed limit";
+  const mb = rate / MB;
+  // formatRate says 500 KB/s where this ladder counts in halves of a megabyte, and a menu
+  // whose steps change unit halfway down does not read as a ladder at all.
+  if (mb >= 0.1) return `${Math.round(mb * 10) / 10} MB/s`;
   return formatRate(rate);
+}
+
+/// The field holds MB/s because that is how a limit is thought about; the engine holds
+/// bytes per second. `null` for no limit, `undefined` for something that is not a limit
+/// at all.
+function toRate(typed: string): number | null | undefined {
+  const trimmed = typed.trim();
+  if (trimmed === "") return null;
+
+  const megabytes = Number(trimmed);
+  if (!Number.isFinite(megabytes) || megabytes < 0) return undefined;
+  if (megabytes === 0) return null;
+  return Math.round(megabytes * MB);
 }
 
 export default function Downloads({
@@ -391,6 +417,8 @@ export default function Downloads({
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
   const [options, setOptions] = useState<DownloadOptions | null>(null);
+  /// A typed limit in MB/s, or null while the menu's own steps are in force.
+  const [typedLimit, setTypedLimit] = useState<string | null>(null);
   const [models, setModels] = useState<ModelEntry[]>([]);
   const [rates, setRates] = useState<Record<string, Smoothed>>({});
   const [page, setPage] = useState(PAGE);
@@ -487,6 +515,17 @@ export default function Downloads({
       .catch((e) => setFailure(String(e)));
   };
 
+  const applyTyped = () => {
+    if (typedLimit == null) return;
+    const rateLimit = toRate(typedLimit);
+    if (rateLimit === undefined) {
+      setFailure("a speed limit is a number of MB/s, or empty for no limit");
+      return;
+    }
+    applyLimit(rateLimit);
+    setTypedLimit(null);
+  };
+
   const active = jobs.find((job) => job.state === "active");
   const unfinished = jobs.filter(
     (job) =>
@@ -511,6 +550,11 @@ export default function Downloads({
   const inLibrary = (job: DownloadJob) =>
     models.some((entry) => entry.path === job.path);
 
+  // A limit under the engine's own floor is honoured as the floor, so the line says so
+  // rather than showing a figure no transfer will ever run at.
+  const asked = typedLimit == null ? options?.rateLimit : toRate(typedLimit);
+  const slowLimit = asked != null && asked !== undefined && asked < FLOOR;
+
   let status = "Nothing downloading";
   if (unfinished.length === 1) status = "1 downloading";
   if (unfinished.length > 1) status = `${unfinished.length} downloading`;
@@ -533,10 +577,15 @@ export default function Downloads({
                 <span>·</span>
                 <select
                   className="limit-select"
-                  value={String(options.rateLimit ?? "")}
+                  value={typedLimit == null ? String(options.rateLimit ?? "") : "custom"}
                   title="How fast a transfer is allowed to go. A change applies to the download running now, not only the next one."
                   onChange={(e) => {
                     const chosen = e.currentTarget.value;
+                    if (chosen === "custom") {
+                      setTypedLimit(toField(options.rateLimit));
+                      return;
+                    }
+                    setTypedLimit(null);
                     applyLimit(chosen === "" ? null : Number(chosen));
                   }}
                 >
@@ -545,7 +594,26 @@ export default function Downloads({
                       {limitLabel(rate)}
                     </option>
                   ))}
+                  <option value="custom">Something else…</option>
                 </select>
+                {typedLimit != null && (
+                  <>
+                    <input
+                      className="limit-field"
+                      autoFocus
+                      value={typedLimit}
+                      placeholder="MB/s"
+                      onChange={(e) => setTypedLimit(e.currentTarget.value)}
+                      onBlur={applyTyped}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") applyTyped();
+                        if (e.key === "Escape") setTypedLimit(null);
+                      }}
+                    />
+                    <span>MB/s</span>
+                  </>
+                )}
+                {slowLimit && <span>· below {formatRate(FLOOR)}, so the engine uses that</span>}
               </>
             )}
           </p>

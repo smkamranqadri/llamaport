@@ -2191,3 +2191,14 @@ input[type="range"] {
   justify-content: flex-end;
   margin-top: 14px;
 }
+
+.limit-field {
+  width: 60px;
+  padding: 2px 6px;
+  font: inherit;
+  color: var(--text);
+  background: var(--input);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  outline: none;
+}
