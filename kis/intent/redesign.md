@@ -73,9 +73,10 @@ project's own tally says that is where defects come from
 4. **Downloads, Settings, first run, Activity.** Restyles for the first two;
    the CPU% telemetry field, its tests, and the Activity screen for the last.
    **The first run left this phase on 2026-09-02** — the author asked for it
-   ahead of the rest and it is done; its proof is below. **Downloads is done
-   2026-09-03** (`21cec86`, `e85ecae`) and **Activity Monitor with it**
-   (`e897b2a`), both proved below. Settings is what remains.
+   ahead of the rest and it is done; its proof is below. **Done 2026-09-03**:
+   Downloads (`21cec86`, `e85ecae`), Activity Monitor (`e897b2a`) and Settings
+   (`9e16cb5`), each proved below. **The phase is closed, and the redesign with
+   it.**
 
 ## What still does not match, screen by screen
 
@@ -774,3 +775,43 @@ Two deviations from the drawing, both deliberate: the cards sit under the table
 rather than pinned to the window's bottom edge, so they follow the window
 instead of floating over it; and a stray row is marked amber, because it is the
 one thing on that screen this app did not start.
+
+### Phase 4, Settings — done 2026-09-03, and the redesign closes
+
+Files: `src/SettingsScreen.tsx`, `src/App.css`, `src-tauri/Cargo.toml`,
+`src-tauri/src/lib.rs`, `src-tauri/capabilities/default.json`, `package.json`.
+Four panels became four cards with a ground of their own and sentence-case
+titles; `.panel` is Settings' alone, so the change reaches nothing else.
+
+- **Change… opens the real folder picker**, the author's call over keeping a
+  typed path: `tauri-plugin-dialog` is a new dependency in a signed app, and a
+  "…" button that opens nothing is a promise the screen does not keep. The field
+  is read-only and shows what was chosen. The binary uses the same picker, and
+  "Find it for me" clears the choice back to the automatic search.
+- **The binary's six facts become one line**, the author's call over folding
+  them away: found-or-chosen, the version, and either "everything Llamaport
+  needs is supported" or the name of the flag that is missing. `--metrics` and
+  `--cache-type-k` are what it checks; `--fit` is deliberately not among them,
+  because without it the app resolves Auto itself.
+- **Launch defaults folds behind "Edit defaults"**, whose summary is what the
+  fold hides — "Built-in · fitted context · port 8080".
+- **Appearance keeps its card.** The artboard predates it and draws three; this
+  screen has four.
+
+**The artboard's caption was false for the second time.** It reads "Llamaport
+watches it, so files you drop in show up in the Library" — nothing watches the
+models directory, which is why Rescan exists and why item 2 kept it. The line
+now says to press Rescan. The rule this produced is in
+[knowledge/technical.md](../knowledge/technical.md).
+
+```text
+build: 0
+cargo test status: 0        (261 passed, 5 ignored — unchanged)
+clippy status: 0
+fmt status: 0
+```
+
+**Owed to the author's eyes, and to a signed build**: the picker is the first
+native dialog this app opens, and a `dev` window says nothing about how it
+behaves inside a notarised bundle — recorded in
+[release.md](release.md) under "Unverified against v0.6.1".

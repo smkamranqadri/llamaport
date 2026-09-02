@@ -63,8 +63,11 @@ become a ledger. Four checks nobody has run, each needing a human at the machine
 - A **queued download row with nothing on disk behind it** coming back from a
   restart.
 - An **Intel Mac** running the universal build.
+- **The folder picker on a signed build.** `tauri-plugin-dialog` arrived with
+  Settings on 2026-09-03 and is the first native dialog this app opens; a
+  `dev` window says nothing about how it behaves inside a notarised bundle.
 
-The first two are owed against v0.6.1; the other two are older.
+The first two are owed against v0.6.1; two are older; the picker is new.
 
 ## v0.6.0 — shipped 2026-09-02
 

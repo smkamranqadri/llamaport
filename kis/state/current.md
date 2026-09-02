@@ -6,24 +6,24 @@ Branch:   `main`, working tree clean. **`v0.6.1` is tagged at `5d8957d` and HEAD
           building a release artefact** — the distance is deliberately not
           written here, because the commit that records it increments it. Why
           it matters is in [knowledge/technical.md](../knowledge/technical.md).
-Task:     **Redesign phase 4 is one screen from done.** Downloads (`21cec86`,
-          `e85ecae`) and **Activity Monitor** (`e897b2a`) are built on
-          2026-09-03 — the last a new screen with new telemetry, a row per
-          `llama-server` the app knows and the machine's figures under them
-          ([intent/redesign.md](../intent/redesign.md)). **Settings is all that
-          is left**, and its artboard predates the Appearance section that now
-          sits in it.
+Task:     **The redesign is finished.** All four phases and all five of the
+          author's mismatches are done: Settings closed it on 2026-09-03
+          (`9e16cb5`), after Downloads (`21cec86`, `e85ecae`) and Activity
+          Monitor (`e897b2a`) the same day
+          ([intent/redesign.md](../intent/redesign.md)). Every sidebar entry but
+          Discover — disabled by design — now leads somewhere.
 
-          Before them: **Appearance** shipped the same day
-          ([intent/appearance.md](../intent/appearance.md)), and the redesign's
-          five-item list closed with the measurement inside the model screen.
+          **Two things arrived with it that are not the drawing's**: the
+          Appearance section ([intent/appearance.md](../intent/appearance.md)),
+          and **`tauri-plugin-dialog`**, this app's first native dialog, behind
+          Settings' Change… button.
 
           **The app is the author's: never launch, capture or drive it** — ask
           him for the screenshot, and render what can be rendered without it
           ([knowledge/technical.md](../knowledge/technical.md) Verify). **His
-          eyes are owed a running transfer** on Downloads and **a live Activity
-          screen**: rates, percentages and a progress bar are what a render
-          cannot prove.
+          eyes are owed three screens**: a running transfer on Downloads, a live
+          Activity table, and the folder picker — none of which a render can
+          prove, the last not even in a dev window.
 
 Mode:     Standard. Nothing is part-finished.
 
@@ -47,16 +47,19 @@ Blocker:  none. **The unusable-window bug has escalated and now wants its own
           **Four checks nobody has run**, each needing a human at the machine,
           listed in [intent/release.md](../intent/release.md) under "Unverified
           against v0.6.1".
-Next:     **Settings**, which closes phase 4 and the redesign with it. The
-          artboard draws three cards — Models folder with a Change…, llama-server
-          as a verdict line over its path, and Launch defaults folded behind an
-          "Edit defaults" row. The app has the same three as open panels, plus
-          the **Appearance** section the drawing never had.
+Next:     **The README's screenshots**, which have waited behind the whole
+          redesign for exactly this moment — the UI is finished, so they can be
+          taken once ([release.md](../intent/release.md) phase 3). They need the
+          author at the machine, like every capture.
 
-          Waiting on the author at the machine: **the README's screenshots**
-          ([release.md](../intent/release.md) phase 3), **the four unverified
-          v0.6.1 checks**, and the **unusable-window bug**, which still wants its
-          own task.
+          Then a **release**, which is the first that would carry the redesign,
+          the appearance work and a new plugin. Run
+          `git rev-list --count v0.6.1..HEAD` before building anything, and read
+          [release.md](../intent/release.md)'s "Unverified against v0.6.1" — now
+          five checks, the newest being **the folder picker inside a notarised
+          bundle**.
+
+          Also open: the **unusable-window bug**, which still wants its own task.
 
           Recorded and not fixed: the memory-safety badges, the Starting pill
           and the warning badge still use fixed ambers and greens that no

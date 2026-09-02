@@ -167,10 +167,11 @@ user, reversing two standing decisions ([direction.md](direction.md)).
    of someone who is not an expert. The README screenshots, previously Next,
    wait behind it — they are done once, against the finished redesign.
 
-   **Phases 1 to 3 are built, and the five screens the author listed as not
-   matching are all signed off as of 2026-09-02**, the last being the
-   measurement. Phase 4 keeps Downloads, Settings and Activity; the first run
-   left it early on the author's ask.
+   **All four phases are built as of 2026-09-03**, and the five screens the
+   author listed as not matching are signed off. Phase 4 finished with
+   Downloads, Activity Monitor — the last disabled sidebar entry — and Settings;
+   the first run had left it early on the author's ask. What the redesign did
+   not touch is Discover, which ships disabled by design.
 
 15. **Appearance** — asked for and shipped 2026-09-03, in
    [appearance.md](appearance.md). A Mode control and five palettes, four of
