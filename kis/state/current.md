@@ -6,30 +6,25 @@ Branch:   `main`, working tree clean. **`v0.6.1` is tagged at `5d8957d` and HEAD
           building a release artefact** — the distance is deliberately not
           written here, because the commit that records it increments it. Why
           it matters is in [knowledge/technical.md](../knowledge/technical.md).
-Task:     **Appearance shipped 2026-09-03** — a Mode control (System, Light,
-          Dark) and five palettes, four of them ported from `hermes-hq`, in a
-          new Settings section: `d15f9ad`, trimmed to four ported palettes by
-          `d8f9d9b` ([intent/appearance.md](../intent/appearance.md)). The
-          stylesheet now derives its surfaces from seven anchors instead of
-          listing fifteen values twice, and no `prefers-color-scheme` query is
-          left in it: System is resolved once, in `theme.ts`, before the first
-          render.
+Task:     **Redesign phase 4 has started: Downloads is done 2026-09-03**
+          (`21cec86`, `e85ecae`) — the paste field and Get in the header, a card
+          per transfer, Finished rows named by the catalog, and the speed limit
+          turned into a named ladder on the status line rather than a panel
+          ([intent/redesign.md](../intent/redesign.md)). **Settings and Activity
+          Monitor are what is left of the phase**; the first run left it early
+          on 2026-09-02.
 
-          Before it, the redesign closed. **All five things that did not match
-          the artboards are signed off**, the last being the measurement
-          (`295ea04`, `02b1c1a`, built inside the model screen on the author's
-          ruling). The running screen took its own pass on 2026-09-02 —
-          `39c40e6`, header down to a name and a state, the Memory card no
-          longer captioned with the Mac's usage — and **Use in pi now wears
-          pi's own mark** (`48a54b4`): the earlier "no brand asset exists"
-          finding had searched `~/.pi` and `~/.superconductor` and never the
-          package that installs the command.
+          Before it: **Appearance** shipped 2026-09-03 — Mode plus five palettes,
+          four ported from `hermes-hq`
+          ([intent/appearance.md](../intent/appearance.md)) — and the redesign's
+          own five-item list closed, the last being the measurement inside the
+          model screen.
 
           **The app is the author's: never launch, capture or drive it** — ask
           him for the screenshot, and render what can be rendered without it
-          ([knowledge/technical.md](../knowledge/technical.md) Verify). Four
-          things this week were caught by rendering the markup against
-          `App.css` before handing anything over.
+          ([knowledge/technical.md](../knowledge/technical.md) Verify). **The
+          author's eyes are owed a running transfer**: the bar and the figures
+          line are what a render cannot prove.
 
 Mode:     Standard. Nothing is part-finished.
 
@@ -53,19 +48,23 @@ Blocker:  none. **The unusable-window bug has escalated and now wants its own
           **Four checks nobody has run**, each needing a human at the machine,
           listed in [intent/release.md](../intent/release.md) under "Unverified
           against v0.6.1".
-Next:     **The author's call. Nothing is blocked and nothing is owed:**
+Next:     **Activity Monitor**, the author's pick — the last screen in the
+          redesign and the only one that needs new telemetry. Two things are
+          already decided and both matter before a line is written
+          ([intent/redesign.md](../intent/redesign.md) interview): **it ships
+          with a CPU% column and no GPU column**, because per-process GPU has no
+          public macOS API, and **CPU comes from the `proc_pid_rusage` call
+          `sysmem.rs` already makes** for the footprint. The artboard draws a GPU
+          column and a GPU card; both are dropped for good rather than deferred.
 
-          - **The README's screenshots**, which waited behind the redesign so
-            they are taken once against the finished UI
-            ([release.md](../intent/release.md) phase 3). They are a release
-            behind, and they need the author at the machine.
-          - **The unusable-window bug**, which wants its own task: eight
-            sightings on 2026-09-02, one with nobody touching the window.
-          - **The four checks nobody has run** against v0.6.1
-            ([intent/release.md](../intent/release.md)).
-          - **Redesign phase 4** — Downloads, Settings and Activity. The first
-            run left it early; the rest is unstarted
-            ([intent/redesign.md](../intent/redesign.md)).
+          Then **Settings**, which closes phase 4. Its artboard draws Models
+          folder, llama-server and Launch defaults — and not the Appearance
+          section that now sits with them.
+
+          Waiting on the author at the machine: **the README's screenshots**
+          ([release.md](../intent/release.md) phase 3), **the four unverified
+          v0.6.1 checks**, and the **unusable-window bug**, which still wants its
+          own task.
 
           Recorded and not fixed: the memory-safety badges, the Starting pill
           and the warning badge still use fixed ambers and greens that no

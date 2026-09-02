@@ -276,6 +276,15 @@ default. Sibling `.bak`, `.save` and `.backup` files already accumulate beside i
   one out of rendering every palette before handing any of them over. That is the argument for doing the comparison first
   rather than after a round of corrections.
 
+- **An artboard is the spec for the shape, not for the facts.** Downloads' own
+  caption read "Downloads survive quitting the app — they pick up where they
+  left off", and they do not: a relaunch restores them Paused with Resume live,
+  which this project had already verified and written down
+  ([intent/downloader.md](../intent/downloader.md)). Matching the drawing
+  faithfully would have shipped a false sentence in the app's voice. Every claim
+  a mockup makes about behaviour is checked against the code or the phase file
+  that proved it, and corrected in place when it is wrong.
+
 - **A palette is seven anchors; the surfaces are mixed from them.** `App.css`
   holds ground, text, muted text, line, accent, running and danger per theme,
   and derives sidebar, card, card2, hover, badge, input, code and faint from

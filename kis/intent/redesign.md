@@ -73,7 +73,9 @@ project's own tally says that is where defects come from
 4. **Downloads, Settings, first run, Activity.** Restyles for the first two;
    the CPU% telemetry field, its tests, and the Activity screen for the last.
    **The first run left this phase on 2026-09-02** — the author asked for it
-   ahead of the rest and it is done; its proof is below.
+   ahead of the rest and it is done; its proof is below. **Downloads is done
+   2026-09-03** (`21cec86`, `e85ecae`), proof below. Settings and Activity
+   remain.
 
 ## What still does not match, screen by screen
 
@@ -680,3 +682,51 @@ The app is his and stays his ([knowledge/technical.md](../knowledge/technical.md
 under Verify): the panel's own DOM was rendered against `App.css` in headless
 Chrome, in both appearances and in all three states — running, finished, folded
 — and put beside the artboard. His word on it: "all good".
+
+### Phase 4, Downloads — done 2026-09-03
+
+Files: `src/Downloads.tsx`, `src/App.css`. Two panels — Fetch a model, Speed
+limit — and a History table became the artboard: a paste field and Get in the
+header, one card per transfer, then Finished rows with a tick, a name and Show.
+
+Decisions, the first two the author's:
+
+- **A finished row is named by the catalog**, which reads the GGUF's own name,
+  so the Library and this screen cannot call the same file different things. A
+  row still in flight has no GGUF to read, so its file name stands in and its
+  quant badge is parsed by a TypeScript copy of `catalog.rs`'s rule.
+- **The URL survives only on a failure.** It is the one moment somebody needs to
+  read the address they asked for; elsewhere it is the row's tooltip.
+- **The speed limit is a named choice on the status line**, not a panel: No
+  speed limit, then 0.5, 1, 1.5 and 2 MB/s — the author's ladder — and
+  "Something else…", which opens a field. Past two megabytes the useful figure
+  depends on a line nobody here has seen, so there is no rung worth guessing.
+  This is [direction.md](direction.md)'s named choices applied to the last
+  free-typed number on any screen. The engine's 64 KB/s floor is named beside
+  the field, because typing is the only way under it.
+- **A third group, "Did not finish."** The artboard draws Downloading and
+  Finished; a failure is neither, and filing it under Finished would be the
+  screen lying about what happened.
+- **Clear sits below both lists.** `downloads::clear` removes complete *and*
+  failed rows, so a Clear under the Finished group would have said otherwise.
+
+**The artboard's own caption was false, and matching it would have shipped the
+lie.** It reads "Downloads survive quitting the app — they pick up where they
+left off"; [downloader.md](downloader.md)'s verification records that a
+relaunch restores them as **Paused** with Resume live. The line now says so, and
+the rule is in [knowledge/technical.md](../knowledge/technical.md).
+
+Rules the rewrite orphaned went with it: `.download-row`, `.download-progress`,
+`.panel-head`, `.badge-quiet`, and the verifying tint on `.kv-bar`.
+
+```text
+build: 0
+cargo test status: 0        (258 passed, 5 ignored — unchanged)
+clippy status: 0
+fmt status: 0
+```
+
+Rendered against `App.css` in both appearances before hand-over, including the
+failure state the artboard does not draw. **The author's eyes are still owed a
+running transfer**: the bar and the figures line are the two things a render
+cannot prove.
