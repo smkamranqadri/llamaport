@@ -114,7 +114,7 @@ export function presetName(which: Which): string | null {
   return null;
 }
 
-function suggestionFields(key: SpeedKey): SpeedFields {
+export function suggestionFields(key: SpeedKey): SpeedFields {
   return {
     ctx: key.ctx,
     ngl: key.ngl,

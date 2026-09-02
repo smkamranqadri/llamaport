@@ -281,13 +281,21 @@ export default function TunePanel({
   const caveats = summary != null && (summary.tied > 1 || summary.confidence === "observed");
   const why = caveats || report.promptWords != null;
 
+  let intro =
+    "Llamaport launched this model at each of these settings and asked every one of them the same question.";
+  if (running) {
+    intro =
+      "Llamaport tries a few safe combinations of context size and memory precision, and times each one. The model restarts between tries — this takes a couple of minutes.";
+  }
+
+  let whySub = "what the reading is worth";
+  if (summary != null && summary.tied > 1) {
+    whySub = `${summary.tied} settings within 10% of each other`;
+  }
+
   return (
     <div className="tune">
-      <p className="tune-intro">
-        Llamaport tries a few safe combinations of context size and memory
-        precision, and times each one. The model restarts between tries — this
-        takes a couple of minutes.
-      </p>
+      <p className="tune-intro">{intro}</p>
 
       <p className="group-label">
         Tries — {report.done} of {report.total} done
@@ -344,11 +352,7 @@ export default function TunePanel({
         <Disclosure
           flat
           title="Why this one"
-          sub={
-            summary.tied > 1
-              ? `${summary.tied} settings within 10% of each other`
-              : "what the reading is worth"
-          }
+          sub={whySub}
         >
           {summary.tied > 1 && (
             <p className="field-hint">

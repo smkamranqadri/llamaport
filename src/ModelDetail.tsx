@@ -20,7 +20,12 @@ import Disclosure from "./Disclosure";
 import { AdvancedFields, AUTO_CTX, ProfileFields } from "./ProfileForm";
 import HealthPanel from "./HealthPanel";
 import PiPanel from "./PiPanel";
-import Presets, { presetName, selectedPreset, type Which } from "./Presets";
+import Presets, {
+  presetName,
+  selectedPreset,
+  suggestionFields,
+  type Which,
+} from "./Presets";
 import TunePanel from "./TunePanel";
 import type {
   HealthReport,
@@ -376,11 +381,16 @@ export default function ModelDetail({
   const [testing, setTesting] = useState(false);
   const [tune, setTune] = useState<TuneReport | null>(null);
   const [speeds, setSpeeds] = useState<SpeedSummary | null>(null);
+  const [speedOpen, setSpeedOpen] = useState(false);
+  const wasMeasuring = useRef(false);
   const [defaults, setDefaults] = useState<Profile | null>(null);
   /// The preset card last pressed. Cleared by any other edit, so a hand-changed field
   /// falls back to whatever the values themselves say.
   const [picked, setPicked] = useState<Which>(null);
   const history = useRef<number[]>([]);
+
+  const mine = tune != null && tune.modelId === model.id ? tune : null;
+  const measuring = mine?.running === true;
 
   const isCurrent = runner.modelId === model.id;
   const running = isCurrent && (runner.state === "starting" || runner.state === "ready");
@@ -435,6 +445,32 @@ export default function ModelDetail({
   useEffect(() => {
     speedsFor(model.id).then(setSpeeds).catch(() => {});
   }, [model.id, runner.state, tune?.done, tune?.running]);
+
+  // The ladder opens its own row and closes it again when it is over: what it was asked
+  // for is one preset, and reading four tries afterwards is a choice, not the outcome.
+  useEffect(() => {
+    if (measuring) {
+      wasMeasuring.current = true;
+      setSpeedOpen(true);
+      return;
+    }
+    if (wasMeasuring.current) {
+      wasMeasuring.current = false;
+      setSpeedOpen(false);
+      // Read the history again here rather than waiting for the effect that watches the
+      // report: the suggestion this applies has to be the one the last row produced, and
+      // the copy in state is still the one from before the ladder ran.
+      speedsFor(model.id)
+        .then((next) => {
+          setSpeeds(next);
+          const key = next.suggestion;
+          if (key == null) return;
+          setPicked("best");
+          setForm((current) => current && { ...current, ...suggestionFields(key) });
+        })
+        .catch(() => {});
+    }
+  }, [measuring, model.id]);
 
   useEffect(() => {
     if (telemetry?.genTps == null) return;
@@ -496,7 +532,6 @@ export default function ModelDetail({
       : "Tune launches servers of its own, and this app runs one model at a time. Stop the running model first.");
 
   const cost = launchCost(shown);
-  const measuring = tune?.running === true && tune.modelId === model.id;
   let ceilingText = "";
   if (shown.deviceBudgetBytes != null) {
     ceilingText = ` of ${formatMemory(shown.deviceBudgetBytes)}`;
@@ -598,12 +633,21 @@ export default function ModelDetail({
     }
   }
 
-  const mineTune = tune != null && tune.modelId === model.id ? tune : null;
+  // The row is folded once the ladder is over, so its one line has to carry the outcome.
+  let speedTitle = "Measuring best speed";
   let speedSub = "trying safe combinations of context and memory precision";
-  if (mineTune != null && mineTune.total > 0) {
-    speedSub = `${mineTune.done} of ${mineTune.total} tries done`;
-    if (mineTune.cancelled) {
-      speedSub = `cancelled after ${mineTune.done} of ${mineTune.total} tries`;
+  if (mine != null && mine.total > 0) {
+    speedSub = `${mine.done} of ${mine.total} tries done`;
+    if (!mine.running) {
+      speedTitle = "Best speed measured";
+      speedSub = `${mine.done} tries measured`;
+      if (speeds?.suggestion != null) {
+        speedSub += " · Best speed selected";
+      }
+    }
+    if (mine.cancelled) {
+      speedTitle = "Measurement cancelled";
+      speedSub = `${mine.done} of ${mine.total} tries measured`;
     }
   }
 
@@ -900,13 +944,14 @@ export default function ModelDetail({
         {/* The ladder while it runs and while its answer is still on screen: a calm
             stopped model's history is the one line the Best speed card carries. Cancel
             sits in the summary, where the artboard's header puts it. */}
-        {!running && mineTune != null && (mineTune.running || mineTune.rows.length > 0) ? (
+        {!running && mine != null && (mine.running || mine.rows.length > 0) ? (
           <Disclosure
-            title="Measuring best speed"
+            title={speedTitle}
             sub={speedSub}
-            open
+            open={speedOpen}
+            onToggle={setSpeedOpen}
             action={
-              mineTune.running ? (
+              mine.running && (
                 <button
                   className="button button-plain button-danger"
                   onClick={() => {
@@ -919,15 +964,16 @@ export default function ModelDetail({
                   <CloseIcon />
                   Cancel
                 </button>
-              ) : undefined
+              )
             }
           >
             <TunePanel
-              report={mineTune}
+              report={mine}
               summary={speeds}
-              onApply={(settings) =>
-                setForm((current) => current && { ...current, ...settings })
-              }
+              onApply={(settings) => {
+                setForm((current) => current && { ...current, ...settings });
+                setSpeedOpen(false);
+              }}
             />
           </Disclosure>
         ) : null}
