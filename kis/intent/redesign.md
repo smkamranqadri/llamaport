@@ -71,9 +71,9 @@ project's own tally says that is where defects come from
    results row, the address line with copy. The pi button moves and must not
    change: its 22 tests are the guard ([pi.md](pi.md)).
 4. **Downloads, Settings, first run, Activity.** Restyles for the first two;
-   the starter list (frontend-hardcoded, models proposed at this phase's
-   planning) for the third; the CPU% telemetry field, its tests, and the
-   Activity screen for the fourth.
+   the CPU% telemetry field, its tests, and the Activity screen for the last.
+   **The first run left this phase on 2026-09-02** — the author asked for it
+   ahead of the rest and it is done; its proof is below.
 
 ## What still does not match, screen by screen
 
@@ -83,11 +83,10 @@ putting the artboard and the app side by side — the method is in
 [knowledge/technical.md](../knowledge/technical.md), and not using it is what
 made the first four passes worthless.
 
-1. **Stopped model screen** — the artboard has exactly two rows, Advanced and
-   Full command. The app still shows Speed, Model details and Logs there. The
-   author has ruled on the last one: **no log on a model that is not
-   running.** Decide where the facts and the measurement history go before
-   deleting their rows.
+1. **Stopped model screen** — built 2026-09-02, **look owed**. The artboard has
+   exactly two rows, Advanced and Full command; the app also showed Speed,
+   Model details and Logs. The three questions that had to be answered before
+   deleting anything were put to the author and are answered — proof below.
 2. **Library rows** — the artboard's row is a dot, the name, its badges, then
    one stat sentence and the action. The app still shows the file name under
    the title and three separate columns, and the running row carries no
@@ -99,9 +98,9 @@ made the first four passes worthless.
    speed", the four tries with their verdicts, Cancel, Use fastest so far).
    The app runs it inside the Speed row, which is why the author says the
    measure screen does not match: it was never built.
-5. **Empty Library** — the artboard offers starter models sized to the Mac.
-   The app prints "Models directory not found". This one is phase 4 and is
-   not owed yet.
+5. ~~**Empty Library**~~ — done 2026-09-02, pulled forward out of phase 4 by
+   the author, who put the artboard and the app side by side and said to fix
+   this one first. Proof below.
 
 ## Risks named at planning
 
@@ -385,3 +384,103 @@ fmt status: 0
 Captured after a clean restart, which is also what proved the Logs change:
 React had kept the old `showLogs` across the hot reload, so the first
 capture still showed them open.
+
+### First run — empty Library, done 2026-09-02
+
+Pulled out of phase 4 by the author. Files: `src/FirstRun.tsx` (new),
+`src/Library.tsx`, `src/icons.tsx`, `src/api.ts`, `src/types.ts`,
+`src/App.css`, `src-tauri/src/lib.rs`.
+
+The screen the app printed was **"Models directory not found"** over a path.
+It is now the artboard's: a cube, "Get your first model", three starter cards
+with a badge, a sentence and a size, and a paste-a-link row. `Library`'s
+header subtitle reads "No models yet" while the list is empty.
+
+Decisions made at the keyboard, all four with the author:
+
+- **The starters are three fixed Qwen models**, named by the author:
+  `Qwen3.5-2B-Q4_K_M` (1.3 GB), `Qwen3.6-35B-A3B-UD-Q4_K_M` (22.1 GB) and
+  `Qwen3.8-27B-UD-Q4_K_M` (16.5 GB), all from `unsloth`. Every URL and byte
+  count was **verified live by HTTP HEAD** rather than estimated, so the size
+  beside a card is the size that lands. An earlier pass offered Llama 3.2 3B,
+  Qwen 2.5 7B and Phi-4 and filtered the list by memory; the author replaced
+  both the models and the filtering.
+- **The ceiling is the Metal working set, not installed memory.** A new
+  `machine_memory` command carries `device_budget_bytes` off the same
+  `capabilities()` the launch plan uses — it discovers `llama-server` with no
+  model named, so `--list-devices` is reachable on a first run. This machine
+  reads 25.0 GB where installed memory says 32.0 GB. Where the binary has not
+  been found the screen falls back to installed memory **and says so in the
+  sentence**, because falling back silently is the defect
+  [screen.md](screen.md) closed.
+- **Four bands, because three lied.** ≤50% of the ceiling "fits easily", ≤75%
+  "fits", ≤100% "tight — little room for a conversation", above it "too big for
+  this Mac". The first build said "too big" at 75%, which is false: 22.1 GB
+  under a 25.0 GB ceiling loads and leaves nothing for the cache. A memory sum
+  says a launch is allowed and never that it is good
+  ([knowledge/technical.md](../knowledge/technical.md)). Nothing is filtered
+  out; the wording carries the judgement and every card stays downloadable.
+- **`download_start` creates the models directory.** The author's is
+  `/Users/mkamran/models1` and does not exist; admission, the `.part` and the
+  room check all assume a directory to write in, so every Download button would
+  have failed on the machine this screen was built for.
+
+**Two deliberate deviations from the artboard**, both offered to the author and
+kept: Rescan stays in the header, because this is the one screen where the
+folder may be missing and Rescan is the recovery after creating it; and one
+quiet line names a models directory that does not exist yet, which the artboard
+does not cover.
+
+**Found on the way and written up rather than fixed**: the app can only build a
+fully offloaded launch, so a 35B-A3B costs its whole 22.1 GB while doing 3B of
+arithmetic per token. [moe.md](moe.md).
+
+```text
+build: 0
+cargo test status: 0        (256 passed, 5 ignored — unchanged)
+clippy status: 0
+fmt status: 0
+```
+
+**Verified on screen and by the author.** The artboard was rendered out of the
+canvas artifact and screenshotted headless, the app window captured by id, and
+the two put side by side — the method in
+[knowledge/technical.md](../knowledge/technical.md), used from the start this
+time rather than after four wasted passes. The author's word on it: "First run
+— empty Library is done."
+
+### Item 1 — stopped model screen, built 2026-09-02, look owed
+
+Files: `src/ModelDetail.tsx` alone. The three rows the artboard does not draw
+were not deleted on sight: where their content goes was put to the author
+first, because two of the three are the only route to something real.
+
+- **Model details stays as a third row.** The author overturned the artboard
+  rather than lose the file's facts — architecture, layers, KV heads, chat
+  template, Reveal in Finder — on the one screen you read before running a
+  model. The alternatives offered were an info button in the header opening a
+  panel, and dropping the row to the running screen where phase 3 already put
+  it.
+- **Speed appears only while a measurement runs.** A stopped model's history is
+  the one line the Best speed card already carries — "Measured here on Aug 31 ·
+  Measure again" — and the ladder's tries belong to the Measure screen that
+  item 4 builds. The row's summary is now the artboard's own wording, `2 of 4
+  tries done`, off `TuneReport`.
+- **Logs survive a crash.** The author's ruling was "no log on a model that is
+  not running", and a crashed model is not running — which would have deleted
+  the log at the one moment it is the only answer. Put back to them and
+  settled: the row shows while running and after a crash, and is gone from a
+  calm stopped screen.
+
+```text
+build: 0
+cargo test status: 0        (256 passed, 5 ignored — unchanged)
+clippy status: 0
+fmt status: 0
+```
+
+**Why not done**: committed without the author's eyes on it. The side-by-side
+was set up — the Launch artboard rendered out of the canvas artifact and
+screenshotted — but the app's window was hidden in the tray and offscreen, and
+the one capture that landed was half-occluded. It shows three disclosure rows
+where there were five, which is the change, and is not a look.

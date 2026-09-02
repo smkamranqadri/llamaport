@@ -1740,3 +1740,97 @@ input[type="range"] {
 .pi-remove {
   background: rgb(192 57 43 / 14%);
 }
+
+/* First run — an empty models directory */
+
+.first-run {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 24px 0;
+  text-align: center;
+}
+
+.first-run-mark {
+  color: var(--faint);
+  line-height: 0;
+}
+
+.first-run-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.first-run-lead {
+  max-width: 460px;
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+.starters {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  width: 100%;
+  max-width: 780px;
+  margin-top: 8px;
+}
+
+.starter {
+  gap: 8px;
+  text-align: left;
+}
+
+.starter-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.starter-name {
+  font-weight: 550;
+}
+
+.field-hint.tone-warn {
+  color: var(--danger);
+}
+
+.starter-action {
+  margin-top: 4px;
+}
+
+.first-run-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.link-field {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 300px;
+  padding: 0 10px;
+  color: var(--faint);
+  background: var(--input);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+}
+
+.link-field input {
+  width: 100%;
+  padding: 6px 0;
+  font: inherit;
+  color: var(--text);
+  background: none;
+  border: 0;
+  outline: none;
+}

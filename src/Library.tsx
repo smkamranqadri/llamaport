@@ -7,6 +7,7 @@ import {
   setFavourite,
 } from "./api";
 import { formatContext, formatFileSize, formatRelative } from "./format";
+import FirstRun from "./FirstRun";
 import { PlayIcon, StopIcon } from "./icons";
 import type { DirInfo, ModelEntry, RunnerSnapshot } from "./types";
 
@@ -301,26 +302,23 @@ export default function Library({
         ]
       : [{ label: null, entries: models }];
 
-  const empty = {
-    title: "Models directory not found",
-    hint: "Create this folder, or point Settings at the one you keep models in.",
-  };
-  if (dir?.exists) {
-    empty.title = "No GGUF files here";
-    empty.hint =
-      "Fetch one from Downloads, or point Settings at the folder you keep models in.";
-  }
-
   return (
     <>
       <header className="screen-header">
         <div>
           <h1>Library</h1>
           <p className="screen-subtitle">
-            {dir?.path ?? "…"}
-            {dir?.freeBytes != null && ` · ${formatFileSize(dir.freeBytes)} free`}
-            {models.length > 0 &&
-              ` · ${models.length} model${models.length === 1 ? "" : "s"}`}
+            {models.length === 0 && !loading && !failure ? (
+              "No models yet"
+            ) : (
+              <>
+                {dir?.path ?? "…"}
+                {dir?.freeBytes != null &&
+                  ` · ${formatFileSize(dir.freeBytes)} free`}
+                {models.length > 0 &&
+                  ` · ${models.length} model${models.length === 1 ? "" : "s"}`}
+              </>
+            )}
           </p>
         </div>
         <button className="button" onClick={() => void load()} disabled={loading}>
@@ -330,13 +328,7 @@ export default function Library({
 
       {failure && <p className="notice notice-error">{failure}</p>}
 
-      {!loading && !failure && models.length === 0 && (
-        <div className="empty">
-          <p className="empty-title">{empty.title}</p>
-          <p className="empty-detail">{dir?.path}</p>
-          <p className="empty-detail">{empty.hint}</p>
-        </div>
-      )}
+      {!loading && !failure && models.length === 0 && <FirstRun dir={dir} />}
 
       {models.length > 0 && groups.map(({ label, entries }) => (
         <section key={label ?? "all"}>

@@ -167,6 +167,17 @@ user, reversing two standing decisions ([direction.md](direction.md)).
    of someone who is not an expert. The README screenshots, previously Next,
    wait behind it — they are done once, against the finished redesign.
 
+15. **MoE launches** — written up 2026-09-02, **unplanned and blocked on a
+   measurement**, in [moe.md](moe.md). Every launch the app builds is fully
+   offloaded, so a 35B-A3B costs its whole 22.1 GB of the Metal working set
+   while doing 3B of arithmetic per token; `llama-server` has offered
+   `--n-cpu-moe` all along and nothing in the app names it. It is numbered here
+   rather than left in Gaps because it is this project's own work and not a
+   comparison with another tool, but it is not scheduled: what it needs first is
+   a ladder timing `-ncmoe` against the smaller quant the author runs today.
+   Found by the author asking why a MoE cannot fit when its active parameters
+   are few — the same route as steps 3, 5, 6, 11 and 14.
+
 ## Gaps
 
 What two comparable tools do and this one does not, read off their source on

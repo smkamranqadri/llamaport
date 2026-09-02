@@ -10,10 +10,12 @@ Branch:   `main`, clean and pushed. **`v0.6.1` is tagged at `5d8957d`, behind
           that writes the number increments it. Assuming tag and HEAD are
           identical is what put a build of HEAD in the v0.3.0 release
           ([knowledge/technical.md](../knowledge/technical.md)).
-Task:     **Redesign phases 2 and 3 are built and committed, and five things
-          still do not match the artboards** — they are listed screen by
-          screen in [intent/redesign.md](../intent/redesign.md) under "What
-          still does not match". Phase 1 landed as `c6ac59f`.
+Task:     **Redesign phases 2 and 3 are built and committed, and of the five
+          things that did not match the artboards, one is done** — the empty
+          Library, which the author pulled forward out of phase 4 and signed
+          off on screen. The remaining four are listed in
+          [intent/redesign.md](../intent/redesign.md) under "What still does
+          not match". Phase 1 landed as `c6ac59f`.
 
           **Six passes were needed for one screen**, four of them wasted
           because the app was compared against the code that generated the
@@ -32,11 +34,15 @@ Blocker:  none. The **Gatekeeper check is met**, twice over on 2026-09-02 — th
           was against v0.5.0 and does not carry. Two older: a queued download row
           with nothing on disk behind it coming back from a restart, and an Intel
           Mac running the universal build.
-Next:     **Item 1 of "What still does not match"** — the stopped model
-          screen's rows, starting with the log the author does not want on a
-          model that is not running
-          ([intent/redesign.md](../intent/redesign.md)). One screen, one
-          task, and the capture before it is called done. The README's
+Next:     **Item 2 of "What still does not match"** — the Library rows, against
+          the `Main.dc.html` artboard: a dot, the name, its badges, one stat
+          sentence and the action, where the app still prints the file name
+          under the title in three separate columns and offers no **Use in pi**
+          on the running row ([intent/redesign.md](../intent/redesign.md)).
+          One screen, one task, and the capture before it is called done.
+
+          **Item 1 is built and its look is still owed** — the stopped model
+          screen's rows, committed unverified and marked so. The README's
           screenshots, previously here, wait behind the whole redesign on the
           author's decision: every phase would invalidate them again, so they
           are done once, against the finished UI
@@ -44,8 +50,10 @@ Next:     **Item 1 of "What still does not match"** — the stopped model
 
           The "named choices" remainder of
           [intent/direction.md](../intent/direction.md) is now owned by
-          redesign phase 2. Still unplanned after it: per-field override, and
-          search — blocked on what "best model" means.
+          redesign phase 2. Still unplanned after it: per-field override,
+          search — blocked on what "best model" means — and **MoE launches**
+          ([intent/moe.md](../intent/moe.md)), blocked on timing `-ncmoe`
+          against the quant the author runs today.
 ```
 
 Run and verify commands: [knowledge/technical.md](../knowledge/technical.md).

@@ -49,6 +49,13 @@ export interface DirInfo {
   totalBytes: number | null;
 }
 
+export interface MachineMemory {
+  installedBytes: number | null;
+  availableBytes: number | null;
+  /// What a fully offloaded launch must fit inside — absent until llama-server is found.
+  deviceBudgetBytes: number | null;
+}
+
 export interface Profile {
   alias: string;
   host: string;

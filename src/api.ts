@@ -7,6 +7,7 @@ import type {
   DownloadProgress,
   HealthReport,
   LaunchPlan,
+  MachineMemory,
   ModelEntry,
   Profile,
   RunnerSnapshot,
@@ -35,6 +36,10 @@ export function setFavourite(
 
 export function deleteModel(modelId: string): Promise<ModelEntry[]> {
   return invoke<ModelEntry[]>("model_delete", { modelId });
+}
+
+export function machineMemory(): Promise<MachineMemory> {
+  return invoke<MachineMemory>("machine_memory");
 }
 
 export function getDirInfo(): Promise<DirInfo> {

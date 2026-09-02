@@ -60,3 +60,18 @@ export function ChevronLeftIcon() {
 export function StopIcon() {
   return <Icon path='<rect x="4" y="4" width="8" height="8" rx="1.5"/>' size={13} />;
 }
+
+export function CubeIcon() {
+  return (
+    <Icon
+      path='<path d="M8 1.5 L14 4.5 V11.5 L8 14.5 L2 11.5 V4.5 Z"/><path d="M2 4.5 L8 7.5 L14 4.5"/><path d="M8 7.5 V14.5"/>'
+      size={44}
+    />
+  );
+}
+
+export function SearchIcon() {
+  return (
+    <Icon path='<circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 L14 14"/>' size={14} />
+  );
+}

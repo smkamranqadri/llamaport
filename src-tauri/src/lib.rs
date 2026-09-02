@@ -141,6 +141,16 @@ struct PlanMemory {
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
+struct MachineMemory {
+    installed_bytes: Option<u64>,
+    available_bytes: Option<u64>,
+    /// What a fully offloaded launch has to fit inside. `None` where llama-server has not
+    /// been found, or where the build does not report its devices.
+    device_budget_bytes: Option<u64>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 struct Settings {
     models_dir: String,
     llama_server_path: Option<String>,
@@ -318,6 +328,29 @@ async fn model_delete(
         .map_err(|e| e.to_string())?;
     *state.models.lock().expect("models lock") = entries.clone();
     Ok(arranged(&state, entries))
+}
+
+/// What the machine has, with no model named. The launch plan carries the same readings,
+/// but the first-run screen has to size its offer before any model exists to plan for.
+///
+/// The device budget is the figure that matters and the one that can be missing: it comes
+/// from `llama-server --list-devices`, and a first run may not have found the binary yet.
+/// Installed memory is the fallback and the screen says which one it is sizing against —
+/// they differ by 7 GB on an M2 Pro, which is more than a whole model.
+#[tauri::command]
+fn machine_memory(state: State<'_, AppState>) -> MachineMemory {
+    let mut system = sysinfo::System::new();
+    system.refresh_memory();
+
+    MachineMemory {
+        installed_bytes: sysmem::installed_bytes().or_else(|| Some(system.total_memory())),
+        available_bytes: Some(system.available_memory()),
+        device_budget_bytes: state
+            .capabilities()
+            .ok()
+            .and_then(|caps| caps.device_budget_mib())
+            .map(|mib| mib * 1024 * 1024),
+    }
 }
 
 #[tauri::command]
@@ -724,6 +757,9 @@ fn orphan_stop(pid: u32, state: State<'_, AppState>) -> Result<Vec<Orphan>, Stri
 #[tauri::command]
 fn download_start(url: String, state: State<'_, AppState>) -> Result<Vec<DownloadJob>, String> {
     let dir = state.models_dir();
+    // The first run offers a download before the models directory necessarily exists, and
+    // every later step — admission, `.part`, room check — assumes a directory to write in.
+    std::fs::create_dir_all(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
     let options = {
         let config = state.config.lock().expect("config lock");
         config.downloads.clone()
@@ -976,6 +1012,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             catalog_list,
+            machine_memory,
             catalog_dir_info,
             model_favourite,
             model_delete,
