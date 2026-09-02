@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   appVersion,
+  getSettings,
   listModels,
   onCatalogChanged,
   onRunnerLog,
@@ -24,6 +25,7 @@ import {
 import Library from "./Library";
 import ModelDetail from "./ModelDetail";
 import SettingsScreen from "./SettingsScreen";
+import { apply as applyAppearance, watchSystem } from "./theme";
 import type { ModelEntry, Orphan, RunnerSnapshot, Telemetry } from "./types";
 import "./App.css";
 
@@ -127,6 +129,19 @@ export default function App() {
   const [ignoredOrphans, setIgnoredOrphans] = useState<number[]>([]);
   const [catalogVersion, setCatalogVersion] = useState(0);
   const [version, setVersion] = useState("");
+
+  // The config is the truth and the webview's copy is a cache of it, so the two are
+  // reconciled once at boot — and while the mode is System, macOS gets the last word.
+  useEffect(() => {
+    getSettings()
+      .then((settings) => applyAppearance(settings.appearance))
+      .catch(() => {});
+    return watchSystem(() => {
+      getSettings()
+        .then((settings) => applyAppearance(settings.appearance))
+        .catch(() => {});
+    });
+  }, []);
 
   useEffect(() => {
     appVersion().then(setVersion).catch(() => {});

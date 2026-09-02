@@ -30,7 +30,7 @@ use estimate::Estimate;
 use probe::Capabilities;
 use profile::Profile;
 use runner::{EventSink, LaunchSpec, Orphan, RunState, Runner, RunnerSnapshot};
-use store::Config;
+use store::{Appearance, Config};
 use tune::Tuner;
 
 struct TauriEvents(AppHandle);
@@ -164,6 +164,9 @@ struct Settings {
     built_in_defaults: Profile,
     capabilities: Option<Capabilities>,
     capability_error: Option<String>,
+    /// Absent until the user picks one: the app follows macOS until then, and the screen
+    /// says so rather than showing a choice nobody made.
+    appearance: Option<Appearance>,
 }
 
 /// Fills in what the user has not chosen: an alias derived from the model's name, and a
@@ -411,6 +414,7 @@ fn settings_view(state: &AppState) -> Settings {
         built_in_defaults: Profile::default(),
         capabilities: caps.as_ref().ok().cloned(),
         capability_error: caps.err(),
+        appearance: config.appearance.clone(),
     }
 }
 
@@ -441,6 +445,18 @@ fn set_launch_defaults(
     {
         let mut config = state.config.lock().expect("config lock");
         config.launch_defaults = defaults;
+    }
+    state.save_config()?;
+    Ok(settings_view(&state))
+}
+
+/// The palette and, for the built-in one, whether it follows macOS. Stored verbatim: the
+/// names live on the screen that draws them, and this side neither knows nor checks them.
+#[tauri::command]
+fn set_appearance(appearance: Appearance, state: State<'_, AppState>) -> Result<Settings, String> {
+    {
+        let mut config = state.config.lock().expect("config lock");
+        config.appearance = Some(appearance);
     }
     state.save_config()?;
     Ok(settings_view(&state))
@@ -1043,6 +1059,7 @@ pub fn run() {
             download_status,
             download_clear,
             set_download_options,
+            set_appearance,
             set_launch_defaults,
         ])
         .build(tauri::generate_context!())

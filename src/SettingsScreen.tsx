@@ -1,11 +1,20 @@
 import { useEffect, useState } from "react";
 import {
   getSettings,
+  setAppearance,
   setLaunchDefaults,
   setLlamaServerPath,
   setModelsDir,
 } from "./api";
 import ProfileForm from "./ProfileForm";
+import {
+  apply as applyAppearance,
+  modeOf,
+  MODES,
+  THEMES,
+  themeOf,
+  type Mode,
+} from "./theme";
 import type { Profile, Settings } from "./types";
 
 /// What a model opens on before anyone has launched it. Mirrors `Profile::default()` in
@@ -51,6 +60,19 @@ export default function SettingsScreen({
   }
 
   const caps = settings.capabilities;
+  const theme = themeOf(settings.appearance);
+  const mode = modeOf(settings.appearance);
+
+  // Applied from what Rust wrote back rather than from what was clicked: the screen then
+  // shows the palette that is actually stored, even if the write failed.
+  const saveAppearance = (nextTheme: string, nextMode: Mode) => {
+    setAppearance({ theme: nextTheme, mode: nextMode })
+      .then((next) => {
+        setSettings(next);
+        applyAppearance(next.appearance);
+      })
+      .catch((e) => setFailure(String(e)));
+  };
 
   return (
     <>
@@ -138,6 +160,51 @@ export default function SettingsScreen({
             </div>
           </dl>
         )}
+      </section>
+
+      <section className="panel">
+        <h2>Appearance</h2>
+        <p className="field-hint">
+          Mode belongs to the Llamaport palette, which has a light and a dark
+          set. Every other palette is one appearance and says which.
+        </p>
+
+        <div className="mode-row">
+          {MODES.map((option) => (
+            <button
+              key={option.id}
+              className={`button${mode === option.id ? " button-primary" : ""}`}
+              onClick={() => saveAppearance(theme.id, option.id)}
+            >
+              {option.label}
+            </button>
+          ))}
+          {theme.fixed && (
+            <span className="field-hint">
+              {theme.label} is a {theme.fixed} theme — mode applies to Llamaport
+            </span>
+          )}
+        </div>
+
+        <div className="themes">
+          {THEMES.map((option) => (
+            <button
+              key={option.id}
+              className={`theme-row${option.id === theme.id ? " is-selected" : ""}`}
+              onClick={() => saveAppearance(option.id, mode)}
+            >
+              <span className="swatch">
+                {option.swatch.map((colour) => (
+                  <span key={colour} style={{ background: colour }} />
+                ))}
+              </span>
+              <span>
+                <span className="theme-name">{option.label}</span>
+                <span className="field-hint">{option.desc}</span>
+              </span>
+            </button>
+          ))}
+        </div>
       </section>
 
       <section className="panel">

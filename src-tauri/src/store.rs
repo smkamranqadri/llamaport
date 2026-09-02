@@ -14,7 +14,18 @@ use crate::speeds::SpeedRecord;
 
 /// Bumped whenever the shape changes. Absence means the original shape, which had no
 /// version field at all.
-pub const CURRENT_SCHEMA: u32 = 7;
+pub const CURRENT_SCHEMA: u32 = 8;
+
+/// What the window looks like: a palette and, for the built-in one, whether it follows
+/// macOS or is pinned. Both are plain strings and neither is an enum, because a config is
+/// untrusted input — a name written by a newer build must fall back to the default
+/// palette on the screen, not fail the parse and take every other setting with it.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct Appearance {
+    pub theme: String,
+    pub mode: String,
+}
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
@@ -42,6 +53,9 @@ pub struct Config {
     /// below, and a real field of that name would be claimed by serde first — silently
     /// adopting launch settings written by a build two schemas old.
     pub launch_defaults: Option<Profile>,
+    /// Absent until the user picks one, which is what lets the screen say the app is
+    /// following macOS rather than showing a choice nobody made.
+    pub appearance: Option<Appearance>,
     /// Keys written by a different version of the app. Captured and written back
     /// untouched so that running an older build cannot silently delete newer settings.
     #[serde(flatten)]
@@ -659,6 +673,43 @@ mod tests {
         );
         assert!(!migrated.extra.contains_key("defaultProfile"));
         assert_eq!(migrated.models_dir.as_deref(), Some("/models"));
+    }
+
+    #[test]
+    fn an_appearance_survives_a_round_trip_and_an_unknown_name_is_kept() {
+        let path = scratch("appearance");
+        let config = Config {
+            appearance: Some(Appearance {
+                theme: "nous".into(),
+                mode: "dark".into(),
+            }),
+            ..Default::default()
+        };
+
+        save_to(&path, &config).expect("save");
+        let loaded = load_from(&path).appearance.expect("remembered");
+        assert_eq!(loaded.theme, "nous");
+        assert_eq!(loaded.mode, "dark");
+
+        // A palette a newer build named. Keeping it is the whole reason these are strings
+        // rather than enums: an unreadable name must cost the screen its highlight, not
+        // cost the user their models directory.
+        fs::write(
+            &path,
+            r#"{
+              "schemaVersion": 8,
+              "modelsDir": "/models",
+              "appearance": { "theme": "sunrise-from-a-later-build", "mode": "light" }
+            }"#,
+        )
+        .expect("seed");
+
+        let newer = load_from(&path);
+        assert_eq!(
+            newer.appearance.expect("kept").theme,
+            "sunrise-from-a-later-build"
+        );
+        assert_eq!(newer.models_dir.as_deref(), Some("/models"));
     }
 
     /// Ready is announced on every telemetry tick, so a listener acting on it acts dozens

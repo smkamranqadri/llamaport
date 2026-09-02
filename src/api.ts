@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import type {
+  Appearance,
   DirInfo,
   DownloadJob,
   DownloadOptions,
@@ -21,6 +22,10 @@ import type {
 
 export function listModels(): Promise<ModelEntry[]> {
   return invoke<ModelEntry[]>("catalog_list");
+}
+
+export function setAppearance(appearance: Appearance): Promise<Settings> {
+  return invoke<Settings>("set_appearance", { appearance });
 }
 
 export function appVersion(): Promise<string> {

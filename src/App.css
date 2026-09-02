@@ -1,4 +1,42 @@
+/* Every colour on every screen comes from these. A palette sets its anchors — ground,
+   text, muted text, line, accent, running, danger — and the surfaces between them are
+   mixed from those here, so a palette ported from elsewhere needs seven values rather
+   than fifteen. The built-in one names all of them, because they were drawn rather than
+   derived.
+
+   `theme.ts` writes `data-theme` and `data-mode` on the root before the first render;
+   the blocks below never both match, so what wins is what the user picked and not what
+   comes later in this file. */
 :root {
+  --bg: #ffffff;
+  --text: #1c1c1e;
+  --text-muted: #6e6e73;
+  --border: #e2e2e6;
+  --accent: #0a6cff;
+  --on-accent: #ffffff;
+  --running: #23a047;
+  --danger: #c0392b;
+  color-scheme: light;
+
+  --bg-sidebar: color-mix(in srgb, var(--bg) 93%, var(--text) 7%);
+  --bg-hover: color-mix(in srgb, var(--bg) 88%, var(--text) 12%);
+  --bg-card: color-mix(in srgb, var(--bg) 95%, var(--text) 5%);
+  --bg-card2: color-mix(in srgb, var(--bg) 91%, var(--text) 9%);
+  --badge-bg: color-mix(in srgb, var(--bg) 86%, var(--text) 14%);
+  --code-bg: color-mix(in srgb, var(--bg) 96%, #000 4%);
+  --input: color-mix(in srgb, var(--bg) 97%, #000 3%);
+  --faint: color-mix(in srgb, var(--text-muted) 72%, var(--bg) 28%);
+
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui,
+    sans-serif;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* The app's own palette, off the artboards, in both appearances. */
+[data-theme="llamaport"][data-mode="light"] {
   --bg: #ffffff;
   --bg-sidebar: #f4f4f6;
   --bg-hover: #ececef;
@@ -14,33 +52,98 @@
   --accent: #0a6cff;
   --running: #23a047;
   --danger: #c0392b;
-
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui,
-    sans-serif;
-  font-size: 13px;
-  color: var(--text);
-  background: var(--bg);
-  -webkit-font-smoothing: antialiased;
+  color-scheme: light;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #1e1e20;
-    --bg-sidebar: #26262a;
-    --bg-hover: #2e2e33;
-    --bg-card: #252529;
-    --bg-card2: #2b2b30;
-    --badge-bg: #34343a;
-    --code-bg: #19191b;
-    --input: #202023;
-    --text: #f2f2f7;
-    --text-muted: #98989f;
-    --faint: #6e6e75;
-    --border: #38383e;
-    --accent: #4a9bff;
-    --running: #32d74b;
-    --danger: #ff6b5e;
-  }
+[data-theme="llamaport"][data-mode="dark"] {
+  --bg: #1e1e20;
+  --bg-sidebar: #26262a;
+  --bg-hover: #2e2e33;
+  --bg-card: #252529;
+  --bg-card2: #2b2b30;
+  --badge-bg: #34343a;
+  --code-bg: #19191b;
+  --input: #202023;
+  --text: #f2f2f7;
+  --text-muted: #98989f;
+  --faint: #6e6e75;
+  --border: #38383e;
+  --accent: #4a9bff;
+  --running: #32d74b;
+  --danger: #ff6b5e;
+  color-scheme: dark;
+}
+
+/* Ported from hermes-hq (`frontend/src/index.css`): its ground, text, muted, line and
+   accent, with its working and error colours standing in for running and danger. Each is
+   one appearance and says which, so Mode applies to the built-in palette alone. */
+[data-theme="violet"] {
+  --bg: #15151f;
+  --text: #f1f1f6;
+  --text-muted: #9a9ab0;
+  --border: rgba(255, 255, 255, 0.1);
+  --accent: #8b5cf6;
+  --running: #5ee2b5;
+  --danger: #f26d6d;
+  color-scheme: dark;
+}
+
+[data-theme="nous"] {
+  --bg: #041c1c;
+  --text: #ffe6cb;
+  --text-muted: rgba(255, 230, 203, 0.6);
+  --border: rgba(255, 230, 203, 0.2);
+  --accent: #ffac02;
+  --on-accent: #041c1c;
+  --running: #8fff89;
+  --danger: #ff7b7b;
+  color-scheme: dark;
+}
+
+[data-theme="nous-light"] {
+  --bg: #f8faf8;
+  --text: #16315f;
+  --text-muted: rgba(22, 49, 95, 0.6);
+  --border: rgba(30, 74, 92, 0.18);
+  --accent: #2557b7;
+  --running: #4f7c64;
+  --danger: #b3403a;
+  color-scheme: light;
+}
+
+[data-theme="bronze"] {
+  --bg: #0d0f12;
+  --text: #eceff4;
+  --text-muted: #7f8a96;
+  --border: rgba(185, 138, 68, 0.22);
+  --accent: #b98a44;
+  --on-accent: #0d0f12;
+  --running: #4fa36c;
+  --danger: #d9534f;
+  color-scheme: dark;
+}
+
+[data-theme="slate"] {
+  --bg: #0d1117;
+  --text: #c9d1d9;
+  --text-muted: #8b949e;
+  --border: #30363d;
+  --accent: #7eb8f6;
+  --on-accent: #0d1117;
+  --running: #63d0a6;
+  --danger: #f47067;
+  color-scheme: dark;
+}
+
+[data-theme="hermes"] {
+  --bg: #0a0e1a;
+  --text: #e6eaf2;
+  --text-muted: #9aa5bd;
+  --border: #24304a;
+  --accent: #6366f1;
+  --running: #34d399;
+  --danger: #f87171;
+  color-scheme: dark;
 }
 
 * {
@@ -112,12 +215,12 @@ body,
 }
 
 .nav-item.is-active {
-  color: #fff;
+  color: var(--on-accent);
   background: var(--accent);
 }
 
 .nav-item.is-active svg {
-  color: #fff;
+  color: var(--on-accent);
 }
 
 .nav-item:disabled {
@@ -467,7 +570,7 @@ body,
 }
 
 .button-primary {
-  color: #fff;
+  color: var(--on-accent);
   background: var(--accent);
   border-color: transparent;
 }
@@ -763,14 +866,12 @@ input[type="range"] {
   background: var(--badge-bg);
 }
 
-@media (prefers-color-scheme: dark) {
-  .safety-green {
-    color: #4fd08c;
-  }
+[data-mode="dark"] .safety-green {
+  color: #4fd08c;
+}
 
-  .safety-yellow {
-    color: #e0aa4a;
-  }
+[data-mode="dark"] .safety-yellow {
+  color: #e0aa4a;
 }
 
 .memory-reasons {
@@ -960,10 +1061,8 @@ input[type="range"] {
   color: var(--danger);
 }
 
-@media (prefers-color-scheme: dark) {
-  .delta-better {
-    color: #4fd08c;
-  }
+[data-mode="dark"] .delta-better {
+  color: #4fd08c;
 }
 
 .compare-head {
@@ -1063,10 +1162,8 @@ input[type="range"] {
   background: color-mix(in srgb, #d99b28 22%, transparent);
 }
 
-@media (prefers-color-scheme: dark) {
-  .badge-warn {
-    color: #e0aa4a;
-  }
+[data-mode="dark"] .badge-warn {
+  color: #e0aa4a;
 }
 
 /* Downloads */
@@ -1973,4 +2070,64 @@ input[type="range"] {
   background: none;
   border: 0;
   outline: none;
+}
+
+/* Appearance */
+
+.mode-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 14px 0 18px;
+}
+
+.themes {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 8px;
+}
+
+.theme-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  font: inherit;
+  color: var(--text);
+  text-align: left;
+  background: var(--bg-card2);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  cursor: pointer;
+}
+
+.theme-row:hover {
+  background: var(--bg-hover);
+}
+
+.theme-row.is-selected {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border-color: var(--accent);
+}
+
+.theme-name {
+  display: block;
+  font-weight: 550;
+}
+
+/* The palette's own colours, drawn on the palette the app is wearing: a chip has to keep
+   its value whatever theme it sits inside. */
+.swatch {
+  display: flex;
+  flex: none;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+}
+
+.swatch span {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
 }

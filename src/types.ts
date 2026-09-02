@@ -227,6 +227,14 @@ export interface DownloadOptions {
   verify: boolean;
 }
 
+/// The palette, and whether the built-in one follows macOS. Both are plain strings on
+/// purpose: a name written by a later build is kept rather than dropped, and the screen
+/// falls back to the default when it does not recognise one.
+export interface Appearance {
+  theme: string;
+  mode: string;
+}
+
 export interface Settings {
   modelsDir: string;
   llamaServerPath: string | null;
@@ -237,6 +245,8 @@ export interface Settings {
   builtInDefaults: Profile;
   capabilities: Capabilities | null;
   capabilityError: string | null;
+  /// Null until the user picks one: the app follows macOS until then.
+  appearance: Appearance | null;
 }
 
 export interface TuneCandidate {
