@@ -13,6 +13,7 @@ import {
   runnerStatus,
   runnerStop,
 } from "./api";
+import ActivityScreen from "./Activity";
 import Downloads from "./Downloads";
 import {
   ChartIcon,
@@ -29,7 +30,7 @@ import { apply as applyAppearance, watchSystem } from "./theme";
 import type { ModelEntry, Orphan, RunnerSnapshot, Telemetry } from "./types";
 import "./App.css";
 
-type Screen = "library" | "downloads" | "settings";
+type Screen = "library" | "downloads" | "activity" | "settings";
 
 function NavItem({
   label,
@@ -209,6 +210,9 @@ export default function App() {
     if (screen === "downloads") {
       return <Downloads onShowInLibrary={showInLibrary} />;
     }
+    if (screen === "activity") {
+      return <ActivityScreen />;
+    }
     if (screen === "settings") {
       return (
         <SettingsScreen
@@ -247,7 +251,12 @@ export default function App() {
           onClick={() => go("downloads")}
         />
         <div className="side-section">General</div>
-        <NavItem label="Activity Monitor" icon={<ChartIcon />} disabled />
+        <NavItem
+          label="Activity Monitor"
+          icon={<ChartIcon />}
+          active={screen === "activity"}
+          onClick={() => go("activity")}
+        />
         <div className="side-spacer" />
         <NavItem
           label="Settings"

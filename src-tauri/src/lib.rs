@@ -1,3 +1,4 @@
+pub mod activity;
 pub mod catalog;
 pub mod download;
 pub mod downloads;
@@ -55,6 +56,7 @@ struct AppState {
     downloads: Downloads,
     tray: Mutex<Option<TrayHandles>>,
     orphan: Mutex<Vec<Orphan>>,
+    activity: activity::Monitor,
 }
 
 impl AppState {
@@ -448,6 +450,54 @@ fn set_launch_defaults(
     }
     state.save_config()?;
     Ok(settings_view(&state))
+}
+
+/// What the app is costing the machine: a row per `llama-server` it knows about, and the
+/// machine-wide figures under them.
+///
+/// Polled by the screen rather than pushed, because it is only ever read while that screen
+/// is open — and a CPU figure is a difference between two polls, so the interval the
+/// screen chooses is the window it measures over.
+#[tauri::command]
+fn activity_snapshot(state: State<'_, AppState>) -> activity::Activity {
+    let snapshot = state.runner.snapshot();
+    let tune = state.tuner.report();
+    let tune_pid = state.tuner.live_pid();
+    // The scan excludes the app's own child; the measurement's server is the app's too,
+    // and is excluded inside `known_processes` rather than here.
+    let orphans = runner::detect_orphans(snapshot.pid);
+    let known = activity::known_processes(&snapshot, &tune, tune_pid, &orphans);
+
+    let mut activity = state.activity.machine();
+    let (processes, total_cpu) = state.activity.poll(&known);
+    activity.processes = processes;
+    activity.total_cpu_percent = total_cpu;
+    activity.device_budget_bytes = state
+        .capabilities()
+        .ok()
+        .and_then(|caps| caps.device_budget_mib())
+        .map(|mib| mib * 1024 * 1024);
+
+    // What the running launch asks of the GPU, priced at the context the server actually
+    // accepted rather than at Auto, which names no number at all.
+    if let Some(model_id) = snapshot.model_id.as_deref() {
+        let draft = {
+            let config = state.config.lock().expect("config lock");
+            config.last_used.get(model_id).cloned()
+        };
+        let draft = draft.map(|mut profile| {
+            if let Some(ctx) = snapshot.server_ctx {
+                profile.ctx = ctx;
+            }
+            profile
+        });
+        activity.gpu_wanted_bytes = build_plan(&state, model_id, draft)
+            .ok()
+            .and_then(|plan| plan.estimate)
+            .map(|estimate| estimate.total_bytes);
+    }
+
+    activity
 }
 
 /// The palette and, for the built-in one, whether it follows macOS. Stored verbatim: the
@@ -958,6 +1008,7 @@ pub fn run() {
                 downloads,
                 tray: Mutex::new(None),
                 orphan: Mutex::new(runner::detect_orphans(None)),
+                activity: activity::Monitor::new(),
             });
 
             // What finished came from the history file; what did not is on the disk, in
@@ -1059,6 +1110,7 @@ pub fn run() {
             download_status,
             download_clear,
             set_download_options,
+            activity_snapshot,
             set_appearance,
             set_launch_defaults,
         ])

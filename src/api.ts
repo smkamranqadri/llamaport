@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import type {
+  Activity,
   Appearance,
   DirInfo,
   DownloadJob,
@@ -26,6 +27,10 @@ export function listModels(): Promise<ModelEntry[]> {
 
 export function setAppearance(appearance: Appearance): Promise<Settings> {
   return invoke<Settings>("set_appearance", { appearance });
+}
+
+export function activitySnapshot(): Promise<Activity> {
+  return invoke<Activity>("activity_snapshot");
 }
 
 export function appVersion(): Promise<string> {

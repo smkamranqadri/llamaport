@@ -128,6 +128,30 @@ export interface PlanMemory {
   pressure: Pressure;
 }
 
+export interface ActivityProcess {
+  pid: number;
+  name: string;
+  /// "model", "measurement" or "stray" — what the row is drawn as.
+  kind: string;
+  port: number | null;
+  memoryBytes: number | null;
+  /// Percent of one core, the way Activity Monitor counts it.
+  cpuPercent: number | null;
+}
+
+export interface Activity {
+  processes: ActivityProcess[];
+  totalCpuPercent: number | null;
+  memoryUsedBytes: number | null;
+  memoryTotalBytes: number | null;
+  swapUsedBytes: number | null;
+  pressure: Pressure;
+  /// What a launch must fit inside. Null where llama-server has not been found.
+  deviceBudgetBytes: number | null;
+  /// What the running model's launch asks of that, null when nothing runs.
+  gpuWantedBytes: number | null;
+}
+
 export interface Orphan {
   pid: number;
   port: number | null;
