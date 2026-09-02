@@ -10,11 +10,11 @@ Branch:   `main`, clean and pushed. **`v0.6.1` is tagged at `5d8957d`, behind
           that writes the number increments it. Assuming tag and HEAD are
           identical is what put a build of HEAD in the v0.3.0 release
           ([knowledge/technical.md](../knowledge/technical.md)).
-Task:     **The pi button shipped as `v0.6.0`; `v0.6.1` fixed the packaging it
-          exposed** ([intent/pi.md](../intent/pi.md),
-          [intent/release.md](../intent/release.md)). The app writes the provider
-          and the enabled entry pi needs, diffing both files first — item 6 is one
-          click.
+Task:     **The redesign is planned and not started**
+          ([intent/redesign.md](../intent/redesign.md)): four phases moving the
+          whole UI to a sidebar-plus-pane layout against mockups the author
+          approved 2026-09-02. The pi button remains the last shipped work
+          ([intent/pi.md](../intent/pi.md)).
 Mode:     none in progress.
 Blocker:  none. The **Gatekeeper check is met**, twice over on 2026-09-02 — the
           run that failed is why v0.6.1 exists
@@ -26,14 +26,17 @@ Blocker:  none. The **Gatekeeper check is met**, twice over on 2026-09-02 — th
           was against v0.5.0 and does not carry. Two older: a queued download row
           with nothing on disk behind it coming back from a restart, and an Intel
           Mac running the universal build.
-Next:     **The README's screenshots**, a release behind — they show a Running
-          panel with no Use in pi button. The author's, per
-          [release.md](../intent/release.md) phase 3.
+Next:     **Redesign phase 1 — shell and Library**
+          ([intent/redesign.md](../intent/redesign.md)). The README's
+          screenshots, previously here, wait behind the whole redesign on the
+          author's decision: every phase would invalidate them again, so they
+          are done once, against the finished UI
+          ([release.md](../intent/release.md) phase 3).
 
-          After that, what is left of [intent/direction.md](../intent/direction.md):
-          the launch form shrinking behind named choices, per-field override, and
-          search. None is planned, and search is blocked on what "best model"
-          means.
+          The "named choices" remainder of
+          [intent/direction.md](../intent/direction.md) is now owned by
+          redesign phase 2. Still unplanned after it: per-field override, and
+          search — blocked on what "best model" means.
 ```
 
 Run and verify commands: [knowledge/technical.md](../knowledge/technical.md).

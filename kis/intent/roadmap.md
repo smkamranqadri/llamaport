@@ -159,6 +159,14 @@ user, reversing two standing decisions ([direction.md](direction.md)).
    [knowledge/technical.md](../knowledge/technical.md) and applies to every
    writer of a file the app does not own.
 
+14. **Redesign** — planned 2026-09-02, four phases in [redesign.md](redesign.md).
+   The whole UI moves to a sidebar-plus-pane layout against approved mockups,
+   and the launch form finally shrinks behind the named choices
+   [direction.md](direction.md) asked for. Prompted the same way steps 3, 5, 6
+   and 11 were: by the author using the built app and finding it asks too much
+   of someone who is not an expert. The README screenshots, previously Next,
+   wait behind it — they are done once, against the finished redesign.
+
 ## Gaps
 
 What two comparable tools do and this one does not, read off their source on
