@@ -218,14 +218,17 @@ default. Sibling `.bak`, `.save` and `.backup` files already accumulate beside i
   the suite. Anything that puts prose next to a figure earns a look before it is
   called done.
 
-  **The running tally, because it is the argument: nineteen defects across five
+  **The running tally, because it is the argument: twenty defects across six
   phases, every one found by looking and none by the suite.** Eleven on
-  2026-08-31, five in Tune's panel on 2026-09-01, and three in the pi button on
+  2026-08-31, five in Tune's panel on 2026-09-01, three in the pi button on
   2026-09-02 — a label that wrapped, a file mode read out of `ls -l`, and a
-  provider that turned out not to be selectable. **A twentieth was worse and took
-  five releases**: a bundle macOS refuses to open, which only a browser download
-  exposed ([intent/release.md](../intent/release.md)). A phase is not done when
-  the suite is green; it is done when somebody has looked.
+  provider that turned out not to be selectable — and one in the redesign on
+  2026-09-02: every stray-server banner the app had ever shown named an unknown
+  model on an unknown port, and it took the author photographing one to notice.
+  **A twenty-first was worse and took five releases**: a bundle macOS refuses to
+  open, which only a browser download exposed
+  ([intent/release.md](../intent/release.md)). A phase is not done when the suite
+  is green; it is done when somebody has looked.
 
 - **`--fit` is on by default, and this app suppresses it by naming every value.**
   It "adjusts unset arguments to fit in device memory" (`--fit [on|off]`,
@@ -292,6 +295,13 @@ default. Sibling `.bak`, `.save` and `.backup` files already accumulate beside i
   row it was written for. Losing a row silently is the failure it prevents in
   production, where writers are serialised — the collision is what happens when
   they are not.
+- **`sysinfo`'s plain `refresh_processes` leaves `cmd()` empty.** The argv is only
+  populated by `refresh_processes_specifics` with a `ProcessRefreshKind` that asks
+  for it. Nothing errors: the process list is complete and correct, every entry
+  simply has no command line, so a parser over it returns `None` forever. That is
+  what made `detect_orphans` name an unknown model on an unknown port for the
+  life of the feature, with the parser and its tests entirely correct. Proved
+  2026-09-02 by a throwaway test printing `cmd=[]` for a live `llama-server`.
 - HTTP is `ureq` with `default-features = false, features = ["tls"]`, which is
   rustls plus webpki-roots. Blocking, one thread per connection — there is no
   async runtime and nothing needs one.

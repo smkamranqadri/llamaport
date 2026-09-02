@@ -87,13 +87,10 @@ made the first four passes worthless.
    exactly two rows, Advanced and Full command; the app also showed Speed,
    Model details and Logs. The three questions that had to be answered before
    deleting anything were put to the author and are answered — proof below.
-2. **Library rows** — the artboard's row is a dot, the name, its badges, then
-   one stat sentence and the action. The app still shows the file name under
-   the title and three separate columns, and the running row carries no
-   **Use in pi**.
-3. **The stray-server banner** — the artboard is one line: the sentence, then
-   Stop it and Ignore at the right. The app stacks a bullet list under a
-   two-line heading.
+2. ~~**Library rows**~~ — done 2026-09-02, the author signing off on screen
+   after two rounds of his own corrections. Proof below.
+3. ~~**The stray-server banner**~~ — done 2026-09-02, and it was hiding a
+   defect rather than only a layout. Proof below.
 4. **Measure** — the artboard gives it a **whole screen** ("Measuring best
    speed", the four tries with their verdicts, Cancel, Use fastest so far).
    The app runs it inside the Speed row, which is why the author says the
@@ -484,3 +481,87 @@ was set up — the Launch artboard rendered out of the canvas artifact and
 screenshotted — but the app's window was hidden in the tray and offscreen, and
 the one capture that landed was half-occluded. It shows three disclosure rows
 where there were five, which is the change, and is not a look.
+
+### Item 2 — Library rows, done 2026-09-02
+
+Files: `src/Library.tsx`, `src/App.tsx`, `src/App.css`, `src/icons.tsx`.
+
+Three columns and a file name became the artboard's one line: a dot, the name,
+its badges, one stat sentence, the action. `rowStat` is that sentence — a
+running model says `1.7 GB memory · 285 tok/s` off telemetry the Library now
+receives, a stopped one `21.2 GB · ran yesterday` or `1.4 GB · added 12 days
+ago, never run`. A broken file replaces the sentence rather than adding a line
+under it.
+
+Decisions, all put to the author before anything was deleted:
+
+- **The star and Delete wait for a hover.** The artboard draws neither, and the
+  Library row is the only place either exists in the whole app — the model
+  screen has no Delete and no favourites. Dropping them to match would have
+  deleted two features. A favourited model keeps its star at rest, because a
+  mark you cannot see is not a mark, and the hidden star still holds its width
+  so the stat column does not jump between rows.
+- **The header took the counts and the search, not the Download model button.**
+  The author asked for all three, then removed the button on seeing it. Search
+  filters on display name *and* file name, since the row no longer shows the
+  file and that is often the half you remember. Rescan stays: nothing watches
+  the models directory, so it is the only manual refresh.
+- **Use in pi** is on the running row, opening the same `PiPanel` the model
+  screen uses. Its mark is a drawn π: there is no pi brand asset anywhere on
+  this machine — `~/.pi` and `~/.superconductor` were searched — and inventing
+  a logo would be worse than the glyph.
+
+Two corrections from the author on the first capture, both his eye and not the
+suite's: the Download model button, and **a row 14px shorter than the drawing**.
+The second had a cause worth keeping — the padding sat on the row *button*,
+while the action buttons are its siblings on the item, so the tallest thing in
+the row set no height at all. The padding moved to `.model-item`.
+
+A third correction came after: **with nothing running there is no Running or
+Stopped label, and the label was the only thing supplying the gap above the
+list**, so the first row sat flush against whatever was above it.
+`.model-cards` now carries its own top margin, cancelled by
+`.group-label + .model-cards`.
+
+### Item 3 — the stray-server banner, done 2026-09-02
+
+Files: `src/App.tsx`, `src/App.css`, `src-tauri/src/runner.rs`.
+
+The banner was a two-line heading over a bullet list. It is now the artboard's
+one line per stray server: the sentence, the facts, then Stop it and Ignore at
+the right.
+
+**It was hiding a defect the redesign only exposed.** The line reads
+`<model> · port <port> · probably left over…`, and the app had nothing to put
+in either slot — every orphan it had ever reported said *unknown model* on an
+unknown port. `parse_server_command` was correct and so were its tests;
+`detect_orphans` called `sysinfo`'s plain `refresh_processes`, which leaves
+`cmd()` empty, so the parser was never given anything to parse. Proved with a
+throwaway test printing `cmd=[]` for a live `llama-server`, then fixed with
+`refresh_processes_specifics` and `ProcessRefreshKind::everything()`. Recorded
+as a constraint in [knowledge/technical.md](../knowledge/technical.md), and the
+defect tally there moves to twenty.
+
+**The alias now wins over the file name.** It is what the artboard draws
+(`qwen3.5-2b`, not `Qwen_Qwen3.5-2B-Q4_K_M.gguf`), it is the id a client
+addresses, and the file name was long enough to wrap the banner it sat in. One
+new test, mutation-checked: gutting the preference to `let model = from_path;`
+fails it with `left: Some("Qwen_Qwen3.5-2B-Q4_K_M")`.
+
+```text
+build: 0
+cargo test status: 0        (257 passed, 5 ignored — one new)
+clippy status: 0
+fmt status: 0
+```
+
+**Verified on screen for both items**, the artboards rendered out of the canvas
+artifact and the app captured by window id, with the author confirming each.
+The running row needed a model actually running, so one was started for the
+capture and stopped afterwards.
+
+**Cost recorded rather than hidden**: editing `src-tauri/src/lib.rs` makes
+`tauri dev` rebuild and restart, which stops whatever model is running. It
+stopped the author's twice in this session. And **the unusable-window bug fired
+four more times**, three on consecutive launches, which is an escalation the
+roadmap now carries.

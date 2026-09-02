@@ -263,8 +263,16 @@ unplanned.
 
   **Six observations now, and the pattern to chase is the corner**: every
   collapse puts the window at the bottom-left of a display, which is where a
-  frame of (0,0)-ish origin with a collapsed size would land. Restarting has
-  cleared it every time, and roughly one launch in three is affected.
+  frame of (0,0)-ish origin with a collapsed size would land.
+
+  **Four more on 2026-09-02, and two of the claims above are now wrong.** The
+  sizes were 142×187, 118×129, 142×165 and 142×165, the last three on
+  consecutive launches. So it is no longer *roughly one launch in three* and
+  restarting no longer *clears it every time* — it went from occasional to
+  reproducing on nearly every dev launch within a single session, which is the
+  strongest lead anyone has had and is why this needs its own task rather than
+  another tally mark. It blocked a screen capture outright: the tray's Show
+  window is the only recovery, and it needs a human at the machine.
 - ~~The Dock icon does not reopen the main window once it has been closed.~~
   Fixed 2026-08-08, issue 1: the run loop matched only `ExitRequested` and `Exit`,
   so the hide-on-close decision ([knowledge/project.md](../knowledge/project.md))

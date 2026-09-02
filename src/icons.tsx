@@ -75,3 +75,9 @@ export function SearchIcon() {
     <Icon path='<circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 L14 14"/>' size={14} />
   );
 }
+
+export function PiIcon() {
+  return (
+    <Icon path='<path d="M2.5 4.5 H13.5"/><path d="M5.5 4.5 V12"/><path d="M10.5 4.5 V11 a1.5 1.5 0 0 0 2.5 1"/>' size={14} />
+  );
+}

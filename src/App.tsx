@@ -19,6 +19,7 @@ import {
   DownloadIcon,
   SlidersIcon,
   StackIcon,
+  StopIcon,
 } from "./icons";
 import Library from "./Library";
 import ModelDetail from "./ModelDetail";
@@ -71,6 +72,8 @@ const IDLE: RunnerSnapshot = {
   serverCtx: null,
 };
 
+/// One line per stray server, as the artboard draws it: what it is on the left, Stop it
+/// and Ignore on the right. It used to stack a bullet list under a two-line heading.
 function OrphanBanner({
   orphans,
   onStopped,
@@ -81,43 +84,36 @@ function OrphanBanner({
   onIgnore: () => void;
 }) {
   return (
-    <div className="banner">
-      <div className="banner-body">
-        <span className="banner-title">
-          {orphans.length === 1
-            ? "A llama-server is running that Llamaport did not start"
-            : `${orphans.length} llama-servers are running that Llamaport did not start`}
-        </span>
-        <span className="banner-detail">
-          Probably left over from a previous session, or started from the
-          terminal.
-        </span>
-        <ul className="orphan-list">
-          {orphans.map((orphan) => (
-            <li key={orphan.pid}>
-              <span>
-                {orphan.model ?? "unknown model"}
-                {orphan.port != null && ` · port ${orphan.port}`} · pid{" "}
-                {orphan.pid}
+    <>
+      {orphans.map((orphan) => {
+        const facts = [orphan.model ?? "unknown model"];
+        if (orphan.port != null) facts.push(`port ${orphan.port}`);
+        facts.push("probably left over from a previous session or started from the terminal");
+
+        return (
+          <div className="banner" key={orphan.pid}>
+            <div className="banner-body">
+              <span className="banner-title">
+                A llama-server is running that Llamaport did not start
               </span>
-              <button
-                className="button"
-                onClick={() =>
-                  orphanStop(orphan.pid)
-                    .then(onStopped)
-                    .catch(() => {})
-                }
-              >
-                Stop it
-              </button>
-            </li>
-          ))}
-        </ul>
-      </div>
-      <button className="button button-plain" onClick={onIgnore}>
-        Ignore
-      </button>
-    </div>
+              <span className="banner-detail">{facts.join(" · ")}</span>
+            </div>
+            <button
+              className="button"
+              onClick={() =>
+                orphanStop(orphan.pid).then(onStopped).catch(() => {})
+              }
+            >
+              <StopIcon />
+              Stop it
+            </button>
+            <button className="button button-plain" onClick={onIgnore}>
+              Ignore
+            </button>
+          </div>
+        );
+      })}
+    </>
   );
 }
 
@@ -209,6 +205,7 @@ export default function App() {
       <Library
         key={catalogVersion}
         runner={runner}
+        telemetry={telemetry}
         onSelect={setSelected}
         onStop={stop}
         onRunnerChange={setRunner}

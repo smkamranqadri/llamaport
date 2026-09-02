@@ -11,20 +11,32 @@ Branch:   `main`, clean and pushed. **`v0.6.1` is tagged at `5d8957d`, behind
           identical is what put a build of HEAD in the v0.3.0 release
           ([knowledge/technical.md](../knowledge/technical.md)).
 Task:     **Redesign phases 2 and 3 are built and committed, and of the five
-          things that did not match the artboards, one is done** — the empty
-          Library, which the author pulled forward out of phase 4 and signed
-          off on screen. The remaining four are listed in
-          [intent/redesign.md](../intent/redesign.md) under "What still does
-          not match". Phase 1 landed as `c6ac59f`.
+          things that did not match the artboards, four are done** — the empty
+          Library (pulled forward out of phase 4 by the author), the stopped
+          model screen, the Library rows and the stray-server banner. Only
+          **item 4, the Measure screen**, is left
+          ([intent/redesign.md](../intent/redesign.md)). Phase 1 landed as
+          `c6ac59f`.
 
-          **Six passes were needed for one screen**, four of them wasted
-          because the app was compared against the code that generated the
-          mockup rather than the mockup rendered. The author called it, and
-          the next session works **one screen per task**, each finished by
-          the side-by-side capture in
-          [knowledge/technical.md](../knowledge/technical.md).
-Mode:     Phase — redesign, between phase 3 and the corrections above.
-Blocker:  none. The **Gatekeeper check is met**, twice over on 2026-09-02 — the
+          **The method now works.** The artboards are rendered out of the
+          canvas artifact and screenshotted headless, the app is captured by
+          window id, and the two go side by side before anything is called
+          done ([knowledge/technical.md](../knowledge/technical.md)). Three
+          screens were signed off that way in one session, against six wasted
+          passes for one screen before it.
+
+          One screen per task, each finished by the capture. The six-pass
+          history that established the rule is in
+          [intent/redesign.md](../intent/redesign.md), not here.
+Mode:     Phase — redesign, one item from the end of it.
+Blocker:  none for the redesign. **The unusable-window bug has escalated and
+          now wants its own task**: four more sightings on 2026-09-02, three
+          on consecutive launches, where it used to be one in three and a
+          restart always cleared it. It blocked a capture outright — the
+          tray's Show window is the only recovery and it needs a human at the
+          machine ([intent/roadmap.md](../intent/roadmap.md) risks).
+
+          The **Gatekeeper check is met**, twice over on 2026-09-02 — the
           run that failed is why v0.6.1 exists
           ([intent/release.md](../intent/release.md)).
 
@@ -34,15 +46,17 @@ Blocker:  none. The **Gatekeeper check is met**, twice over on 2026-09-02 — th
           was against v0.5.0 and does not carry. Two older: a queued download row
           with nothing on disk behind it coming back from a restart, and an Intel
           Mac running the universal build.
-Next:     **Item 2 of "What still does not match"** — the Library rows, against
-          the `Main.dc.html` artboard: a dot, the name, its badges, one stat
-          sentence and the action, where the app still prints the file name
-          under the title in three separate columns and offers no **Use in pi**
-          on the running row ([intent/redesign.md](../intent/redesign.md)).
-          One screen, one task, and the capture before it is called done.
+Next:     **Item 4 of "What still does not match"** — the Measure screen, the
+          last one. The artboard `Tune.dc.html` gives it a whole screen:
+          "Measuring best speed", the four tries with their verdicts, Cancel
+          and Use fastest so far. It was never built; the app runs the ladder
+          inside a Speed row on the stopped model screen, which item 1 left
+          showing only while a measurement runs, on purpose, for this
+          ([intent/redesign.md](../intent/redesign.md)).
 
-          **Item 1 is built and its look is still owed** — the stopped model
-          screen's rows, committed unverified and marked so. The README's
+          **Item 1's look is still owed** — the stopped model screen was
+          committed unverified and marked so; the author has said he will
+          check it when the work reaches that screen. The README's
           screenshots, previously here, wait behind the whole redesign on the
           author's decision: every phase would invalidate them again, so they
           are done once, against the finished UI

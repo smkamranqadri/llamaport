@@ -7,7 +7,7 @@ use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
-use sysinfo::{Pid, ProcessesToUpdate, System};
+use sysinfo::{Pid, ProcessRefreshKind, ProcessesToUpdate, System};
 
 use crate::speeds::{SpeedKey, SpeedRecord};
 use crate::store;
@@ -774,6 +774,10 @@ fn is_live_server(pid: u32) -> bool {
 }
 
 /// Pulls the port and model out of a llama-server command line.
+///
+/// The alias wins over the file name where there is one: it is the id a client addresses
+/// and the name the person who started the server chose, where `-m` gives a path whose
+/// last segment is long enough to wrap the banner it is printed in.
 pub fn parse_server_command(args: &[String]) -> (Option<u16>, Option<String>) {
     let value_after = |flag: &str| -> Option<String> {
         args.iter()
@@ -783,14 +787,13 @@ pub fn parse_server_command(args: &[String]) -> (Option<u16>, Option<String>) {
     };
 
     let port = value_after("--port").and_then(|value| value.parse().ok());
-    let model = value_after("-m")
+    let from_path = value_after("-m")
         .or_else(|| value_after("--model"))
         .map(|path| {
-            path.rsplit('/')
-                .next()
-                .map(String::from)
-                .unwrap_or(path.clone())
+            let name = path.rsplit('/').next().unwrap_or(&path).to_string();
+            name.strip_suffix(".gguf").unwrap_or(&name).to_string()
         });
+    let model = value_after("--alias").or(from_path);
     (port, model)
 }
 
@@ -801,7 +804,13 @@ pub fn parse_server_command(args: &[String]) -> (Option<u16>, Option<String>) {
 /// could see. Two 15 GB copies accumulated that way in a single evening.
 pub fn detect_orphans(exclude_pid: Option<u32>) -> Vec<Orphan> {
     let mut system = System::new();
-    system.refresh_processes(ProcessesToUpdate::All, true);
+    // Specifics, not the plain refresh: that one leaves `cmd()` empty, so every orphan the
+    // app has ever reported named an unknown model on an unknown port.
+    system.refresh_processes_specifics(
+        ProcessesToUpdate::All,
+        true,
+        ProcessRefreshKind::everything(),
+    );
 
     system
         .processes()
@@ -917,7 +926,22 @@ garbage line
 
         let (port, model) = parse_server_command(&args);
         assert_eq!(port, Some(8889));
-        assert_eq!(model.as_deref(), Some("Qwen3.6-35B-A3B-UD-Q3_K_XL.gguf"));
+        assert_eq!(model.as_deref(), Some("Qwen3.6-35B-A3B-UD-Q3_K_XL"));
+    }
+
+    #[test]
+    fn an_alias_is_preferred_to_the_file_name() {
+        let args: Vec<String> = [
+            "-m",
+            "/Users/me/models/Qwen_Qwen3.5-2B-Q4_K_M.gguf",
+            "--alias",
+            "qwen3.5-2b",
+        ]
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
+
+        assert_eq!(parse_server_command(&args).1.as_deref(), Some("qwen3.5-2b"));
     }
 
     #[test]

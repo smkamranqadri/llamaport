@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   deleteModel,
   getDirInfo,
@@ -6,10 +6,11 @@ import {
   runnerStart,
   setFavourite,
 } from "./api";
-import { formatContext, formatFileSize, formatRelative } from "./format";
+import { formatFileSize, formatMemory, formatRelative } from "./format";
 import FirstRun from "./FirstRun";
-import { PlayIcon, StopIcon } from "./icons";
-import type { DirInfo, ModelEntry, RunnerSnapshot } from "./types";
+import { PiIcon, PlayIcon, SearchIcon, StopIcon } from "./icons";
+import PiPanel from "./PiPanel";
+import type { DirInfo, ModelEntry, RunnerSnapshot, Telemetry } from "./types";
 
 function Badges({ model }: { model: ModelEntry }) {
   const md = model.metadata;
@@ -29,28 +30,37 @@ function Badges({ model }: { model: ModelEntry }) {
   );
 }
 
-/// One cell for two facts: when the model last ran, or when its file arrived if it never
-/// has. Told apart by weight rather than by a label, because the list has no header row
-/// and "today" for a download reads exactly like "today" for a launch.
-function Recency({ model }: { model: ModelEntry }) {
+/// The one sentence a row gets, where three separate columns used to sit. A running model
+/// says what it is costing and how fast it is answering; a stopped one says how big it is
+/// and when it last ran, or that it never has. The verb carries what a bare date could
+/// not: "today" for a download reads exactly like "today" for a launch.
+function rowStat(
+  model: ModelEntry,
+  running: boolean,
+  telemetry: Telemetry | null,
+): string {
+  const size = formatFileSize(model.sizeBytes);
+
+  if (running) {
+    const parts: string[] = [];
+    if (telemetry?.processFootprintBytes != null) {
+      parts.push(`${formatMemory(telemetry.processFootprintBytes)} memory`);
+    }
+    const gen = telemetry?.genTps ?? telemetry?.lastGenTps ?? null;
+    if (gen != null && gen > 0) {
+      parts.push(`${gen.toFixed(0)} tok/s`);
+    }
+    if (parts.length > 0) return parts.join(" · ");
+    return `${size} · starting up`;
+  }
+
   if (model.lastLaunchedSecs) {
-    return (
-      <span className="model-stat" title="Last launched">
-        {formatRelative(model.lastLaunchedSecs)}
-      </span>
-    );
+    return `${size} · ran ${formatRelative(model.lastLaunchedSecs)}`;
   }
   if (model.modifiedSecs) {
-    return (
-      <span
-        className="model-stat model-muted"
-        title="Added to the models directory — never launched"
-      >
-        {formatRelative(model.modifiedSecs)}
-      </span>
-    );
+    return `${size} · added ${formatRelative(model.modifiedSecs)}, never run`;
   }
-  return <span className="model-stat model-muted">—</span>;
+  return size;
 }
 
 /// What a delete is about to take. A shard set is several files and one model, and the
@@ -61,28 +71,55 @@ function deleteScope(model: ModelEntry): string {
   return `${files} · ${formatFileSize(model.sizeBytes)}`;
 }
 
-/// A running model offers Stop where every other row offers Run, with Delete kept but
-/// quiet: deleting is rare, and a running model refuses it anyway. Run sends no draft,
-/// so the backend launches on the same remembered profile the model's own screen opens
-/// with.
+/// A running model offers Use in pi and Stop where every other row offers Run. The star
+/// and Delete are the artboard's omissions kept alive: neither exists anywhere else in the
+/// app, so rather than lose them they wait for a hover. Run sends no draft, so the backend
+/// launches on the same remembered profile the model's own screen opens with.
 function RowAction({
+  model,
   isRunning,
+  ready,
   launchable,
+  onFavourite,
   onRun,
   onStop,
+  onPi,
   onConfirmDelete,
 }: {
+  model: ModelEntry;
   isRunning: boolean;
+  ready: boolean;
   launchable: boolean;
+  onFavourite: () => void;
   onRun: () => void;
   onStop: () => void;
+  onPi: () => void;
   onConfirmDelete: () => void;
 }) {
+  // A favourited model shows its star at rest — a mark you cannot see is not a mark.
+  const star = (
+    <button
+      className={`star${model.favourite ? " is-on" : " button-quiet"}`}
+      title={model.favourite ? "Remove from favourites" : "Add to favourites"}
+      aria-pressed={model.favourite}
+      onClick={onFavourite}
+    >
+      {model.favourite ? "★" : "☆"}
+    </button>
+  );
+
   if (isRunning) {
     return (
       <span className="row-actions">
+        {star}
+        {ready && (
+          <button className="button" title="Point pi at this model" onClick={onPi}>
+            <PiIcon />
+            Use in pi
+          </button>
+        )}
         <button
-          className="button row-action"
+          className="button button-danger row-action"
           title="Stop this model"
           onClick={onStop}
         >
@@ -95,6 +132,7 @@ function RowAction({
 
   return (
     <span className="row-actions">
+      {star}
       <button
         className="button button-danger button-quiet"
         title="Move this model to the Trash"
@@ -122,21 +160,24 @@ function RowAction({
 function ModelRow({
   model,
   runner,
+  telemetry,
   onSelect,
   onFavourite,
   onDelete,
   onRun,
   onStop,
+  onPi,
 }: {
   model: ModelEntry;
   runner: RunnerSnapshot;
+  telemetry: Telemetry | null;
   onSelect: (model: ModelEntry) => void;
   onFavourite: (model: ModelEntry) => void;
   onDelete: (model: ModelEntry) => void;
   onRun: (model: ModelEntry) => void;
   onStop: () => void;
+  onPi: () => void;
 }) {
-  const md = model.metadata;
   const incomplete = model.shards && model.shards.missing.length > 0;
   const isRunning =
     runner.modelId === model.id &&
@@ -177,53 +218,46 @@ function ModelRow({
     );
   }
 
+  // What is wrong with a file replaces the stat rather than sitting under it: the row is
+  // one line, and a broken model has nothing worth saying about its size.
+  let stat = rowStat(model, isRunning, telemetry);
+  let broken = false;
+  if (model.error) {
+    stat = model.error;
+    broken = true;
+  } else if (incomplete) {
+    const missing = model.shards!.missing;
+    stat = `incomplete — missing part${missing.length > 1 ? "s" : ""} ${missing.join(", ")} of ${model.shards!.total}`;
+    broken = true;
+  }
+
   return (
     <li className={`model-item${isRunning ? " is-running" : ""}`}>
-      <button
-        className={`star${model.favourite ? " is-on" : ""}`}
-        title={model.favourite ? "Remove from favourites" : "Add to favourites"}
-        aria-pressed={model.favourite}
-        onClick={() => onFavourite(model)}
-      >
-        {model.favourite ? "★" : "☆"}
-      </button>
-
       <button
         className={`model-row${model.error ? " is-broken" : ""}`}
         onClick={() => onSelect(model)}
       >
-        <span className="model-identity">
-          <span className="model-name">
-            {isRunning && <span className={`dot state-${runner.state}`} />}
-            {model.displayName}
-          </span>
-          <span className="model-file" title={model.fileName}>
-            {model.fileName}
-          </span>
-          {model.error && <span className="model-error">{model.error}</span>}
-          {incomplete && (
-            <span className="model-error">
-              incomplete shard set — missing part
-              {model.shards!.missing.length > 1 ? "s " : " "}
-              {model.shards!.missing.join(", ")} of {model.shards!.total}
-            </span>
-          )}
-        </span>
-
+        <span className={`dot ${isRunning ? `state-${runner.state}` : "is-idle"}`} />
+        <span className="model-name">{model.displayName}</span>
         <Badges model={model} />
-
-        <span className="model-stat">{formatFileSize(model.sizeBytes)}</span>
-        <span className="model-stat">
-          {md?.contextLength ? formatContext(md.contextLength) : "—"}
-        </span>
-        <Recency model={model} />
+        {isRunning && <span className="model-stat">{stat}</span>}
+        <span className="row-spacer" />
+        {!isRunning && (
+          <span className={`model-stat${broken ? " is-broken-stat" : ""}`}>
+            {stat}
+          </span>
+        )}
       </button>
 
       <RowAction
+        model={model}
         isRunning={isRunning}
+        ready={isRunning && runner.state === "ready"}
         launchable={launchable}
+        onFavourite={() => onFavourite(model)}
         onRun={() => onRun(model)}
         onStop={onStop}
+        onPi={onPi}
         onConfirmDelete={() => setConfirming(true)}
       />
     </li>
@@ -232,11 +266,13 @@ function ModelRow({
 
 export default function Library({
   runner,
+  telemetry,
   onSelect,
   onStop,
   onRunnerChange,
 }: {
   runner: RunnerSnapshot;
+  telemetry: Telemetry | null;
   onSelect: (model: ModelEntry) => void;
   onStop: () => void;
   onRunnerChange: (snapshot: RunnerSnapshot) => void;
@@ -245,6 +281,8 @@ export default function Library({
   const [dir, setDir] = useState<DirInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [failure, setFailure] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  const [pi, setPi] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -287,11 +325,27 @@ export default function Library({
     [onRunnerChange],
   );
 
+  // The search matches the display name and the file name both: a row no longer shows its
+  // file, and that is often the half you remember.
+  const shown = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    if (!needle) return models;
+    return models.filter(
+      (model) =>
+        model.displayName.toLowerCase().includes(needle) ||
+        model.fileName.toLowerCase().includes(needle),
+    );
+  }, [models, query]);
+
+  const onDisk = models.reduce((sum, model) => sum + model.sizeBytes, 0);
+  const runningCount =
+    runner.state === "starting" || runner.state === "ready" ? 1 : 0;
+
   const active =
     runner.state === "starting" || runner.state === "ready"
-      ? models.filter((model) => model.id === runner.modelId)
+      ? shown.filter((model) => model.id === runner.modelId)
       : [];
-  const rest = models.filter(
+  const rest = shown.filter(
     (model) => !active.some((r) => r.id === model.id),
   );
   const groups: { label: string | null; entries: ModelEntry[] }[] =
@@ -300,7 +354,15 @@ export default function Library({
           { label: "Running", entries: active },
           { label: "Stopped", entries: rest },
         ]
-      : [{ label: null, entries: models }];
+      : [{ label: null, entries: shown }];
+
+  // What the folder holds, not where it is: the path is Settings' business and the row it
+  // sat above no longer shows a file name either.
+  const counts: string[] = [];
+  if (runningCount > 0) counts.push(`${runningCount} running`);
+  counts.push(`${models.length} model${models.length === 1 ? "" : "s"}`);
+  counts.push(`${formatFileSize(onDisk)} on disk`);
+  const subtitle = counts.join(" · ");
 
   return (
     <>
@@ -308,19 +370,21 @@ export default function Library({
         <div>
           <h1>Library</h1>
           <p className="screen-subtitle">
-            {models.length === 0 && !loading && !failure ? (
-              "No models yet"
-            ) : (
-              <>
-                {dir?.path ?? "…"}
-                {dir?.freeBytes != null &&
-                  ` · ${formatFileSize(dir.freeBytes)} free`}
-                {models.length > 0 &&
-                  ` · ${models.length} model${models.length === 1 ? "" : "s"}`}
-              </>
-            )}
+            {models.length === 0 && !loading && !failure
+              ? "No models yet"
+              : subtitle}
           </p>
         </div>
+        {models.length > 0 && (
+          <span className="search-field">
+            <SearchIcon />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search models"
+            />
+          </span>
+        )}
         <button className="button" onClick={() => void load()} disabled={loading}>
           {loading ? "Scanning…" : "Rescan"}
         </button>
@@ -330,7 +394,13 @@ export default function Library({
 
       {!loading && !failure && models.length === 0 && <FirstRun dir={dir} />}
 
-      {models.length > 0 && groups.map(({ label, entries }) => (
+      {models.length > 0 && shown.length === 0 && (
+        <p className="empty-detail">Nothing here matches “{query.trim()}”.</p>
+      )}
+
+      {pi && <PiPanel onClose={() => setPi(false)} />}
+
+      {shown.length > 0 && groups.map(({ label, entries }) => (
         <section key={label ?? "all"}>
           {label && <h2 className="group-label">{label}</h2>}
           <ul className="model-cards">
@@ -339,11 +409,13 @@ export default function Library({
                 key={model.id}
                 model={model}
                 runner={runner}
+                telemetry={telemetry}
                 onSelect={onSelect}
                 onFavourite={favourite}
                 onDelete={remove}
                 onRun={run}
                 onStop={onStop}
+                onPi={() => setPi(true)}
               />
             ))}
           </ul>

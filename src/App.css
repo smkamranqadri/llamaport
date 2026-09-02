@@ -265,11 +265,10 @@ body,
 }
 
 .model-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto 72px 56px 84px;
+  display: flex;
   align-items: center;
   width: 100%;
-  gap: 16px;
+  gap: 10px;
   padding: 11px 14px;
   font: inherit;
   color: inherit;
@@ -298,9 +297,14 @@ body,
 
 .model-name {
   overflow: hidden;
-  font-weight: 600;
+  font-weight: 550;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.dot.is-idle {
+  background: var(--faint);
+  opacity: 0.5;
 }
 
 .model-file,
@@ -317,8 +321,21 @@ body,
 }
 
 .model-stat {
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
   font-variant-numeric: tabular-nums;
-  text-align: right;
+}
+
+.model-stat.is-broken-stat {
+  color: var(--danger);
+}
+
+/* Pushes the stopped row's stat to the action end and the running row's to the badges,
+   which is how the artboard draws the difference between a live figure and a quiet one. */
+.row-spacer {
+  flex: 1;
+  min-width: 8px;
 }
 
 .model-muted {
@@ -1011,10 +1028,10 @@ input[type="range"] {
 
 .banner {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 12px;
   margin-top: 16px;
-  padding: 12px 14px;
+  padding: 11px 14px;
   background: color-mix(in srgb, #d99b28 10%, transparent);
   border: 1px solid color-mix(in srgb, #d99b28 35%, transparent);
   border-radius: 9px;
@@ -1037,20 +1054,6 @@ input[type="range"] {
   color: var(--text-muted);
 }
 
-.orphan-list {
-  margin: 8px 0 0;
-  padding: 0;
-  list-style: none;
-}
-
-.orphan-list li {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 4px 0;
-  font-size: 12px;
-}
 
 .badge-warn {
   color: #a2701a;
@@ -1102,9 +1105,15 @@ input[type="range"] {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  margin: 0;
+  margin: 16px 0 0;
   padding: 0;
   list-style: none;
+}
+
+/* The group label carries the gap when there is one, and there is none while nothing runs
+   — which left the first row touching whatever sat above it, banner or header. */
+.group-label + .model-cards {
+  margin-top: 0;
 }
 
 .group-label {
@@ -1117,14 +1126,20 @@ input[type="range"] {
 .model-item {
   display: flex;
   align-items: center;
+  gap: 10px;
+  padding: 11px 14px;
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: 9px;
 }
 
+/* The buttons are the row's tallest content and they are the item's children, not the
+   row button's — so the padding has to sit on the item or they set no height at all and
+   the row lands 14px under the artboard's. */
 .model-item .model-row {
   flex: 1;
   min-width: 0;
+  padding: 0;
   border-bottom: none;
 }
 
@@ -1142,7 +1157,7 @@ input[type="range"] {
 
 .star {
   flex: none;
-  padding: 8px 4px 8px 12px;
+  padding: 2px 2px;
   font-size: 15px;
   line-height: 1;
   color: var(--text-muted);
@@ -1164,7 +1179,6 @@ input[type="range"] {
   flex: none;
   align-items: center;
   gap: 6px;
-  margin-right: 10px;
 }
 
 /* One width for whichever button the row ends on. The row button beside it is `flex: 1`,
@@ -1826,6 +1840,31 @@ input[type="range"] {
 }
 
 .link-field input {
+  width: 100%;
+  padding: 6px 0;
+  font: inherit;
+  color: var(--text);
+  background: none;
+  border: 0;
+  outline: none;
+}
+
+/* Library header search */
+
+.search-field {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 7px;
+  width: 210px;
+  padding: 0 10px;
+  color: var(--faint);
+  background: var(--input);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+}
+
+.search-field input {
   width: 100%;
   padding: 6px 0;
   font: inherit;
