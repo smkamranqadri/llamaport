@@ -271,8 +271,26 @@ unplanned.
   restarting no longer *clears it every time* — it went from occasional to
   reproducing on nearly every dev launch within a single session, which is the
   strongest lead anyone has had and is why this needs its own task rather than
-  another tally mark. It blocked a screen capture outright: the tray's Show
-  window is the only recovery, and it needs a human at the machine.
+  another tally mark.
+
+  **Four more on 2026-09-02, and the recovery claim was wrong.** Sizes 142×165,
+  177×197 and 130×136 twice, one of them appearing with nobody touching the
+  window. The tray's Show window is still the only recovery — but it does *not*
+  need a human at the machine: an `osascript` that clicks the tray menu item
+  restored the window three times from the session, and the script is kept at
+  `show.applescript` in the scratchpad. Two things learned with it, both of
+  which cost time before they were understood:
+
+  - **Never resize the window through System Events.** `set size of window 1`
+    collapses it to 130×136 outright rather than resizing it. That is the one
+    reproducible trigger anyone has found, and it may be the same code path the
+    spontaneous collapses take.
+  - **A capture taken straight after the tray recovery is sheared**, because the
+    window animates open from the menu-bar icon and `screencapture` reads it
+    mid-zoom. It returns a plausible-looking image whose horizontal lines slope
+    a few pixels across the width — which sent one session chasing a stagger in
+    the preset cards that the CSS cannot produce. Poll the window's bounds until
+    they stop changing before capturing.
 - ~~The Dock icon does not reopen the main window once it has been closed.~~
   Fixed 2026-08-08, issue 1: the run loop matched only `ExitRequested` and `Exit`,
   so the hide-on-close decision ([knowledge/project.md](../knowledge/project.md))

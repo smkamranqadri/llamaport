@@ -58,9 +58,9 @@ project's own tally says that is where defects come from
    sends no draft**, so `runner_start` resolves the same remembered profile
    the model's own screen opens with — no new machinery; **the native title
    bar stays** — the mockup's traffic lights are the real ones.
-2. **Launch.** Built 2026-09-02, **not done until the author's look** — the
-   proof section says why. The three presets over the machinery that already
-   exists:
+2. ~~**Launch.**~~ Done 2026-09-02. The look it owed was closed by item 1's
+   second pass, which is the same screen. The three presets over the machinery
+   that already exists:
    Default is the launch defaults, Best speed is the measured `speeds.json`
    row, Model suggested is the offered-not-applied opinion from fitting. A
    preset whose backing fact is missing renders disabled with the action that
@@ -83,9 +83,10 @@ putting the artboard and the app side by side — the method is in
 [knowledge/technical.md](../knowledge/technical.md), and not using it is what
 made the first four passes worthless.
 
-1. **Stopped model screen** — built 2026-09-02, **look owed**. The artboard has
-   exactly two rows, Advanced and Full command; the app also showed Speed,
-   Model details and Logs. The three questions that had to be answered before
+1. ~~**Stopped model screen**~~ — done 2026-09-02, the author signing off on
+   screen after three rounds of his own corrections. The artboard has exactly
+   two rows, Advanced and Full command; the app also showed Speed, Model
+   details and Logs. The three questions that had to be answered before
    deleting anything were put to the author and are answered — proof below.
 2. ~~**Library rows**~~ — done 2026-09-02, the author signing off on screen
    after two rounds of his own corrections. Proof below.
@@ -134,7 +135,7 @@ badges and a visible Run each, no group headers when nothing runs.
 watching the Running group form with its tint and Stop; the orphan banner
 (none existed to photograph); Ignore dismissing it.
 
-### Phase 2 — built 2026-09-02, look owed
+### Phase 2 — built 2026-09-02, look closed by item 1's second pass
 
 Files: `src/Presets.tsx` (new), `src/ModelDetail.tsx`, `src/ProfileForm.tsx`,
 `src/App.css`. The model screen's Launch settings section became "How should
@@ -446,7 +447,7 @@ the two put side by side — the method in
 time rather than after four wasted passes. The author's word on it: "First run
 — empty Library is done."
 
-### Item 1 — stopped model screen, built 2026-09-02, look owed
+### Item 1 — stopped model screen, built 2026-09-02
 
 Files: `src/ModelDetail.tsx` alone. The three rows the artboard does not draw
 were not deleted on sight: where their content goes was put to the author
@@ -476,11 +477,61 @@ clippy status: 0
 fmt status: 0
 ```
 
-**Why not done**: committed without the author's eyes on it. The side-by-side
-was set up — the Launch artboard rendered out of the canvas artifact and
-screenshotted — but the app's window was hidden in the tray and offscreen, and
-the one capture that landed was half-occluded. It shows three disclosure rows
-where there were five, which is the change, and is not a look.
+**Why not done at the time**: committed without the author's eyes on it. The
+side-by-side was set up — the Launch artboard rendered out of the canvas
+artifact and screenshotted — but the app's window was hidden in the tray and
+offscreen, and the one capture that landed was half-occluded. It shows three
+disclosure rows where there were five, which is the change, and is not a look.
+
+### Item 1, second pass — the look, 2026-09-02
+
+Files: `src/App.tsx`, `src/App.css`. The artboard was rendered and put beside
+the app before anything was changed, which found one defect and six metric
+drifts.
+
+**The defect: the sidebar went blank on a model screen.** Phase 3 removed the
+`‹ Library` crumb on the ruling that the sidebar is how you leave a model — but
+`active` was gated on `&& !selected`, so opening a model unlit Library and left
+nothing on screen saying where you were. The artboard draws Library lit. The
+guard is gone from all three entries; `selected` only ever coexists with the
+library screen, so it was dead on the other two.
+
+Six metrics read off the artboard's own stylesheet rather than from memory:
+`.field-hint` to `--faint` at 11.5px, so a hint sits a step below the label
+above it; the memory verdict to 12px; `.d-title` 600 → 550; `.radio` 15 → 16px;
+`.badges-row` 6 → 5px.
+
+Two spacing failures the drawing does not cover, both found by the author:
+
+- **`.preset-foot` had `margin-top: auto`**, pinning "Measured here on Sep 2 ·
+  Measure again" to the card's floor. Harmless on the artboard, where every card
+  is one line; on the app it opened a hole under Best speed's description as
+  soon as Default's own hint made the row two lines tall.
+- **The flat row's rhythm belonged on the row, not its summary.** Padding under
+  a summary lands *between the sentence and the figures* the moment the row is
+  opened, so an opened memory panel sat 13px from Advanced. It is now a margin
+  on `.disclosure.is-flat`, with the body's own padding above it.
+
+**The author overruled the artboard on the gaps around the memory line**, which
+draws them tighter than he wanted: 22px above, 24px below, against the drawing's
+15 and 16.
+
+**One deviation confirmed rather than reopened**: the memory line keeps a
+chevron the artboard does not draw, because the four figures behind it — GPU
+limit, free, swap, installed — have no other route on this screen. Same argument
+that kept Model details as a third row.
+
+```text
+build: 0
+cargo test status: 0        (257 passed, 5 ignored — unchanged)
+clippy status: 0
+fmt status: 0
+```
+
+**Verified on screen by the author, who took the captures himself** — the
+session's own attempts were disturbing a machine he was working on, and he said
+so. That is the cheaper route whenever the author is at the keyboard: no window
+stealing, and his eye is the acceptance test anyway.
 
 ### Item 2 — Library rows, done 2026-09-02
 

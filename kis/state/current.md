@@ -7,27 +7,34 @@ Branch:   `main`, working tree clean. **`v0.6.1` is tagged at `5d8957d` and HEAD
           written here, because the commit that records it increments it. Why
           it matters is in [knowledge/technical.md](../knowledge/technical.md).
 Task:     **Redesign phases 2 and 3 are built and committed, and of the five
-          things that did not match the artboards, four are built and three
-          are signed off** — the empty Library (pulled forward out of phase 4
-          by the author), the Library rows and the stray-server banner. The
-          fourth, the **stopped model screen**, was committed unverified and
-          is marked so; its look is the one thing owed backwards. Only **item
-          4, the Measure screen**, is unbuilt
+          things that did not match the artboards, four are done and signed
+          off** — the stopped model screen (`e5e9f31`), the empty Library, the
+          Library rows and the stray-server banner. The only look still marked
+          owed is **phase 3's running view**, which the author's own five-item
+          list never named — so it is probably closed and is not written down as
+          such. Only **item 4, the Measure screen**, is unbuilt
           ([intent/redesign.md](../intent/redesign.md)). Phase 1 landed as
           `c6ac59f`.
 
           **One screen per task, each finished by the capture** — artboard
-          rendered out of the canvas artifact, app taken by window id, the two
-          side by side ([knowledge/technical.md](../knowledge/technical.md)).
-          Three screens were signed off that way in one session, against six
-          wasted passes for one screen before the rule existed.
+          rendered out of the canvas artifact, app captured, the two side by
+          side ([knowledge/technical.md](../knowledge/technical.md)). Four
+          screens have been signed off that way, against six wasted passes for
+          one screen before the rule existed. **Ask the author to take the app
+          half whenever they are at the machine**: it costs them a keystroke,
+          costs the session nothing, and their eye is the acceptance test
+          anyway.
 Mode:     Phase — redesign, one item from the end of it.
 Blocker:  none for the redesign. **The unusable-window bug has escalated and
-          now wants its own task**: four more sightings on 2026-09-02, three
-          on consecutive launches, where it used to be one in three and a
-          restart always cleared it. It blocked a capture outright — the
-          tray's Show window is the only recovery and it needs a human at the
-          machine ([intent/roadmap.md](../intent/roadmap.md) risks).
+          now wants its own task**: eight sightings on 2026-09-02, one of them
+          with nobody touching the window. It is no longer one launch in three. **The recovery is scriptable after all**
+          — an `osascript` clicking the tray's Show window restored it three
+          times from the session, so it does not need a human at the machine.
+          Two traps that cost time are recorded with it
+          ([intent/roadmap.md](../intent/roadmap.md) risks): never resize the
+          window through System Events, which collapses it outright, and never
+          capture straight after a tray recovery, which returns a sheared image
+          that lies about alignment.
 
           The **Gatekeeper check is met**, twice over on 2026-09-02 — the
           run that failed is why v0.6.1 exists

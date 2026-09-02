@@ -109,7 +109,8 @@ were handed over as matching and none did; the fifth rendered the artboard,
 looked at it, and found a missing control in a minute
 ([intent/redesign.md](../intent/redesign.md)).
 
-Both halves are scriptable, and neither needs the author:
+Both halves are scriptable without the author — but scripting the app half
+takes their window, so ask before doing it while they are at the machine:
 
 - **The mockup.** The canvas artboards under the scratchpad are `.dc.html` —
   plain markup inside `<x-dc>`/`<helmet>` wrappers. Strip the wrappers, hoist
@@ -127,6 +128,20 @@ Both halves are scriptable, and neither needs the author:
   makes it capturable — and unlike `frontmost`, that call is permitted here.
   Waiting for `on=true` does not work; the window can sit that way for
   minutes.
+- **Wait for the window's bounds to stop moving before capturing.** A window
+  restored from the tray animates open from the menu-bar icon, and
+  `screencapture` reading it mid-zoom returns an image whose horizontal lines
+  slope several pixels across the width. It looks like a real capture and it
+  lies about alignment: one session read a stagger in the preset cards off such
+  an image and went looking for CSS that could not have produced it. Poll
+  `CGWindowListCopyWindowInfo` until the size repeats, then take the shot. And
+  **never resize the window through System Events** — `set size of window 1`
+  collapses it rather than resizing it ([intent/roadmap.md](../intent/roadmap.md)).
+- **The cheapest capture is the author's own**, whenever they are at the
+  machine. Everything above steals focus or the window from a person who may be
+  working; asking for a screenshot costs them one keystroke, costs the session
+  nothing, and their eye is the acceptance test regardless. Ask first, and only
+  drive the window when nobody is there.
 - **Reaching a screen behind a click.** The webview forgets its React state on
   every hot reload, so the model screen cannot be photographed by opening it
   by hand and then editing. Patch a temporary `useEffect` into `App.tsx` that
@@ -225,17 +240,23 @@ default. Sibling `.bak`, `.save` and `.backup` files already accumulate beside i
   the suite. Anything that puts prose next to a figure earns a look before it is
   called done.
 
-  **The running tally, because it is the argument: twenty defects across six
+  **The running tally, because it is the argument: twenty-one defects across six
   phases, every one found by looking and none by the suite.** Eleven on
   2026-08-31, five in Tune's panel on 2026-09-01, three in the pi button on
   2026-09-02 — a label that wrapped, a file mode read out of `ls -l`, and a
-  provider that turned out not to be selectable — and one in the redesign on
+  provider that turned out not to be selectable — and two in the redesign on
   2026-09-02: every stray-server banner the app had ever shown named an unknown
-  model on an unknown port, and it took the author photographing one to notice.
-  **A twenty-first was worse and took five releases**: a bundle macOS refuses to
-  open, which only a browser download exposed
-  ([intent/release.md](../intent/release.md)). A phase is not done when the suite
-  is green; it is done when somebody has looked.
+  model on an unknown port, and it took the author photographing one to notice;
+  and the sidebar unlit itself on a model screen, so a screen with no back
+  button said nothing about where you were. **A twenty-second was worse and took
+  five releases**: a bundle macOS refuses to open, which only a browser download
+  exposed ([intent/release.md](../intent/release.md)). A phase is not done when
+  the suite is green; it is done when somebody has looked.
+
+  The sidebar one is the only entry the *method* caught rather than the author:
+  it fell out of rendering the artboard and putting it beside the app, before
+  anything was changed. That is the argument for doing the comparison first
+  rather than after a round of corrections.
 
 - **`--fit` is on by default, and this app suppresses it by naming every value.**
   It "adjusts unset arguments to fit in device memory" (`--fit [on|off]`,
