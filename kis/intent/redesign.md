@@ -74,8 +74,8 @@ project's own tally says that is where defects come from
    the CPU% telemetry field, its tests, and the Activity screen for the last.
    **The first run left this phase on 2026-09-02** — the author asked for it
    ahead of the rest and it is done; its proof is below. **Downloads is done
-   2026-09-03** (`21cec86`, `e85ecae`), proof below. Settings and Activity
-   remain.
+   2026-09-03** (`21cec86`, `e85ecae`) and **Activity Monitor with it**
+   (`e897b2a`), both proved below. Settings is what remains.
 
 ## What still does not match, screen by screen
 
@@ -730,3 +730,47 @@ Rendered against `App.css` in both appearances before hand-over, including the
 failure state the artboard does not draw. **The author's eyes are still owed a
 running transfer**: the bar and the figures line are the two things a render
 cannot prove.
+
+### Phase 4, Activity Monitor — done 2026-09-03
+
+Files: `src-tauri/src/activity.rs` (new), `src-tauri/src/lib.rs`,
+`src/Activity.tsx` (new), `src/App.tsx`, `src/api.ts`, `src/types.ts`,
+`src/App.css`. A disabled sidebar entry became a screen.
+
+- **Every `llama-server` the app knows**, the author's call over "only the
+  running model": the model, the server a measurement launches on its own port,
+  and any stray the orphan scan found, each row saying which it is.
+- **A CPU column and no GPU column**, as the interview decided. Per-process GPU
+  has no public macOS API and neither does overall utilisation, so the
+  artboard's GPU column and its `38%` card are dropped for good.
+- **The GPU card carries memory instead** — the author's pick of three: what the
+  running launch asks of the Metal working set against what that set will hand
+  out, both already read for the launch plan.
+- **CPU comes from `sysinfo`, not `proc_pid_rusage`** — a deviation from the
+  interview's implementation note, recorded rather than quietly taken. A
+  percentage is a difference between two samples, so `activity::Monitor` holds
+  one `System` between polls and that one sample answers per-process and
+  machine-wide alike; `sysinfo` is already this app's process source for the
+  orphan scan. Memory stays on `sysmem::process_footprint_bytes`, so this table
+  and the running model's own screen cannot disagree about the same number.
+- **Polled, not pushed.** The screen is read only while open, and the interval
+  it chooses is the window every CPU figure is averaged over.
+
+**A defect the tests caught before the author could.** The orphan scan is told
+to skip the runner's child and knows nothing about Tune's, so a measurement in
+progress was about to be listed as somebody's stray server — the stray banner's
+own defect, one layer up. Excluded in `known_processes`, with three tests and
+the exclusion mutation-checked: dropping the `continue` fails it with
+`left: [42, 99]`.
+
+```text
+build: 0
+cargo test status: 0        (261 passed, 5 ignored — three new)
+clippy status: 0
+fmt status: 0
+```
+
+Two deviations from the drawing, both deliberate: the cards sit under the table
+rather than pinned to the window's bottom edge, so they follow the window
+instead of floating over it; and a stray row is marked amber, because it is the
+one thing on that screen this app did not start.

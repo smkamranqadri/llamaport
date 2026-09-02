@@ -6,25 +6,24 @@ Branch:   `main`, working tree clean. **`v0.6.1` is tagged at `5d8957d` and HEAD
           building a release artefact** — the distance is deliberately not
           written here, because the commit that records it increments it. Why
           it matters is in [knowledge/technical.md](../knowledge/technical.md).
-Task:     **Redesign phase 4 has started: Downloads is done 2026-09-03**
-          (`21cec86`, `e85ecae`) — the paste field and Get in the header, a card
-          per transfer, Finished rows named by the catalog, and the speed limit
-          turned into a named ladder on the status line rather than a panel
-          ([intent/redesign.md](../intent/redesign.md)). **Settings and Activity
-          Monitor are what is left of the phase**; the first run left it early
-          on 2026-09-02.
+Task:     **Redesign phase 4 is one screen from done.** Downloads (`21cec86`,
+          `e85ecae`) and **Activity Monitor** (`e897b2a`) are built on
+          2026-09-03 — the last a new screen with new telemetry, a row per
+          `llama-server` the app knows and the machine's figures under them
+          ([intent/redesign.md](../intent/redesign.md)). **Settings is all that
+          is left**, and its artboard predates the Appearance section that now
+          sits in it.
 
-          Before it: **Appearance** shipped 2026-09-03 — Mode plus five palettes,
-          four ported from `hermes-hq`
-          ([intent/appearance.md](../intent/appearance.md)) — and the redesign's
-          own five-item list closed, the last being the measurement inside the
-          model screen.
+          Before them: **Appearance** shipped the same day
+          ([intent/appearance.md](../intent/appearance.md)), and the redesign's
+          five-item list closed with the measurement inside the model screen.
 
           **The app is the author's: never launch, capture or drive it** — ask
           him for the screenshot, and render what can be rendered without it
-          ([knowledge/technical.md](../knowledge/technical.md) Verify). **The
-          author's eyes are owed a running transfer**: the bar and the figures
-          line are what a render cannot prove.
+          ([knowledge/technical.md](../knowledge/technical.md) Verify). **His
+          eyes are owed a running transfer** on Downloads and **a live Activity
+          screen**: rates, percentages and a progress bar are what a render
+          cannot prove.
 
 Mode:     Standard. Nothing is part-finished.
 
@@ -48,18 +47,11 @@ Blocker:  none. **The unusable-window bug has escalated and now wants its own
           **Four checks nobody has run**, each needing a human at the machine,
           listed in [intent/release.md](../intent/release.md) under "Unverified
           against v0.6.1".
-Next:     **Activity Monitor**, the author's pick — the last screen in the
-          redesign and the only one that needs new telemetry. Two things are
-          already decided and both matter before a line is written
-          ([intent/redesign.md](../intent/redesign.md) interview): **it ships
-          with a CPU% column and no GPU column**, because per-process GPU has no
-          public macOS API, and **CPU comes from the `proc_pid_rusage` call
-          `sysmem.rs` already makes** for the footprint. The artboard draws a GPU
-          column and a GPU card; both are dropped for good rather than deferred.
-
-          Then **Settings**, which closes phase 4. Its artboard draws Models
-          folder, llama-server and Launch defaults — and not the Appearance
-          section that now sits with them.
+Next:     **Settings**, which closes phase 4 and the redesign with it. The
+          artboard draws three cards — Models folder with a Change…, llama-server
+          as a verdict line over its path, and Launch defaults folded behind an
+          "Edit defaults" row. The app has the same three as open panels, plus
+          the **Appearance** section the drawing never had.
 
           Waiting on the author at the machine: **the README's screenshots**
           ([release.md](../intent/release.md) phase 3), **the four unverified
@@ -83,8 +75,9 @@ What the app is for: [intent/direction.md](../intent/direction.md).
 ## Proof
 
 The four commands green, each status captured on its own line and never after a
-pipe. **258 tests**, the newest being the appearance round trip, watched to fail
-against `#[serde(skip)]` ([intent/appearance.md](../intent/appearance.md)). The
+pipe. **261 tests**, the newest three being Activity's row assembly, one of them
+watched to fail when the measurement's own server stops being excluded from the
+strays ([intent/redesign.md](../intent/redesign.md)). The
 redesign's own last item added none: it is a screen, and `tune::Report`'s new
 `candidates` field is a copy of the list the ladder is already given. Each phase
 file carries the count it left behind, so the history is not repeated here.
