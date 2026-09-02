@@ -343,6 +343,9 @@ pub struct Report {
     pub model_name: Option<String>,
     /// Roughly how large the shared prompt is, so the screen can say what was asked.
     pub prompt_words: Option<u64>,
+    /// Every rung the ladder will try, named before any of them has run: the screen draws
+    /// the ones still waiting, which cannot be assembled from finished rows.
+    pub candidates: Vec<Candidate>,
     pub current: Option<Candidate>,
     pub done: usize,
     pub total: usize,
@@ -435,6 +438,7 @@ impl Tuner {
                 model_id: Some(request.model_id.clone()),
                 model_name: Some(request.model_name.clone()),
                 prompt_words: Some(prompt.split_whitespace().count() as u64),
+                candidates: request.candidates.clone(),
                 total: request.candidates.len(),
                 ..Default::default()
             };

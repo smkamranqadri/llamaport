@@ -57,6 +57,14 @@ export function ChevronLeftIcon() {
   return <Icon path='<path d="M10 3.5 L5.5 8 L10 12.5"/>' size={14} />;
 }
 
+export function CloseIcon() {
+  return <Icon path='<path d="M4 4 L12 12"/><path d="M12 4 L4 12"/>' size={14} />;
+}
+
+export function CheckIcon() {
+  return <Icon path='<path d="M3 8.5 L6.5 12 L13 4.5"/>' size={14} />;
+}
+
 export function StopIcon() {
   return <Icon path='<rect x="4" y="4" width="8" height="8" rx="1.5"/>' size={13} />;
 }

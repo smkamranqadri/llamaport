@@ -264,6 +264,7 @@ export interface TuneReport {
   modelId: string | null;
   modelName: string | null;
   promptWords: number | null;
+  candidates: TuneCandidate[];
   current: TuneCandidate | null;
   done: number;
   total: number;

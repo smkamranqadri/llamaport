@@ -9,12 +9,14 @@ import {
   runnerStart,
   runnerStop,
   speedsFor,
+  tuneCancel,
   tuneStart,
   tuneStatus,
 } from "./api";
 import { formatContext, formatFileSize, formatMemory } from "./format";
 import { bytesOr, pressureText, Stat } from "./Memory";
-import { ChevronRightIcon, PlayIcon, StopIcon } from "./icons";
+import { CloseIcon, PlayIcon, StopIcon } from "./icons";
+import Disclosure from "./Disclosure";
 import { AdvancedFields, AUTO_CTX, ProfileFields } from "./ProfileForm";
 import HealthPanel from "./HealthPanel";
 import PiPanel from "./PiPanel";
@@ -57,60 +59,6 @@ function Facts({ model }: { model: ModelEntry }) {
         </div>
       ))}
     </dl>
-  );
-}
-
-/// A section the screen keeps folded: a title, one line saying what is inside, and the
-/// full content only on demand. The redesign's launch screen is these rows — the memory
-/// verdict, the speed history, the model's facts, the command — with only the choice of
-/// how to run left open.
-function Disclosure({
-  title,
-  sub,
-  dot,
-  flat,
-  action,
-  open,
-  onToggle,
-  children,
-}: {
-  title: string;
-  sub?: string;
-  /// Shown before the title, coloured by the verdict it carries.
-  dot?: "ok" | "warn" | "bad";
-  /// Without the card: a line on the page that happens to open.
-  flat?: boolean;
-  /// Sits at the right of the summary. Its clicks do not open the row.
-  action?: React.ReactNode;
-  open?: boolean;
-  onToggle?: (open: boolean) => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <details
-      className={`disclosure${flat ? " is-flat" : ""}`}
-      open={open}
-      onToggle={(e) => onToggle?.(e.currentTarget.open)}
-    >
-      <summary>
-        <ChevronRightIcon />
-        {dot && <span className={`dot tone-${dot}`} />}
-        <span className="d-title">{title}</span>
-        {sub && <span className="d-sub">{sub}</span>}
-        {action && (
-          <span
-            className="d-action"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-            }}
-          >
-            {action}
-          </span>
-        )}
-      </summary>
-      <div className="d-body">{children}</div>
-    </details>
   );
 }
 
@@ -650,9 +598,13 @@ export default function ModelDetail({
     }
   }
 
+  const mineTune = tune != null && tune.modelId === model.id ? tune : null;
   let speedSub = "trying safe combinations of context and memory precision";
-  if (tune != null && tune.total > 0) {
-    speedSub = `${tune.done} of ${tune.total} tries done`;
+  if (mineTune != null && mineTune.total > 0) {
+    speedSub = `${mineTune.done} of ${mineTune.total} tries done`;
+    if (mineTune.cancelled) {
+      speedSub = `cancelled after ${mineTune.done} of ${mineTune.total} tries`;
+    }
   }
 
   return (
@@ -945,15 +897,33 @@ export default function ModelDetail({
           </div>
         </Disclosure>
 
-        {/* The ladder while it runs and no longer: a stopped model's history is the one
-            line the Best speed card carries, and the tries get their own screen. */}
-        {!running && measuring ? (
-          <Disclosure title="Speed" sub={speedSub} open>
+        {/* The ladder while it runs and while its answer is still on screen: a calm
+            stopped model's history is the one line the Best speed card carries. Cancel
+            sits in the summary, where the artboard's header puts it. */}
+        {!running && mineTune != null && (mineTune.running || mineTune.rows.length > 0) ? (
+          <Disclosure
+            title="Measuring best speed"
+            sub={speedSub}
+            open
+            action={
+              mineTune.running ? (
+                <button
+                  className="button button-plain button-danger"
+                  onClick={() => {
+                    setFailure(null);
+                    tuneCancel()
+                      .then(setTune)
+                      .catch((e) => setFailure(String(e)));
+                  }}
+                >
+                  <CloseIcon />
+                  Cancel
+                </button>
+              ) : undefined
+            }
+          >
             <TunePanel
-              modelId={model.id}
-              blocked={tuneBlocked}
-              report={tune}
-              onReport={setTune}
+              report={mineTune}
               summary={speeds}
               onApply={(settings) =>
                 setForm((current) => current && { ...current, ...settings })

@@ -1576,6 +1576,109 @@ input[type="range"] {
   margin-top: 12px;
 }
 
+/* The ladder, as the artboard draws it: one row per try, the plain-language name first,
+   the arguments it stands for beside it, and the verdict at the right. */
+
+.tune-intro {
+  max-width: 620px;
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+.tune .group-label {
+  margin: 14px 0 8px;
+}
+
+.tune-tries {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tune-try {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background: var(--bg-card2);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+}
+
+.tune-try.is-fastest {
+  background: color-mix(in srgb, var(--running) 9%, transparent);
+  border-color: color-mix(in srgb, var(--running) 32%, var(--border));
+}
+
+.tune-try-name {
+  font-weight: 550;
+  white-space: nowrap;
+}
+
+.tune-try-note {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 12px;
+  color: var(--text-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tune-try-result {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.tune-try.is-fastest .tune-try-result {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--running);
+}
+
+/* A try reports nothing until it settles, so the bar says only that something is
+   happening — a fraction here would be invented. */
+.tune-progress {
+  flex: none;
+  width: 90px;
+  margin: 0 0 0 auto;
+}
+
+.tune-progress span {
+  width: 40%;
+  animation: tune-progress 1.4s ease-in-out infinite;
+}
+
+@keyframes tune-progress {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(250%);
+  }
+}
+
+.tune-foot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.tune-foot .field-hint {
+  flex: 1;
+}
+
+.tune-verdict {
+  margin: 14px 0 0;
+  font-size: 12px;
+  color: var(--text);
+}
+
 .tune-table {
   display: flex;
   flex-direction: column;
@@ -1599,14 +1702,15 @@ input[type="range"] {
 }
 
 .tune-head {
-  font-size: 12px;
+  font-size: 11.5px;
+  font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--muted);
+  color: var(--faint);
 }
 
 .tune-row.is-fastest {
-  background: var(--surface-raised, rgba(127, 127, 127, 0.12));
+  background: var(--bg-card2);
   font-weight: 600;
 }
 
@@ -1615,24 +1719,14 @@ input[type="range"] {
   font-size: 12px;
   font-style: normal;
   font-weight: 400;
-  color: var(--muted);
+  color: var(--text-muted);
 }
 
 .tune-row.is-unranked {
-  color: var(--muted);
+  color: var(--text-muted);
 }
 
-.tune-suggestion {
-  margin-top: 12px;
-}
 
-.tune-history-head {
-  margin: 20px 0 0;
-  font-size: 12px;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--muted);
-}
 
 /* pi */
 
