@@ -1,14 +1,17 @@
 :root {
   --bg: #ffffff;
   --bg-sidebar: #f4f4f6;
-  --bg-hover: #f7f7f9;
+  --bg-hover: #ececef;
   --bg-card: #f9f9fa;
+  --bg-card2: #f1f1f4;
   --badge-bg: #ebedf1;
+  --input: #ffffff;
   --text: #1c1c1e;
   --text-muted: #6e6e73;
+  --faint: #a0a0a6;
   --border: #e2e2e6;
   --accent: #0a6cff;
-  --running: #2eb872;
+  --running: #23a047;
   --danger: #c0392b;
 
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui,
@@ -21,14 +24,17 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #1c1c1e;
-    --bg-sidebar: #232326;
-    --bg-hover: #2a2a2e;
-    --bg-card: #232326;
+    --bg: #1e1e20;
+    --bg-sidebar: #26262a;
+    --bg-hover: #2e2e33;
+    --bg-card: #252529;
+    --bg-card2: #2b2b30;
     --badge-bg: #34343a;
+    --input: #202023;
     --text: #f2f2f7;
     --text-muted: #98989f;
-    --border: #34343a;
+    --faint: #6e6e75;
+    --border: #38383e;
     --accent: #4a9bff;
     --running: #32d74b;
     --danger: #ff6b5e;
@@ -48,7 +54,7 @@ body,
 
 .app {
   display: grid;
-  grid-template-columns: 208px 1fr;
+  grid-template-columns: 216px 1fr;
   height: 100%;
 }
 
@@ -69,7 +75,7 @@ body,
   font-weight: 600;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  color: var(--text-muted);
+  color: var(--faint);
 }
 
 .nav-item {
@@ -134,7 +140,7 @@ body,
 .side-version {
   padding: 8px 9px 0;
   font-size: 11px;
-  color: var(--text-muted);
+  color: var(--faint);
 }
 
 .dot {
@@ -148,46 +154,89 @@ body,
 /* Content */
 
 .content {
+  display: flex;
+  flex-direction: column;
   overflow-y: auto;
-  padding: 0 24px 32px;
+  padding: 0 20px 24px;
 }
 
+.content > * {
+  flex-shrink: 0;
+}
+
+/* A bar, not a heading block: one row, full bleed against the content's padding, with a
+   rule under it separating it from what it titles. */
+/* The bar belongs at the top of the pane whatever the screen puts before it — App renders
+   the stray-server banner ahead of the screen's own fragment. */
 .screen-header {
+  order: -1;
   position: sticky;
   top: 0;
-  z-index: 1;
+  z-index: 2;
   display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 28px 0 16px;
+  align-items: center;
+  gap: 12px;
+  min-height: 62px;
+  margin: 0 -20px 16px;
+  padding: 12px 20px;
   background: var(--bg);
+  border-bottom: 1px solid var(--border);
 }
 
 .screen-header h1 {
   margin: 0;
-  font-size: 20px;
-  font-weight: 600;
+  font-size: 16px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
 }
 
 .screen-subtitle {
-  margin: 4px 0 0;
+  margin: 2px 0 0;
   font-size: 12px;
   color: var(--text-muted);
+}
+
+.crumb {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 0;
+  font: inherit;
+  color: var(--text-muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.crumb:hover {
+  color: var(--text);
+}
+
+/* The title block takes the slack, so whatever a screen puts after it sits at the right
+   edge of the bar — the crumb before it on the model screen stays where it is. */
+.screen-header > div:first-of-type {
+  min-width: 0;
+  margin-right: auto;
 }
 
 .button {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 5px 12px;
+  gap: 6px;
+  padding: 6px 12px;
   font: inherit;
   font-weight: 500;
+  white-space: nowrap;
   color: var(--text);
-  background: var(--bg-sidebar);
+  background: var(--bg-card2);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: 7px;
   cursor: pointer;
+}
+
+.button-lg {
+  padding: 8px 18px;
+  font-size: 14px;
 }
 
 .button-plain {
@@ -346,18 +395,6 @@ body,
   opacity: 1;
 }
 
-.link-back {
-  display: block;
-  padding: 0;
-  margin-bottom: 6px;
-  font: inherit;
-  font-size: 12px;
-  color: var(--accent);
-  background: none;
-  border: none;
-  cursor: pointer;
-}
-
 .model-name .dot {
   display: inline-block;
   margin-right: 6px;
@@ -465,7 +502,8 @@ body,
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 11px;
+  font-size: 12px;
+  font-weight: 600;
   color: var(--text-muted);
 }
 
@@ -488,12 +526,28 @@ input[type="number"],
 input:not([type]),
 select {
   width: 100%;
-  padding: 5px 8px;
+  padding: 8px 11px;
   font: inherit;
   color: var(--text);
-  background: var(--bg);
+  background: var(--input);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: 8px;
+}
+
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  appearance: none;
+  margin: 0;
+}
+
+/* The system select paints its own control in its own colours, which reads as a foreign
+   object on a dark card. Drawn here instead, matching the chevron every disclosure uses. */
+select {
+  appearance: none;
+  padding-right: 30px;
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16' fill='none' stroke='%2398989f' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6.5 L8 10.5 L12 6.5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 9px center;
 }
 
 input[type="range"] {
@@ -1159,6 +1213,320 @@ input[type="range"] {
   display: flex;
   gap: 8px;
   margin-top: 14px;
+}
+
+/* Disclosures */
+
+.badges-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.disclosures {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.fields-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 14px 20px;
+  margin-bottom: 4px;
+}
+
+/* The memory verdict reads as a sentence on the page, not as another card — it is the
+   one thing on this screen that answers "will this work" before anything is pressed. */
+.disclosure.is-flat {
+  background: none;
+  border: none;
+  border-radius: 0;
+}
+
+.disclosure.is-flat > summary {
+  padding: 12px 2px;
+}
+
+.disclosure.is-flat .d-title {
+  font-weight: 400;
+}
+
+.disclosure.is-flat .d-body {
+  padding: 0 2px 12px;
+}
+
+.dot.tone-ok {
+  background: var(--running);
+  opacity: 1;
+}
+
+.dot.tone-warn {
+  background: #d99b28;
+  opacity: 1;
+}
+
+.dot.tone-bad {
+  background: var(--danger);
+  opacity: 1;
+}
+
+.disclosure {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+}
+
+.disclosure > summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.disclosure > summary::-webkit-details-marker {
+  display: none;
+}
+
+.disclosure > summary > svg {
+  flex-shrink: 0;
+  color: var(--text-muted);
+  transition: transform 120ms;
+}
+
+.disclosure[open] > summary > svg {
+  transform: rotate(90deg);
+}
+
+.disclosure .d-title {
+  font-weight: 600;
+}
+
+.disclosure .d-sub {
+  overflow: hidden;
+  font-size: 12px;
+  color: var(--text-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.disclosure .d-body {
+  padding: 2px 14px 14px;
+}
+
+/* Presets */
+
+.presets {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+/* Hero figures */
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 11px;
+}
+
+.card-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.card-big {
+  font-size: 24px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.card-big.tone-ok {
+  color: var(--running);
+}
+
+.card-big.tone-bad {
+  color: var(--danger);
+}
+
+.card-sub {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+.bar {
+  height: 4px;
+  margin-top: 2px;
+  overflow: hidden;
+  background: var(--badge-bg);
+  border-radius: 2px;
+}
+
+.bar span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  border-radius: 2px;
+}
+
+.address {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 2px 10px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.address code {
+  padding: 6px 10px;
+  font-family: ui-monospace, "SF Mono", monospace;
+  font-size: 12px;
+  color: var(--text);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 20px;
+}
+
+.pill-running {
+  color: var(--running);
+  background: color-mix(in srgb, var(--running) 14%, transparent);
+}
+
+.pill-starting {
+  color: #d99b28;
+  background: color-mix(in srgb, #d99b28 16%, transparent);
+}
+
+.title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.d-action {
+  margin-left: auto;
+}
+
+.preset {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px;
+  font: inherit;
+  text-align: left;
+  color: var(--text);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  cursor: pointer;
+}
+
+.preset:hover:not(.is-disabled):not(.is-selected) {
+  background: var(--bg-hover);
+}
+
+.preset.is-selected {
+  background: color-mix(in srgb, var(--accent) 9%, transparent);
+  border-color: var(--accent);
+}
+
+.preset.is-disabled {
+  cursor: default;
+}
+
+.preset.is-disabled .preset-head,
+.preset.is-disabled .preset-detail {
+  opacity: 0.55;
+}
+
+.preset-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.preset-title {
+  font-weight: 600;
+}
+
+.preset-detail {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+
+.preset-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 5px;
+  margin-top: auto;
+  padding-top: 2px;
+}
+
+.button-link {
+  padding: 0;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--accent);
+  background: none;
+  border: none;
+}
+
+.button-link:hover:not(:disabled) {
+  background: none;
+  text-decoration: underline;
+}
+
+.button-link:disabled {
+  color: var(--text-muted);
+}
+
+.radio {
+  flex-shrink: 0;
+  width: 15px;
+  height: 15px;
+  border: 1.5px solid var(--text-muted);
+  border-radius: 50%;
+}
+
+.radio.is-on {
+  border-color: var(--accent);
+  background: radial-gradient(
+    circle,
+    var(--accent) 0 4px,
+    transparent 4.5px
+  );
 }
 
 .advanced {

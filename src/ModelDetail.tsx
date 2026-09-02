@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   getLaunchPlan,
+  getSettings,
   healthTest,
   onTuneReport,
   openWebUi,
@@ -8,13 +9,16 @@ import {
   runnerStart,
   runnerStop,
   speedsFor,
+  tuneStart,
   tuneStatus,
 } from "./api";
 import { formatContext, formatFileSize, formatMemory } from "./format";
 import { bytesOr, pressureText, Stat } from "./Memory";
-import ProfileForm, { AUTO_CTX } from "./ProfileForm";
+import { ChevronRightIcon, PlayIcon, StopIcon } from "./icons";
+import { AdvancedFields, AUTO_CTX, ProfileFields } from "./ProfileForm";
 import HealthPanel from "./HealthPanel";
 import PiPanel from "./PiPanel";
+import Presets, { presetName, selectedPreset, type Which } from "./Presets";
 import TunePanel from "./TunePanel";
 import type {
   HealthReport,
@@ -56,38 +60,136 @@ function Facts({ model }: { model: ModelEntry }) {
   );
 }
 
-/// What the context field is asking for. Auto asks for nothing and says so, rather than
-/// printing the 0 that carries the meaning.
-function ctxStat(ctx: number): { value: string; hint: string } {
-  if (ctx === AUTO_CTX) {
-    return {
-      value: "fitted to memory",
-      hint: "the server chooses one at launch",
-    };
-  }
-  return { value: ctx.toLocaleString(), hint: "what this launch will request" };
+/// A section the screen keeps folded: a title, one line saying what is inside, and the
+/// full content only on demand. The redesign's launch screen is these rows — the memory
+/// verdict, the speed history, the model's facts, the command — with only the choice of
+/// how to run left open.
+function Disclosure({
+  title,
+  sub,
+  dot,
+  flat,
+  action,
+  open,
+  onToggle,
+  children,
+}: {
+  title: string;
+  sub?: string;
+  /// Shown before the title, coloured by the verdict it carries.
+  dot?: "ok" | "warn" | "bad";
+  /// Without the card: a line on the page that happens to open.
+  flat?: boolean;
+  /// Sits at the right of the summary. Its clicks do not open the row.
+  action?: React.ReactNode;
+  open?: boolean;
+  onToggle?: (open: boolean) => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <details
+      className={`disclosure${flat ? " is-flat" : ""}`}
+      open={open}
+      onToggle={(e) => onToggle?.(e.currentTarget.open)}
+    >
+      <summary>
+        <ChevronRightIcon />
+        {dot && <span className={`dot tone-${dot}`} />}
+        <span className="d-title">{title}</span>
+        {sub && <span className="d-sub">{sub}</span>}
+        {action && (
+          <span
+            className="d-action"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            }}
+          >
+            {action}
+          </span>
+        )}
+      </summary>
+      <div className="d-body">{children}</div>
+    </details>
+  );
 }
 
-/// A figure the header supports, marked where it is only part of one.
-///
-/// `bounded` carries two different facts and they need two different sentences: a cache
-/// of nothing was not priced at all, because Auto has chosen no context yet, and saying
-/// "some layers are not counted" there names the wrong reason entirely.
-function kvStat(plan: LaunchPlan): { value: string; hint: string } {
+function Card({
+  label,
+  value,
+  sub,
+  tone,
+  fill,
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+  tone?: "ok" | "bad";
+  /// 0 to 1, drawn as a bar under the figure.
+  fill?: number | null;
+}) {
+  return (
+    <div className="card">
+      <span className="card-label">{label}</span>
+      <span className={`card-big${tone ? ` tone-${tone}` : ""}`}>{value}</span>
+      {sub && <span className="card-sub">{sub}</span>}
+      {fill != null && (
+        <div className="bar">
+          <span style={{ width: `${Math.min(100, Math.max(0, fill * 100))}%` }} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+/// What this launch asks of the machine, in one sentence. The bar and the folded row
+/// both read it, so the summary can never disagree with the panel under it.
+function launchCost(
+  plan: LaunchPlan,
+): { wants: string; breakdown: string; verdict: string; tone: "ok" | "warn" | "bad" } | null {
   const estimate = plan.estimate;
-  if (estimate == null) {
-    return { value: "Unavailable", hint: "the header does not size it" };
+  if (estimate == null) return null;
+
+  const budget = plan.deviceBudgetBytes;
+  const free = plan.memory.availableBytes;
+  const strained =
+    plan.memory.pressure === "warning" || plan.memory.pressure === "critical";
+  const { weightsBytes, kvBytes, totalBytes, bounded } = estimate;
+  const over = budget != null && totalBytes > budget;
+  const crowded = free != null && totalBytes > free;
+
+  let sign = "";
+  if (bounded) {
+    sign = "≥ ";
   }
-  if (estimate.kvBytes === 0) {
-    return { value: "—", hint: "no context chosen yet" };
+  let wants = `${sign}${formatMemory(totalBytes)}`;
+  let breakdown = `${formatMemory(weightsBytes)} weights + ${formatMemory(kvBytes)} cache at ${plan.profile.ctx.toLocaleString()} tokens`;
+  if (kvBytes === 0) {
+    wants = `${sign}${formatMemory(weightsBytes)}`;
+    breakdown = "weights only — no context chosen, so the cache is not counted";
   }
-  if (estimate.bounded) {
-    return {
-      value: `≥ ${formatMemory(estimate.kvBytes)}`,
-      hint: "a floor — some layers are not counted",
-    };
+
+  // Two questions, and the verdict is the worse of them. Fitting the GPU says a launch is
+  // allowed; it says nothing about a machine with nothing left to give.
+  let verdict = "fits";
+  let tone: "ok" | "warn" | "bad" = "ok";
+  if (over) {
+    verdict = "over the GPU limit";
+    tone = "bad";
+  } else if (budget == null) {
+    verdict = "ceiling unknown";
+    tone = "warn";
+  } else if (strained) {
+    verdict = "fits, but the machine is under pressure";
+    tone = "bad";
+  } else if (crowded) {
+    verdict = "fits the GPU, not what is free";
+    tone = "warn";
+  } else if (budget != null && totalBytes < budget * 0.6) {
+    verdict = "fits comfortably";
   }
-  return { value: formatMemory(estimate.kvBytes), hint: "from the model's header" };
+
+  return { wants, breakdown, verdict, tone };
 }
 
 function MemoryBar({ plan }: { plan: LaunchPlan }) {
@@ -149,39 +251,8 @@ function MemoryBar({ plan }: { plan: LaunchPlan }) {
   const ceiling = budget ?? plan.totalMemory;
   const scale = Math.max(ceiling, totalBytes);
   const width = (n: number) => `${(n / scale) * 100}%`;
-  const over = budget != null && totalBytes > budget;
 
-  let sign = "";
-  if (bounded) {
-    sign = "≥ ";
-  }
-
-  let wants = `${sign}${formatMemory(totalBytes)}`;
-  let breakdown = `${formatMemory(weightsBytes)} weights + ${formatMemory(kvBytes)} cache at ${plan.profile.ctx.toLocaleString()} tokens`;
-  if (kvBytes === 0) {
-    wants = `${sign}${formatMemory(weightsBytes)}`;
-    breakdown = "weights only — no context chosen, so the cache is not counted";
-  }
-
-  // Two questions, and the verdict is the worse of them. Fitting the GPU says a launch is
-  // allowed; it says nothing about a machine with nothing left to give, which is what
-  // "fit does not mean it works" means and what this panel got wrong first time.
-  const crowded = free != null && totalBytes > free;
-  let verdict = "fits";
-  let tone: "ok" | "warn" | "bad" = "ok";
-  if (over) {
-    verdict = "over the GPU limit";
-    tone = "bad";
-  } else if (budget == null) {
-    verdict = "ceiling unknown";
-    tone = "warn";
-  } else if (strained) {
-    verdict = "fits, but the machine is under pressure";
-    tone = "bad";
-  } else if (crowded) {
-    verdict = "fits the GPU, not what is free";
-    tone = "warn";
-  }
+  const cost = launchCost(plan)!;
 
   return (
     <div className="memory">
@@ -192,8 +263,8 @@ function MemoryBar({ plan }: { plan: LaunchPlan }) {
       </div>
 
       <div className="telemetry-stats">
-        <Stat label="This launch wants" value={wants} hint={breakdown} />
-        <Stat label="Against the limit" value={verdict} tone={tone} />
+        <Stat label="This launch wants" value={cost.wants} hint={cost.breakdown} />
+        <Stat label="Against the limit" value={cost.verdict} tone={cost.tone} />
       </div>
 
       {bounded && boundNote && <p className="field-hint">{boundNote}</p>}
@@ -334,14 +405,12 @@ export default function ModelDetail({
   runner,
   telemetry,
   logs,
-  onBack,
   onRunnerChange,
 }: {
   model: ModelEntry;
   runner: RunnerSnapshot;
   telemetry: Telemetry | null;
   logs: string[];
-  onBack: () => void;
   onRunnerChange: (snapshot: RunnerSnapshot) => void;
 }) {
   const [plan, setPlan] = useState<LaunchPlan | null>(null);
@@ -359,6 +428,10 @@ export default function ModelDetail({
   const [testing, setTesting] = useState(false);
   const [tune, setTune] = useState<TuneReport | null>(null);
   const [speeds, setSpeeds] = useState<SpeedSummary | null>(null);
+  const [defaults, setDefaults] = useState<Profile | null>(null);
+  /// The preset card last pressed. Cleared by any other edit, so a hand-changed field
+  /// falls back to whatever the values themselves say.
+  const [picked, setPicked] = useState<Which>(null);
   const history = useRef<number[]>([]);
 
   const isCurrent = runner.modelId === model.id;
@@ -386,7 +459,9 @@ export default function ModelDetail({
   }, [running, runner.serverCtx, model.id, form]);
 
   useEffect(() => {
-    if (isCurrent && (runner.state === "starting" || runner.state === "crashed")) {
+    // Only a crash opens the log by itself. A launch that works has nothing in it the
+    // reader wanted, and unrolling a thousand lines under four calm figures undoes them.
+    if (isCurrent && runner.state === "crashed") {
       setShowLogs(true);
     }
     // A report describes one run; keeping it visible across a restart would misreport.
@@ -397,6 +472,9 @@ export default function ModelDetail({
 
   useEffect(() => {
     tuneStatus().then(setTune).catch(() => {});
+    getSettings()
+      .then((s) => setDefaults(s.launchDefaults ?? s.builtInDefaults))
+      .catch(() => {});
     const stop = onTuneReport(setTune);
     return () => {
       void stop.then((off) => off());
@@ -449,9 +527,7 @@ export default function ModelDetail({
     return (
       <>
         <header className="screen-header">
-          <button className="button" onClick={onBack}>
-            Back
-          </button>
+          <h1>{model.displayName}</h1>
         </header>
         {failure && <p className="notice notice-error">{failure}</p>}
       </>
@@ -464,27 +540,175 @@ export default function ModelDetail({
   // beside a profile reading 0.
   const shown = fitted ?? preview ?? plan;
 
+  const tuneBlocked =
+    blocked ??
+    (runner.state === "idle"
+      ? null
+      : "Tune launches servers of its own, and this app runs one model at a time. Stop the running model first.");
+
+  const cost = launchCost(shown);
+  const measuring = tune?.running === true && tune.modelId === model.id;
+  let ceilingText = "";
+  if (shown.deviceBudgetBytes != null) {
+    ceilingText = ` of ${formatMemory(shown.deviceBudgetBytes)}`;
+  }
+  const preset = presetName(
+    picked ??
+      selectedPreset({
+        form,
+        defaults,
+        summary: speeds,
+        fitAvailable: plan.fitAvailable,
+      }),
+  );
+  /// Every route to the form other than a preset card, which is what makes the highlight
+  /// honest: touch a field and the cards stop claiming credit for the values.
+  const editForm = (next: Profile) => {
+    setPicked(null);
+    setForm(next);
+  };
+  const applyPreset = (partial: Partial<Profile>, which: Which) => {
+    setPicked(which);
+    setForm((current) => current && { ...current, ...partial });
+  };
+  let advancedSub = "";
+  if (preset) {
+    advancedSub = ` — using ${preset} values`;
+  }
+  // The four figures the running screen leads with, each said the way someone who is not
+  // an expert would read it, with the number they would quote kept beside it.
+  const totalMem = telemetry?.systemTotalBytes ?? null;
+  let memoryCardSub = "what this model is using right now";
+  let memoryFill: number | null = null;
+  if (telemetry?.systemUsedBytes != null && totalMem != null) {
+    memoryFill = telemetry.systemUsedBytes / totalMem;
+    memoryCardSub = `the Mac is using ${formatMemory(telemetry.systemUsedBytes)} of ${formatMemory(totalMem)} · pressure ${pressureText(telemetry.pressure)}`;
+  }
+
+  const gen = telemetry?.genTps ?? telemetry?.lastGenTps ?? null;
+  const prompt = telemetry?.promptTps ?? telemetry?.lastPromptTps ?? null;
+  let speedValue = "—";
+  if (gen != null && gen > 0) {
+    speedValue = `${gen.toFixed(0)} tok/s`;
+  }
+  let speedSubtitle = "writing speed — ask it something to see one";
+  if (prompt != null && prompt > 0) {
+    speedSubtitle = `writing speed · reads your prompt at ${prompt.toFixed(0)} tok/s`;
+  }
+
+  const kv = telemetry?.kvCacheUsage ?? null;
+  let contextValue = "—";
+  if (kv != null) {
+    contextValue = `${Math.round(kv * 100)}% full`;
+  }
+  let contextSubtitle = "how much of the conversation it is holding";
+  if (runner.serverCtx != null) {
+    const used = kv == null ? null : Math.round(kv * runner.serverCtx);
+    contextSubtitle =
+      used == null
+        ? `${runner.serverCtx.toLocaleString()} tokens available`
+        : `${used.toLocaleString()} of ${runner.serverCtx.toLocaleString()} tokens in use`;
+  }
+
+  let healthValue = "Starting…";
+  let healthTone: "ok" | "bad" | undefined;
+  let healthSubtitle = "waiting for the server to answer";
+  if (runner.state === "ready") {
+    if (telemetry?.healthOk === false) {
+      healthValue = "Not answering";
+      healthTone = "bad";
+      healthSubtitle = "the process is alive but the endpoint is silent";
+    } else {
+      healthValue = "Ready";
+      healthTone = "ok";
+      healthSubtitle = "answering requests now";
+    }
+  }
+  const passed = health?.checks.filter((c) => c.status === "passed").length ?? 0;
+  if (health) {
+    const first = health.timings.timeToFirstTokenMs;
+    healthSubtitle = `${passed} of ${health.checks.length} checks passed`;
+    if (first != null) {
+      healthSubtitle += ` · first reply in ${(first / 1000).toFixed(1)} s`;
+    }
+    if (health.verdict === "failed") {
+      healthValue = "Problem";
+      healthTone = "bad";
+    }
+  }
+
+  let testSub = "not run yet";
+  let testDot: "ok" | "warn" | "bad" | undefined;
+  if (health) {
+    testSub = `${passed} of ${health.checks.length} checks passed`;
+    testDot = "ok";
+    if (health.verdict === "passedWithWarnings") testDot = "warn";
+    if (health.verdict === "failed") {
+      testDot = "bad";
+      testSub = `${health.checks.length - passed} of ${health.checks.length} checks did not pass`;
+    }
+  }
+
+  let speedSub = "not measured yet";
+  if (speeds?.suggestion) {
+    speedSub = `suggested ${speeds.suggestion.ctx.toLocaleString()} · ${speeds.suggestion.cacheTypeK}`;
+    if (speeds.suggestedTps != null) {
+      speedSub += ` · ${speeds.suggestedTps.toFixed(1)} tok/s`;
+    }
+  }
+
   return (
     <>
       <header className="screen-header">
         <div>
-          <button className="link-back" onClick={onBack}>
-            ← Library
-          </button>
-          <h1 title={model.fileName}>{model.displayName}</h1>
-          <p className="screen-subtitle" title={model.path}>
-            {model.path}{" "}
-            <button
-              className="link-stop"
-              onClick={() => void revealPath(model.path).catch(() => {})}
-            >
-              reveal in Finder
-            </button>
-          </p>
+          <span className="title-row">
+            <h1 title={model.fileName}>{model.displayName}</h1>
+            {isCurrent && runner.state === "ready" && (
+              <span className="pill pill-running">
+                <span className="dot tone-ok" />
+                Running
+              </span>
+            )}
+            {isCurrent && runner.state === "starting" && (
+              <span className="pill pill-starting">
+                <span className="dot state-starting" />
+                Starting…
+              </span>
+            )}
+          </span>
+          <div className="badges-row">
+            {model.quant && <span className="badge">{model.quant}</span>}
+            {model.metadata?.sizeLabel && (
+              <span className="badge">{model.metadata.sizeLabel}</span>
+            )}
+            {model.metadata?.contextLength != null && (
+              <span className="badge">
+                {formatContext(model.metadata.contextLength)} context
+              </span>
+            )}
+            <span className="badge">{formatFileSize(model.sizeBytes)}</span>
+            {model.metadata?.expertCount ? (
+              <span className="badge badge-moe">MoE</span>
+            ) : null}
+            {model.metadata != null && !model.metadata.hasChatTemplate && (
+              <span className="badge badge-warn">no template</span>
+            )}
+          </div>
         </div>
         <div className="actions">
           {running ? (
             <>
+              {port != null && runner.state === "ready" && (
+                <button
+                  className="button"
+                  onClick={() => {
+                    setFailure(null);
+                    openWebUi(port).catch((e) => setFailure(String(e)));
+                  }}
+                >
+                  Open chat
+                </button>
+              )}
               <button
                 className="button"
                 disabled={busy}
@@ -492,20 +716,30 @@ export default function ModelDetail({
               >
                 Reload
               </button>
+              {runner.state === "ready" && (
+                <button
+                  className="button button-primary"
+                  onClick={() => setPi(true)}
+                >
+                  Use in pi
+                </button>
+              )}
               <button
                 className="button button-danger"
                 disabled={busy}
                 onClick={() => guard(() => runnerStop())}
               >
+                <StopIcon />
                 Stop
               </button>
             </>
           ) : (
             <button
-              className="button button-primary"
+              className="button button-primary button-lg"
               disabled={busy || blocked !== null}
               onClick={() => guard(() => runnerStart(model.id, draft))}
             >
+              <PlayIcon />
               Run
             </button>
           )}
@@ -537,21 +771,101 @@ export default function ModelDetail({
 
 
       {isCurrent && runner.state === "ready" && (
-        <section className="panel">
-          <div className="panel-head">
-            <h2>Running</h2>
-            <span className="actions">
-              {port != null && (
-                <button
-                  className="button"
-                  onClick={() => {
-                    setFailure(null);
-                    openWebUi(port).catch((e) => setFailure(String(e)));
-                  }}
-                >
-                  Web UI
-                </button>
-              )}
+        <>
+          <div className="cards">
+            <Card
+              label="Memory"
+              value={bytesOr(telemetry?.processFootprintBytes)}
+              sub={memoryCardSub}
+              fill={memoryFill}
+            />
+            <Card label="Speed" value={speedValue} sub={speedSubtitle} />
+            <Card
+              label="Context"
+              value={contextValue}
+              sub={contextSubtitle}
+              fill={telemetry?.kvCacheUsage ?? null}
+            />
+            <Card
+              label="Health"
+              value={healthValue}
+              tone={healthTone}
+              sub={healthSubtitle}
+            />
+          </div>
+
+          {port != null && (
+            <p className="address">
+              <span>Other apps reach this model at</span>
+              <code>http://localhost:{port}/v1</code>
+              <button
+                className="button"
+                onClick={() =>
+                  navigator.clipboard.writeText(`http://localhost:${port}/v1`)
+                }
+              >
+                Copy
+              </button>
+            </p>
+          )}
+
+          {pi && <PiPanel onClose={() => setPi(false)} />}
+        </>
+      )}
+
+      {/* A running model has already answered "how should it run"; the choice folds away
+          under Details, where the mockup puts it, and the figures take the top. */}
+      {running ? (
+        <h2 className="group-label">Details</h2>
+      ) : (
+        <>
+          <h2 className="group-label">How should it run?</h2>
+
+          <Presets
+            form={form}
+            defaults={defaults}
+            summary={speeds}
+            fitAvailable={plan.fitAvailable}
+            measureBlocked={tuneBlocked}
+            measuring={measuring}
+            picked={picked}
+            onApply={applyPreset}
+            onMeasure={() => {
+              setFailure(null);
+              tuneStart(model.id)
+                .then(setTune)
+                .catch((e) => setFailure(String(e)));
+            }}
+          />
+
+          <ProfileFields
+            value={form}
+            maxCtx={plan.maxCtx}
+            fitAvailable={plan.fitAvailable}
+            onChange={editForm}
+          />
+
+          <Disclosure
+            flat
+            dot={cost?.tone ?? "warn"}
+            title={
+              cost
+                ? `Estimated memory ${cost.wants}${ceilingText} — ${cost.verdict}`
+                : "Memory — not enough header metadata to size this launch"
+            }
+          >
+            <MemoryBar plan={shown} />
+          </Disclosure>
+        </>
+      )}
+
+      <div className="disclosures">
+        {running && (
+          <Disclosure
+            title="Test results"
+            sub={testSub}
+            dot={testDot}
+            action={
               <button
                 className="button"
                 disabled={testing}
@@ -564,110 +878,103 @@ export default function ModelDetail({
                     .finally(() => setTesting(false));
                 }}
               >
-                {testing ? "Testing…" : "Test model"}
+                {testing ? "Testing…" : "Test again"}
               </button>
-              <button className="button" onClick={() => setPi(true)}>
-                Use in pi
-              </button>
-            </span>
-          </div>
-          <TelemetryPanel
-            runner={runner}
-            telemetry={telemetry}
-            history={history.current}
-          />
-          {health && <HealthPanel report={health} />}
-          {pi && <PiPanel onClose={() => setPi(false)} />}
-        </section>
-      )}
-
-      <section className="panel">
-        <h2>Model</h2>
-        <Facts model={model} />
-      </section>
-
-      <section className="panel">
-        <h2>Context</h2>
-        <div className="telemetry-stats">
-          <Stat
-            label="Model maximum"
-            value={
-              plan.maxCtx == null ? "Unavailable" : plan.maxCtx.toLocaleString()
-            }
-            hint="from the file's metadata"
-          />
-          <Stat
-            label="Current profile"
-            value={ctxStat(form.ctx).value}
-            hint={ctxStat(form.ctx).hint}
-          />
-          <Stat
-            label="KV cache at this context"
-            value={kvStat(shown).value}
-            hint={kvStat(shown).hint}
-          />
-        </div>
-      </section>
-
-      <TunePanel
-        modelId={model.id}
-        blocked={
-          blocked ??
-          (runner.state === "idle"
-            ? null
-            : "Tune launches servers of its own, and this app runs one model at a time. Stop the running model first.")
-        }
-        report={tune}
-        onReport={setTune}
-        summary={speeds}
-        onApply={(settings) => setForm((current) => current && { ...current, ...settings })}
-      />
-
-      <section className="panel">
-        <h2>Launch settings</h2>
-
-        <ProfileForm
-          value={form}
-          maxCtx={plan.maxCtx}
-          fitAvailable={plan.fitAvailable}
-          onChange={setForm}
-        />
-
-      </section>
-
-      <section className="panel">
-        <h2>Memory</h2>
-        <MemoryBar plan={shown} />
-      </section>
-
-      <section className="panel">
-        <h2>Command</h2>
-        <pre className="command">{preview?.command ?? plan.command}</pre>
-        <div className="panel-actions">
-          <button
-            className="button"
-            onClick={() =>
-              navigator.clipboard.writeText(preview?.command ?? plan.command)
             }
           >
-            Copy
-          </button>
-        </div>
-      </section>
-
-      <section className="panel">
-        <div className="panel-head">
-          <h2>Logs</h2>
-          <button className="button" onClick={() => setShowLogs((v) => !v)}>
-            {showLogs ? "Hide" : "Show"}
-          </button>
-        </div>
-        {showLogs && (
-          <pre className="logs">
-            {logs.length > 0 ? logs.join("\n") : "No output yet."}
-          </pre>
+            {health ? (
+              <HealthPanel report={health} />
+            ) : (
+              <p className="field-hint">
+                Nothing has been checked yet. Test again runs every check —
+                process, port, health endpoint, model list, alias, and a real
+                reply — and says what passed.
+              </p>
+            )}
+          </Disclosure>
         )}
-      </section>
+
+        {running && runner.state === "ready" && (
+          <Disclosure
+            title="Live details"
+            sub="token counts, queue, swap and the rate over time"
+          >
+            <TelemetryPanel
+              runner={runner}
+              telemetry={telemetry}
+              history={history.current}
+            />
+          </Disclosure>
+        )}
+
+        {!running && (
+          <Disclosure
+            title="Advanced"
+            sub={`GPU layers, cache types, parallel slots, flags${advancedSub}`}
+          >
+            <AdvancedFields value={form} onChange={editForm} />
+          </Disclosure>
+        )}
+
+        {!running && (
+          <Disclosure
+            title="Full command"
+            sub="see exactly what will run before you press Run"
+          >
+            <pre className="command">{preview?.command ?? plan.command}</pre>
+            <div className="panel-actions">
+              <button
+                className="button"
+                onClick={() =>
+                  navigator.clipboard.writeText(preview?.command ?? plan.command)
+                }
+              >
+                Copy
+              </button>
+            </div>
+          </Disclosure>
+        )}
+
+        <Disclosure title="Model details" sub={model.fileName}>
+          <Facts model={model} />
+          <div className="panel-actions">
+            <button
+              className="button"
+              onClick={() => void revealPath(model.path).catch(() => {})}
+            >
+              Reveal in Finder
+            </button>
+          </div>
+        </Disclosure>
+
+        {/* Both only when they have something to say: the measurement history until
+            something has been measured, the log until something has been printed. */}
+        {!running && (measuring || speeds?.rows.length) ? (
+          <Disclosure title="Speed" sub={speedSub} open={measuring}>
+            <TunePanel
+              modelId={model.id}
+              blocked={tuneBlocked}
+              report={tune}
+              onReport={setTune}
+              summary={speeds}
+              onApply={(settings) =>
+                setForm((current) => current && { ...current, ...settings })
+              }
+            />
+          </Disclosure>
+        ) : null}
+
+        {logs.length > 0 && (
+          <Disclosure
+            title="Logs"
+            sub="output from llama-server"
+            open={showLogs}
+            onToggle={setShowLogs}
+          >
+            <pre className="logs">{logs.join("\n")}</pre>
+          </Disclosure>
+        )}
+      </div>
     </>
   );
 }

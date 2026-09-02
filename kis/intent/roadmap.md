@@ -234,8 +234,26 @@ unplanned.
 - The app can start with an unusable window. Observed twice in one session: once
   with no window at all and the Window menu empty, once at 60x60.
   `show_main_window` asserts a usable frame and does not reliably achieve it.
-  Predates the downloader, and is a release blocker of its own. Never reproduced
-  on demand, so the fix will be structural rather than a repair.
+  Predates the downloader, and is a release blocker of its own. **Third
+  observation 2026-09-02, and the first with hard numbers**: a dev build at
+  `c6ac59f` came up 107×114 at (15, 673) — the configured 880×480 minimums
+  ignored — with the whole UI rendered scaled inside it, captured by window
+  id. One of three dev launches that session; the other two were 1060×720.
+  **Three more times the same day, and there is now a suspect.** Two of them
+  did not start that way: a window that had been 1060×720 for minutes was
+  found at 166×164, then another at 145×171, both at the screen's
+  bottom-left corner, with nobody touching either. Each of those two followed
+  a Vite hot reload within seconds, which looked like the first suspect ever
+  seen — **and that hypothesis is wrong.** It was written down on 2026-09-02
+  and falsified the same day by the next launch: a **fresh** `tauri dev` with
+  no reload of any kind came up at **91×112 at (16, 906)**, the same corner.
+  So reload is not the trigger; what the four collapses share is only the
+  corner and a frame far under the configured 880×480 minimums.
+
+  **Six observations now, and the pattern to chase is the corner**: every
+  collapse puts the window at the bottom-left of a display, which is where a
+  frame of (0,0)-ish origin with a collapsed size would land. Restarting has
+  cleared it every time, and roughly one launch in three is affected.
 - ~~The Dock icon does not reopen the main window once it has been closed.~~
   Fixed 2026-08-08, issue 1: the run loop matched only `ExitRequested` and `Exit`,
   so the hide-on-close decision ([knowledge/project.md](../knowledge/project.md))

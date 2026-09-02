@@ -10,14 +10,18 @@ Branch:   `main`, clean and pushed. **`v0.6.1` is tagged at `5d8957d`, behind
           that writes the number increments it. Assuming tag and HEAD are
           identical is what put a build of HEAD in the v0.3.0 release
           ([knowledge/technical.md](../knowledge/technical.md)).
-Task:     **Redesign phase 1 (shell and Library) landed 2026-09-02**, proof in
-          [intent/redesign.md](../intent/redesign.md): four commands green and
-          the dev app's window captured showing the new shell. Uncommitted.
-          Three of its states are owed to the author's look before phase 2:
-          Run pressed from a row, the Running group forming, the orphan
-          banner and its Ignore.
-Mode:     Phase — redesign, between phases 1 and 2
-          ([intent/redesign.md](../intent/redesign.md)).
+Task:     **Redesign phases 2 and 3 are built and committed, and five things
+          still do not match the artboards** — they are listed screen by
+          screen in [intent/redesign.md](../intent/redesign.md) under "What
+          still does not match". Phase 1 landed as `c6ac59f`.
+
+          **Six passes were needed for one screen**, four of them wasted
+          because the app was compared against the code that generated the
+          mockup rather than the mockup rendered. The author called it, and
+          the next session works **one screen per task**, each finished by
+          the side-by-side capture in
+          [knowledge/technical.md](../knowledge/technical.md).
+Mode:     Phase — redesign, between phase 3 and the corrections above.
 Blocker:  none. The **Gatekeeper check is met**, twice over on 2026-09-02 — the
           run that failed is why v0.6.1 exists
           ([intent/release.md](../intent/release.md)).
@@ -28,9 +32,11 @@ Blocker:  none. The **Gatekeeper check is met**, twice over on 2026-09-02 — th
           was against v0.5.0 and does not carry. Two older: a queued download row
           with nothing on disk behind it coming back from a restart, and an Intel
           Mac running the universal build.
-Next:     **The author's look at phase 1 in the built app**, then redesign
-          phase 2 — the launch presets
-          ([intent/redesign.md](../intent/redesign.md)). The README's
+Next:     **Item 1 of "What still does not match"** — the stopped model
+          screen's rows, starting with the log the author does not want on a
+          model that is not running
+          ([intent/redesign.md](../intent/redesign.md)). One screen, one
+          task, and the capture before it is called done. The README's
           screenshots, previously here, wait behind the whole redesign on the
           author's decision: every phase would invalidate them again, so they
           are done once, against the finished UI

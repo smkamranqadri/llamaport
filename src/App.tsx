@@ -191,7 +191,6 @@ export default function App() {
           runner={runner}
           telemetry={telemetry}
           logs={logs}
-          onBack={() => setSelected(null)}
           onRunnerChange={setRunner}
         />
       );

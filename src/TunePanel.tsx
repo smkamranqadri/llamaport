@@ -206,9 +206,12 @@ export default function TunePanel({
   };
 
   return (
-    <section className="panel">
+    <div>
       <div className="panel-head">
-        <h2>Speed</h2>
+        <span className="field-hint">
+          Launches this model at a few settings, asks each the same question,
+          and times the answer.
+        </span>
         <span className="actions">
           {running ? (
             <button className="button" onClick={() => act(tuneCancel)}>
@@ -248,10 +251,8 @@ export default function TunePanel({
 
       {rows.length === 0 && !running && summary?.suggestion == null && (
         <p className="field-hint">
-          Use the model and it will say what it got; press Tune and it will
-          launch this model at a few settings, ask each the same question, and
-          time the answer. A memory sum says a launch is allowed, never that it
-          is fast.
+          Use the model and it will say what it got; press Tune to measure. A
+          memory sum says a launch is allowed, never that it is fast.
         </p>
       )}
 
@@ -346,6 +347,6 @@ export default function TunePanel({
           </div>
         </>
       )}
-    </section>
+    </div>
   );
 }

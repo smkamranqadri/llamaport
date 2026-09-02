@@ -49,6 +49,14 @@ export function PlayIcon() {
   return <Icon path='<path d="M5 3.5 L12 8 L5 12.5 Z"/>' size={13} />;
 }
 
+export function ChevronRightIcon() {
+  return <Icon path='<path d="M6 3.5 L10.5 8 L6 12.5"/>' size={14} />;
+}
+
+export function ChevronLeftIcon() {
+  return <Icon path='<path d="M10 3.5 L5.5 8 L10 12.5"/>' size={14} />;
+}
+
 export function StopIcon() {
   return <Icon path='<rect x="4" y="4" width="8" height="8" rx="1.5"/>' size={13} />;
 }

@@ -96,6 +96,36 @@ bun run tauri dev
 
 ## Verify
 
+**A UI change is checked against the mockup rendered, never against the code
+that generated it.** Established 2026-09-02 after four passes of the redesign
+were handed over as matching and none did; the fifth rendered the artboard,
+looked at it, and found a missing control in a minute
+([intent/redesign.md](../intent/redesign.md)).
+
+Both halves are scriptable, and neither needs the author:
+
+- **The mockup.** The canvas artboards under the scratchpad are `.dc.html` —
+  plain markup inside `<x-dc>`/`<helmet>` wrappers. Strip the wrappers, hoist
+  the `<style>` into `<head>`, serve the directory with `python3 -m
+  http.server`, and open it in Chrome to screenshot.
+- **The app.** `screencapture -x -o -l <window id>` takes the window alone,
+  with no desktop around it and without raising it. The id comes from
+  `CGWindowListCopyWindowInfo` in a one-file Swift script — the app's webview
+  exposes no accessibility tree, and System Events refuses to focus it
+  (`-25208`), so this is the only route.
+- **A window that will not photograph.** `screencapture -l` answers "could not
+  create image from window" when the window is hidden or on another Space,
+  which `kCGWindowIsOnscreen` reports as `on=false`. `osascript -e 'tell
+  application "System Events" to set visible of process "llamaport" to true'`
+  makes it capturable — and unlike `frontmost`, that call is permitted here.
+  Waiting for `on=true` does not work; the window can sit that way for
+  minutes.
+- **Reaching a screen behind a click.** The webview forgets its React state on
+  every hot reload, so the model screen cannot be photographed by opening it
+  by hand and then editing. Patch a temporary `useEffect` into `App.tsx` that
+  selects a model on mount, capture, revert it, and prove the revert with
+  `git diff --stat src/App.tsx` before the four commands run again.
+
 `tools/fits.py MODEL.gguf` is a **second opinion on `estimate.rs`**, not a
 convenience. The suite only ever sizes synthetic headers; the script sizes a
 real file in the models directory by an independent route, so a disagreement
