@@ -5,6 +5,7 @@
   --bg-card: #f9f9fa;
   --bg-card2: #f1f1f4;
   --badge-bg: #ebedf1;
+  --code-bg: #f3f3f6;
   --input: #ffffff;
   --text: #1c1c1e;
   --text-muted: #6e6e73;
@@ -30,6 +31,7 @@
     --bg-card: #252529;
     --bg-card2: #2b2b30;
     --badge-bg: #34343a;
+    --code-bg: #19191b;
     --input: #202023;
     --text: #f2f2f7;
     --text-muted: #98989f;
@@ -711,8 +713,9 @@ input[type="range"] {
   font-family: ui-monospace, "SF Mono", monospace;
   font-size: 11px;
   line-height: 1.6;
-  background: var(--bg-sidebar);
-  border-radius: 6px;
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: 7px;
   white-space: pre-wrap;
   word-break: break-word;
 }
@@ -1394,9 +1397,9 @@ input[type="range"] {
 
 .bar {
   height: 4px;
-  margin-top: 2px;
+  margin-top: 4px;
   overflow: hidden;
-  background: var(--badge-bg);
+  background: var(--bg-hover);
   border-radius: 2px;
 }
 
@@ -1417,11 +1420,11 @@ input[type="range"] {
 }
 
 .address code {
-  padding: 6px 10px;
+  padding: 7px 10px;
   font-family: ui-monospace, "SF Mono", monospace;
   font-size: 12px;
   color: var(--text);
-  background: var(--bg-card);
+  background: var(--code-bg);
   border: 1px solid var(--border);
   border-radius: 7px;
 }

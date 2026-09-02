@@ -65,6 +65,15 @@ export function CheckIcon() {
   return <Icon path='<path d="M3 8.5 L6.5 12 L13 4.5"/>' size={14} />;
 }
 
+export function CopyIcon() {
+  return (
+    <Icon
+      path='<rect x="5.5" y="5.5" width="8" height="8" rx="1.5"/><path d="M10.5 5.5 V4 A1.5 1.5 0 0 0 9 2.5 H4 A1.5 1.5 0 0 0 2.5 4 V9 A1.5 1.5 0 0 0 4 10.5 H5.5"/>'
+      size={14}
+    />
+  );
+}
+
 export function StopIcon() {
   return <Icon path='<rect x="4" y="4" width="8" height="8" rx="1.5"/>' size={13} />;
 }

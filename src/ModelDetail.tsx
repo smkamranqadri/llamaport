@@ -15,7 +15,7 @@ import {
 } from "./api";
 import { formatContext, formatFileSize, formatMemory } from "./format";
 import { bytesOr, pressureText, Stat } from "./Memory";
-import { CloseIcon, PlayIcon, StopIcon } from "./icons";
+import { CloseIcon, CopyIcon, PlayIcon, StopIcon } from "./icons";
 import Disclosure from "./Disclosure";
 import { AdvancedFields, AUTO_CTX, ProfileFields } from "./ProfileForm";
 import HealthPanel from "./HealthPanel";
@@ -559,14 +559,30 @@ export default function ModelDetail({
   if (preset) {
     advancedSub = ` — using ${preset} values`;
   }
+  let commandSub = "see exactly what will run before you press Run";
+  if (running) {
+    commandSub = "the exact llama-server command this run uses";
+  }
   // The four figures the running screen leads with, each said the way someone who is not
   // an expert would read it, with the number they would quote kept beside it.
   const totalMem = telemetry?.systemTotalBytes ?? null;
   let memoryCardSub = "what this model is using right now";
   let memoryFill: number | null = null;
-  if (telemetry?.systemUsedBytes != null && totalMem != null) {
-    memoryFill = telemetry.systemUsedBytes / totalMem;
-    memoryCardSub = `the Mac is using ${formatMemory(telemetry.systemUsedBytes)} of ${formatMemory(totalMem)} · pressure ${pressureText(telemetry.pressure)}`;
+  if (totalMem != null) {
+    let verdict = "plenty left";
+    const used = telemetry?.systemUsedBytes;
+    if (used != null) {
+      const freeShare = 1 - used / totalMem;
+      if (freeShare < 0.15) verdict = "little left";
+      else if (freeShare < 0.35) verdict = "some room left";
+    }
+    if (telemetry?.pressure === "warning" || telemetry?.pressure === "critical") {
+      verdict = "the Mac is under pressure";
+    }
+    memoryCardSub = `of ${formatMemory(totalMem)} — ${verdict}`;
+    if (telemetry?.processFootprintBytes != null) {
+      memoryFill = telemetry.processFootprintBytes / totalMem;
+    }
   }
 
   const gen = telemetry?.genTps ?? telemetry?.lastGenTps ?? null;
@@ -670,24 +686,26 @@ export default function ModelDetail({
               </span>
             )}
           </span>
-          <div className="badges-row">
-            {model.quant && <span className="badge">{model.quant}</span>}
-            {model.metadata?.sizeLabel && (
-              <span className="badge">{model.metadata.sizeLabel}</span>
-            )}
-            {model.metadata?.contextLength != null && (
-              <span className="badge">
-                {formatContext(model.metadata.contextLength)} context
-              </span>
-            )}
-            <span className="badge">{formatFileSize(model.sizeBytes)}</span>
-            {model.metadata?.expertCount ? (
-              <span className="badge badge-moe">MoE</span>
-            ) : null}
-            {model.metadata != null && !model.metadata.hasChatTemplate && (
-              <span className="badge badge-warn">no template</span>
-            )}
-          </div>
+          {!running && (
+            <div className="badges-row">
+              {model.quant && <span className="badge">{model.quant}</span>}
+              {model.metadata?.sizeLabel && (
+                <span className="badge">{model.metadata.sizeLabel}</span>
+              )}
+              {model.metadata?.contextLength != null && (
+                <span className="badge">
+                  {formatContext(model.metadata.contextLength)} context
+                </span>
+              )}
+              <span className="badge">{formatFileSize(model.sizeBytes)}</span>
+              {Boolean(model.metadata?.expertCount) && (
+                <span className="badge badge-moe">MoE</span>
+              )}
+              {model.metadata != null && !model.metadata.hasChatTemplate && (
+                <span className="badge badge-warn">no template</span>
+              )}
+            </div>
+          )}
         </div>
         <div className="actions">
           {running ? (
@@ -798,6 +816,7 @@ export default function ModelDetail({
                   navigator.clipboard.writeText(`http://localhost:${port}/v1`)
                 }
               >
+                <CopyIcon />
                 Copy
               </button>
             </p>
@@ -910,11 +929,7 @@ export default function ModelDetail({
           </Disclosure>
         )}
 
-        {!running && (
-          <Disclosure
-            title="Full command"
-            sub="see exactly what will run before you press Run"
-          >
+        <Disclosure title="Full command" sub={commandSub}>
             <pre className="command">{preview?.command ?? plan.command}</pre>
             <div className="panel-actions">
               <button
@@ -923,11 +938,11 @@ export default function ModelDetail({
                   navigator.clipboard.writeText(preview?.command ?? plan.command)
                 }
               >
+                <CopyIcon />
                 Copy
               </button>
             </div>
-          </Disclosure>
-        )}
+        </Disclosure>
 
         <Disclosure title="Model details" sub={model.fileName}>
           <Facts model={model} />
