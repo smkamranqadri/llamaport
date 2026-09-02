@@ -53,7 +53,7 @@ the event stream, so a state change that only returns leaves the menu bar stale.
 Assert on what was emitted, not only on the snapshot: the snapshot is right in
 exactly the case this gets wrong.
 
-Config is one JSON file at schema 7, every field `#[serde(default)]`, with
+Config is one JSON file at schema 8, every field `#[serde(default)]`, with
 unknown keys preserved through a load/save round-trip. `migrate` strips keys the
 app deliberately retired, so a new field must never reuse a retired name — serde
 would claim it first and adopt settings from a build several schemas old.

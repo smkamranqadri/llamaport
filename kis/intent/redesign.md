@@ -31,6 +31,9 @@ Live status is in [state/current.md](../state/current.md), not here.
 - **First run offers starter models sized to the machine's memory**, with
   paste-a-URL still available.
 - **Theme follows macOS**, both appearances, as the app already does.
+  SUPERSEDED — see [appearance.md](appearance.md): following macOS is now one of
+  three modes rather than the only behaviour, and four ported palettes sit
+  beside the built-in one.
 - **Activity Monitor ships with a CPU% column and no GPU column.** The choice
   was the author's, made knowing the telemetry has neither today: CPU comes
   from the `proc_pid_rusage` call `sysmem.rs` already makes for the footprint;
@@ -728,9 +731,9 @@ fmt status: 0
 ```
 
 Rendered against `App.css` in both appearances before hand-over, including the
-failure state the artboard does not draw. **The author's eyes are still owed a
-running transfer**: the bar and the figures line are the two things a render
-cannot prove.
+failure state the artboard does not draw. **Signed off by the author on
+2026-09-03**, on the running app: "download, activity table and pick all good,
+reviwed".
 
 ### Phase 4, Activity Monitor — done 2026-09-03
 
@@ -776,6 +779,9 @@ rather than pinned to the window's bottom edge, so they follow the window
 instead of floating over it; and a stray row is marked amber, because it is the
 one thing on that screen this app did not start.
 
+**Signed off by the author on 2026-09-03**, on the running app, in the same
+breath as Downloads and the picker.
+
 ### Phase 4, Settings — done 2026-09-03, and the redesign closes
 
 Files: `src/SettingsScreen.tsx`, `src/App.css`, `src-tauri/Cargo.toml`,
@@ -811,7 +817,8 @@ clippy status: 0
 fmt status: 0
 ```
 
-**Owed to the author's eyes, and to a signed build**: the picker is the first
-native dialog this app opens, and a `dev` window says nothing about how it
-behaves inside a notarised bundle — recorded in
-[release.md](release.md) under "Unverified against v0.6.1".
+**Signed off by the author on 2026-09-03** — the picker opens and returns a
+folder in the running app. **The notarised bundle is a separate question**: a
+native dialog can behave one way in a `dev` window and another when signed and
+sandboxed, and that check is in [release.md](release.md) under "Unverified
+against v0.6.1".

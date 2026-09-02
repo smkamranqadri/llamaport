@@ -74,10 +74,11 @@ mistake — the right unit is not the same for all four.
   stays binary and stays labelled GB, because that is what a 32 GB Mac has and
   what Activity Monitor reports. Two formatters, each named for which it is.
 - **The rate limit moves with `formatRate` or not at all.** `toField`, `toRate`,
-  the `MIB` constant and the `FLOOR` hint are one closed binary system, and
-  `Downloads.tsx:310` documents why: a limit typed as 10 reads back as 9.5 if
-  they disagree. Changing the formatter alone re-creates that bug pointing the
-  other way.
+  the `MB` constant and the floor hint in `Downloads.tsx` are one closed system:
+  a limit typed as 10 reads back as 9.5 if they disagree. Changing the formatter
+  alone re-creates that bug pointing the other way. The screen has since been
+  rewritten around a named ladder ([redesign.md](redesign.md)), and the rule
+  survived it — the typed field is still parsed and printed by that same pair.
 - **The exactness claim is not strengthened.** After this the arithmetic is
   right about what it models. Whether it equals llama.cpp's allocation to the
   byte is unproven — the server allocates in cells and pads them, and

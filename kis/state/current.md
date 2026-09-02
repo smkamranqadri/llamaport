@@ -18,12 +18,15 @@ Task:     **The redesign is finished.** All four phases and all five of the
           and **`tauri-plugin-dialog`**, this app's first native dialog, behind
           Settings' Change… button.
 
+          **Signed off by the author on 2026-09-03** on the running app —
+          "download, activity table and pick all good, reviwed" — so nothing in
+          the redesign is owed a look. **The one thing still unseen is the
+          picker inside a notarised bundle**, which a dev window cannot answer
+          ([release.md](../intent/release.md)).
+
           **The app is the author's: never launch, capture or drive it** — ask
           him for the screenshot, and render what can be rendered without it
-          ([knowledge/technical.md](../knowledge/technical.md) Verify). **His
-          eyes are owed three screens**: a running transfer on Downloads, a live
-          Activity table, and the folder picker — none of which a render can
-          prove, the last not even in a dev window.
+          ([knowledge/technical.md](../knowledge/technical.md) Verify).
 
 Mode:     Standard. Nothing is part-finished.
 
