@@ -436,6 +436,7 @@ export default function ModelDetail({
 
   const isCurrent = runner.modelId === model.id;
   const running = isCurrent && (runner.state === "starting" || runner.state === "ready");
+  const crashed = isCurrent && runner.state === "crashed";
   const { port } = runner;
 
   useEffect(() => {
@@ -649,12 +650,9 @@ export default function ModelDetail({
     }
   }
 
-  let speedSub = "not measured yet";
-  if (speeds?.suggestion) {
-    speedSub = `suggested ${speeds.suggestion.ctx.toLocaleString()} · ${speeds.suggestion.cacheTypeK}`;
-    if (speeds.suggestedTps != null) {
-      speedSub += ` · ${speeds.suggestedTps.toFixed(1)} tok/s`;
-    }
+  let speedSub = "trying safe combinations of context and memory precision";
+  if (tune != null && tune.total > 0) {
+    speedSub = `${tune.done} of ${tune.total} tries done`;
   }
 
   return (
@@ -760,7 +758,7 @@ export default function ModelDetail({
       )}
       {failure && <p className="notice notice-error">{failure}</p>}
 
-      {isCurrent && runner.state === "crashed" && (
+      {crashed && (
         <div className="notice notice-error">
           <strong>{runner.error}</strong>
           {runner.crashTail.length > 0 && (
@@ -947,10 +945,10 @@ export default function ModelDetail({
           </div>
         </Disclosure>
 
-        {/* Both only when they have something to say: the measurement history until
-            something has been measured, the log until something has been printed. */}
-        {!running && (measuring || speeds?.rows.length) ? (
-          <Disclosure title="Speed" sub={speedSub} open={measuring}>
+        {/* The ladder while it runs and no longer: a stopped model's history is the one
+            line the Best speed card carries, and the tries get their own screen. */}
+        {!running && measuring ? (
+          <Disclosure title="Speed" sub={speedSub} open>
             <TunePanel
               modelId={model.id}
               blocked={tuneBlocked}
@@ -964,7 +962,7 @@ export default function ModelDetail({
           </Disclosure>
         ) : null}
 
-        {logs.length > 0 && (
+        {(running || crashed) && logs.length > 0 && (
           <Disclosure
             title="Logs"
             sub="output from llama-server"
