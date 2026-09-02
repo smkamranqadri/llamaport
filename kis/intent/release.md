@@ -55,7 +55,7 @@ fix, which is what a check that had never been run was always going to cost.
 ## Unverified against v0.6.1
 
 Moved out of [state/current.md](../state/current.md) on 2026-09-02, where it had
-become a ledger. Four checks nobody has run, each needing a human at the machine:
+become a ledger. Five checks nobody has run, each needing a human at the machine:
 
 - **Five launches from Finder** with nothing fullscreen.
 - **The Dock click.** The 2026-09-01 evidence was against v0.5.0 and does not

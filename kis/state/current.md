@@ -30,26 +30,15 @@ Task:     **The redesign is finished.** All four phases and all five of the
 
 Mode:     Standard. Nothing is part-finished.
 
-Blocker:  none. **The unusable-window bug has escalated and now wants its own
-          task**: eight sightings on 2026-09-02, one of them with nobody
-          touching the window. It is no longer one launch in three. **The recovery is
-          scriptable** — an `osascript` clicking the tray's Show window restored
-          it three times from the session, so it does not need a human at the
-          machine, and it is the one thing that may touch the window under the
-          ruling above, because it is a recovery rather than a capture.
-          Two traps that cost time are recorded with it
-          ([intent/roadmap.md](../intent/roadmap.md) risks): never resize the
-          window through System Events, which collapses it outright, and never
-          capture straight after a tray recovery, which returns a sheared image
-          that lies about alignment.
+Blocker:  none.
 
-          The **Gatekeeper check is met**, twice over on 2026-09-02 — the
-          run that failed is why v0.6.1 exists
-          ([intent/release.md](../intent/release.md)).
+          Two things are open and neither blocks: **the unusable-window bug**,
+          whose sightings, sizes, falsified hypotheses, scripted recovery and
+          two traps are all in [intent/roadmap.md](../intent/roadmap.md) risks —
+          it wants its own task; and **the checks nobody has run**, listed in
+          [intent/release.md](../intent/release.md) under "Unverified against
+          v0.6.1".
 
-          **Four checks nobody has run**, each needing a human at the machine,
-          listed in [intent/release.md](../intent/release.md) under "Unverified
-          against v0.6.1".
 Next:     **The README's screenshots**, which have waited behind the whole
           redesign for exactly this moment — the UI is finished, so they can be
           taken once ([release.md](../intent/release.md) phase 3). They need the
@@ -57,12 +46,9 @@ Next:     **The README's screenshots**, which have waited behind the whole
 
           Then a **release**, which is the first that would carry the redesign,
           the appearance work and a new plugin. Run
-          `git rev-list --count v0.6.1..HEAD` before building anything, and read
-          [release.md](../intent/release.md)'s "Unverified against v0.6.1" — now
-          five checks, the newest being **the folder picker inside a notarised
-          bundle**.
-
-          Also open: the **unusable-window bug**, which still wants its own task.
+          `git rev-list --count v0.6.1..HEAD` before building anything, and work
+          through [release.md](../intent/release.md)'s five unverified checks,
+          the newest being **the folder picker inside a notarised bundle**.
 
           Recorded and not fixed: the memory-safety badges, the Starting pill
           and the warning badge still use fixed ambers and greens that no
@@ -83,10 +69,8 @@ What the app is for: [intent/direction.md](../intent/direction.md).
 The four commands green, each status captured on its own line and never after a
 pipe. **261 tests**, the newest three being Activity's row assembly, one of them
 watched to fail when the measurement's own server stops being excluded from the
-strays ([intent/redesign.md](../intent/redesign.md)). The
-redesign's own last item added none: it is a screen, and `tune::Report`'s new
-`candidates` field is a copy of the list the ladder is already given. Each phase
-file carries the count it left behind, so the history is not repeated here.
+strays ([intent/redesign.md](../intent/redesign.md)). Each phase file carries
+the count it left behind, so the history is not repeated here.
 
 Two suites need the real machine: `real_launch` proves a run is recorded against
 the real binary and a real model, and `real_tune` checks the candidate picker
