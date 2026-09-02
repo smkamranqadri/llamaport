@@ -172,7 +172,13 @@ user, reversing two standing decisions ([direction.md](direction.md)).
    measurement. Phase 4 keeps Downloads, Settings and Activity; the first run
    left it early on the author's ask.
 
-15. **MoE launches** — written up 2026-09-02, **unplanned and blocked on a
+15. **Appearance** — asked for and shipped 2026-09-03, in
+   [appearance.md](appearance.md). A Mode control and five palettes, four of
+   them ported from `hermes-hq`, over a stylesheet that now derives its
+   surfaces from seven anchors rather than listing fifteen values twice. The
+   first thing in this app whose screen has no artboard behind it.
+
+16. **MoE launches** — written up 2026-09-02, **unplanned and blocked on a
    measurement**, in [moe.md](moe.md). Every launch the app builds is fully
    offloaded, so a 35B-A3B costs its whole 22.1 GB of the Metal working set
    while doing 3B of arithmetic per token; `llama-server` has offered

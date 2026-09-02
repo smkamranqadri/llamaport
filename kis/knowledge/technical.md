@@ -248,8 +248,8 @@ default. Sibling `.bak`, `.save` and `.backup` files already accumulate beside i
   the suite. Anything that puts prose next to a figure earns a look before it is
   called done.
 
-  **The running tally, because it is the argument: twenty-three defects across
-  six phases, every one found by looking and none by the suite.** Eleven on
+  **The running tally, because it is the argument: twenty-four defects across
+  seven phases, every one found by looking and none by the suite.** Eleven on
   2026-08-31, five in Tune's panel on 2026-09-01, three in the pi button on
   2026-09-02 — a label that wrapped, a file mode read out of `ls -l`, and a
   provider that turned out not to be selectable — and two in the redesign on
@@ -263,15 +263,30 @@ default. Sibling `.bak`, `.save` and `.backup` files already accumulate beside i
   `.tune-note` and `.tune-row.is-unranked` were painted with `--muted` and
   `.tune-row.is-fastest` with `--surface-raised`, neither of which this
   stylesheet has ever defined, so three greys rendered as body text and a
-  highlight as nothing. **A twenty-fourth was worse and took five releases**: a bundle macOS refuses to open, which only a browser download
+  highlight as nothing. One more in Appearance on 2026-09-03: three of the
+  ported palettes are pale enough that the white label on the primary button
+  vanished into it, which is what `--on-accent` exists for. **A twenty-fourth was worse and took five releases**: a bundle macOS refuses to open, which only a browser download
   exposed ([intent/release.md](../intent/release.md)). A phase is not done when
   the suite is green; it is done when somebody has looked.
 
-  The sidebar one and the dead CSS tokens are the only entries the *method*
-  caught rather than the author: one fell out of rendering the artboard and
-  putting it beside the app before anything was changed, the other out of
-  reading the artboard's stylesheet against `App.css`. That is the argument for doing the comparison first
+  The sidebar one, the dead CSS tokens and the unreadable accent buttons are the
+  only entries the *method* caught rather than the author: one fell out of
+  rendering the artboard and putting it beside the app before anything was
+  changed, one out of reading the artboard's stylesheet against `App.css`, and
+  one out of rendering every palette before handing any of them over. That is the argument for doing the comparison first
   rather than after a round of corrections.
+
+- **A palette is seven anchors; the surfaces are mixed from them.** `App.css`
+  holds ground, text, muted text, line, accent, running and danger per theme,
+  and derives sidebar, card, card2, hover, badge, input, code and faint from
+  those once in `:root`. Adding a palette is a block of seven declarations, and
+  hand-picking a fifteenth value for one theme is how the two lists drifted
+  apart before ([intent/appearance.md](../intent/appearance.md)). `theme.ts`
+  writes `data-theme` and `data-mode` on the root before the first render, so
+  there is no `prefers-color-scheme` query anywhere in the stylesheet: System is
+  resolved in one place. Anything painted on the accent uses `--on-accent`,
+  never `#fff` — three of the palettes are pale enough that white is unreadable
+  on them.
 
 - **`--fit` is on by default, and this app suppresses it by naming every value.**
   It "adjusts unset arguments to fit in device memory" (`--fit [on|off]`,
