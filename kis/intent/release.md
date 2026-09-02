@@ -52,6 +52,20 @@ described. **So the check owed since v0.1.0 is met** — it took two runs on one
 day, the first to find that five releases were broken and the second to prove the
 fix, which is what a check that had never been run was always going to cost.
 
+## Unverified against v0.6.1
+
+Moved out of [state/current.md](../state/current.md) on 2026-09-02, where it had
+become a ledger. Four checks nobody has run, each needing a human at the machine:
+
+- **Five launches from Finder** with nothing fullscreen.
+- **The Dock click.** The 2026-09-01 evidence was against v0.5.0 and does not
+  carry to this build.
+- A **queued download row with nothing on disk behind it** coming back from a
+  restart.
+- An **Intel Mac** running the universal build.
+
+The first two are owed against v0.6.1; the other two are older.
+
 ## v0.6.0 — shipped 2026-09-02
 
 https://github.com/smkamranqadri/llamaport/releases/tag/v0.6.0 — a full release,

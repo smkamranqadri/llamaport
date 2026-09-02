@@ -29,8 +29,14 @@ src-tauri/src/
   sysmem.rs    machine memory readings via libc
   profile.rs   launch settings -> argv
 src/
-  App.tsx, Library.tsx, ModelDetail.tsx, ProfileForm.tsx, SettingsScreen.tsx,
-  HealthPanel.tsx, Memory.tsx, Downloads.tsx, api.ts, types.ts, format.ts
+  App.tsx        the shell: sidebar, screen routing, runner and orphan state
+  Library.tsx    the model list; FirstRun.tsx is what it shows when empty
+  ModelDetail.tsx  one model, stopped or running; Presets.tsx picks how it runs
+  ProfileForm.tsx  ProfileFields and AdvancedFields, shared with Settings
+  SettingsScreen.tsx, Downloads.tsx, HealthPanel.tsx, Memory.tsx
+  TunePanel.tsx  the measurement ladder; PiPanel.tsx writes pi's two files
+  icons.tsx      every SVG the UI draws
+  api.ts, types.ts, format.ts, diff.ts
 src-tauri/tests/   integration tests; real_* need a model, a binary or the network
                    common/ isolates the config directory; call it before any runner
 ```
@@ -82,10 +88,11 @@ output.
 Everything the app keeps lives in `~/Library/Application Support/llamaport`:
 that config, `downloads.json`, `speeds.json`, the runner pidfile, the last run
 log.
-`store::adopt_legacy_dir`
+`store::adopt_legacy_config_dir`
 takes over the directory left under the old `llama-cpp-hub` name, once, as the
 first statement in `setup` — before the pidfile is read or the config is loaded,
-both of which are in that same block.
+both of which are in that same block. It is the no-argument wrapper;
+`adopt_legacy_dir` is the pair-of-paths helper the tests drive.
 
 ## Run
 
