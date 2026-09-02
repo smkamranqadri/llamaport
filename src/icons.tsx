@@ -93,8 +93,23 @@ export function SearchIcon() {
   );
 }
 
+/// pi's own mark, from the logo the project publishes (`https://pi.dev/logo-auto.svg`,
+/// linked by its README). Filled rather than stroked, and cropped to the artwork's own
+/// bounds so it sits at the weight of the stroked icons beside it.
 export function PiIcon() {
   return (
-    <Icon path='<path d="M2.5 4.5 H13.5"/><path d="M5.5 4.5 V12"/><path d="M10.5 4.5 V11 a1.5 1.5 0 0 0 2.5 1"/>' size={14} />
+    <svg
+      width="13"
+      height="13"
+      viewBox="165.29 165.29 469.43 469.43"
+      fill="currentColor"
+      aria-hidden="true"
+    >
+      <path
+        fillRule="evenodd"
+        d="M165.29 165.29 H517.36 V400 H400 V517.36 H282.65 V634.72 H165.29 Z M282.65 282.65 V400 H400 V282.65 Z"
+      />
+      <path d="M517.36 400 H634.72 V634.72 H517.36 Z" />
+    </svg>
   );
 }

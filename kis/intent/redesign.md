@@ -558,9 +558,15 @@ Decisions, all put to the author before anything was deleted:
   file and that is often the half you remember. Rescan stays: nothing watches
   the models directory, so it is the only manual refresh.
 - **Use in pi** is on the running row, opening the same `PiPanel` the model
-  screen uses. Its mark is a drawn π: there is no pi brand asset anywhere on
-  this machine — `~/.pi` and `~/.superconductor` were searched — and inventing
-  a logo would be worse than the glyph.
+  screen uses. Its mark was a drawn π, because `~/.pi` and `~/.superconductor`
+  hold no brand asset. **Corrected 2026-09-02 on the author's "add actual pi
+  icon"**: the installed package names the real one in its README —
+  `https://pi.dev/logo-auto.svg`, a filled blocky P with the i's square, not a
+  Greek letter at all. `PiIcon` is that artwork, cropped to its own bounds so it
+  carries the weight of the stroked icons beside it, and the model screen's
+  header button now takes it too. The search that found nothing looked in the
+  data directories and never in the package that installs the command:
+  `~/.local/lib/node_modules/@earendil-works/pi-coding-agent`.
 
 Two corrections from the author on the first capture, both his eye and not the
 suite's: the Download model button, and **a row 14px shorter than the drawing**.

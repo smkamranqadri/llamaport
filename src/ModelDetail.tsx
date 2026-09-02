@@ -15,7 +15,7 @@ import {
 } from "./api";
 import { formatContext, formatFileSize, formatMemory } from "./format";
 import { bytesOr, pressureText, Stat } from "./Memory";
-import { CloseIcon, CopyIcon, PlayIcon, StopIcon } from "./icons";
+import { CloseIcon, CopyIcon, PiIcon, PlayIcon, StopIcon } from "./icons";
 import Disclosure from "./Disclosure";
 import { AdvancedFields, AUTO_CTX, ProfileFields } from "./ProfileForm";
 import HealthPanel from "./HealthPanel";
@@ -733,6 +733,7 @@ export default function ModelDetail({
                   className="button button-primary"
                   onClick={() => setPi(true)}
                 >
+                  <PiIcon />
                   Use in pi
                 </button>
               )}
