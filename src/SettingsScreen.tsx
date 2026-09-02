@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { open } from "@tauri-apps/plugin-dialog";
 import {
   getSettings,
   setAppearance,
@@ -6,6 +7,8 @@ import {
   setLlamaServerPath,
   setModelsDir,
 } from "./api";
+import Disclosure from "./Disclosure";
+import { formatContext } from "./format";
 import ProfileForm from "./ProfileForm";
 import {
   apply as applyAppearance,
@@ -15,7 +18,32 @@ import {
   themeOf,
   type Mode,
 } from "./theme";
-import type { Profile, Settings } from "./types";
+import { AUTO_CTX } from "./ProfileForm";
+import type { Capabilities, Profile, Settings } from "./types";
+
+/// What this app asks of the build it finds. `--fit` is not here: without it the app
+/// resolves Auto to a number itself, which is a smaller loss than a missing figure.
+const NEEDED = ["--metrics", "--cache-type-k"];
+
+/// One line about the binary, in place of the six facts this card used to print. It says
+/// which flag is missing rather than only that something is: "not supported" without a
+/// name is a sentence nobody can act on.
+function binaryVerdict(
+  settings: Settings,
+  caps: Capabilities,
+  missing: string[],
+): string {
+  let found = "Found automatically";
+  if (settings.llamaServerPath != null) {
+    found = "Chosen by you";
+  }
+  const version = caps.version ?? "an unnamed build";
+
+  if (missing.length === 0) {
+    return `${found} · version ${version} · everything Llamaport needs is supported`;
+  }
+  return `${found} · version ${version} · this build has no ${missing.join(" and no ")}`;
+}
 
 /// What a model opens on before anyone has launched it. Mirrors `Profile::default()` in
 /// Rust; the two only have to agree on what the form shows, because a launch sends the
@@ -27,7 +55,6 @@ export default function SettingsScreen({
 }) {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [dir, setDir] = useState("");
-  const [binary, setBinary] = useState("");
   const [saved, setSaved] = useState<string | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
   const [defaults, setDefaults] = useState<Profile | null>(null);
@@ -37,7 +64,6 @@ export default function SettingsScreen({
       .then((next) => {
         setSettings(next);
         setDir(next.modelsDir);
-        setBinary(next.llamaServerPath ?? "");
         setDefaults(next.launchDefaults);
       })
       .catch((e) => setFailure(String(e)));
@@ -60,6 +86,20 @@ export default function SettingsScreen({
   }
 
   const caps = settings.capabilities;
+  const missing = NEEDED.filter((flag) => !(caps?.flags ?? []).includes(flag));
+
+  // The one line the fold leaves behind, so what the defaults are does not need opening.
+  const shown = defaults ?? settings.builtInDefaults;
+  let source = "Built-in";
+  if (settings.launchDefaults != null) {
+    source = "Yours";
+  }
+  let context = "fitted context";
+  if (shown.ctx !== AUTO_CTX) {
+    context = `${formatContext(shown.ctx)} context`;
+  }
+  const defaultsSummary = `${source} · ${context} · port ${shown.port}`;
+
   const theme = themeOf(settings.appearance);
   const mode = modeOf(settings.appearance);
 
@@ -84,82 +124,83 @@ export default function SettingsScreen({
       {failure && <p className="notice notice-error">{failure}</p>}
 
       <section className="panel">
-        <h2>Models directory</h2>
+        <h2>Models folder</h2>
+        <p className="field-hint">
+          Where your models live on disk. Nothing watches it, so press Rescan in
+          the Library after adding a file by hand.
+        </p>
         <div className="row-input">
-          <input value={dir} onChange={(e) => setDir(e.currentTarget.value)} />
+          <input value={dir} readOnly />
           <button
             className="button"
-            onClick={() =>
-              setModelsDir(dir)
-                .then(() => {
-                  onModelsDirChanged();
-                  flash("saved");
+            onClick={() => {
+              setFailure(null);
+              open({ directory: true, defaultPath: dir })
+                .then((chosen) => {
+                  if (typeof chosen !== "string") return;
+                  setDir(chosen);
+                  return setModelsDir(chosen).then(() => {
+                    onModelsDirChanged();
+                    flash("saved");
+                  });
                 })
-                .catch((e) => setFailure(String(e)))
-            }
+                .catch((e) => setFailure(String(e)));
+            }}
           >
-            Save
+            Change…
           </button>
         </div>
       </section>
 
       <section className="panel">
         <h2>llama-server</h2>
-        <div className="row-input">
-          <input
-            value={binary}
-            placeholder="leave empty to search PATH and the usual locations"
-            onChange={(e) => setBinary(e.currentTarget.value)}
-          />
-          <button
-            className="button"
-            onClick={() =>
-              setLlamaServerPath(binary.trim() === "" ? null : binary.trim())
-                .then((next) => {
-                  setSettings(next);
-                  flash("saved");
-                })
-                .catch((e) => setFailure(String(e)))
-            }
-          >
-            Save
-          </button>
-        </div>
 
         {settings.capabilityError && (
           <p className="notice notice-error">{settings.capabilityError}</p>
         )}
 
         {caps && (
-          <dl className="facts">
-            <div className="fact">
-              <dt>Binary</dt>
-              <dd>{caps.binary}</dd>
-            </div>
-            <div className="fact">
-              <dt>Version</dt>
-              <dd>{caps.version ?? "unknown"}</dd>
-            </div>
-            <div className="fact">
-              <dt>Flags detected</dt>
-              <dd>{caps.flags.length}</dd>
-            </div>
-            <div className="fact">
-              <dt>--flash-attn</dt>
-              <dd>{caps.flashAttnTakesValue ? "takes on/off" : "bare switch"}</dd>
-            </div>
-            <div className="fact">
-              <dt>--metrics</dt>
-              <dd>{caps.flags.includes("--metrics") ? "supported" : "missing"}</dd>
-            </div>
-            <div className="fact">
-              <dt>Cache type flags</dt>
-              <dd>
-                {caps.flags.includes("--cache-type-k") ? "supported" : "missing"}
-              </dd>
-            </div>
-          </dl>
+          <p className="verdict-line">
+            <span className={`dot tone-${missing.length === 0 ? "ok" : "warn"}`} />
+            <span>{binaryVerdict(settings, caps, missing)}</span>
+          </p>
         )}
+
+        <p className="field-hint path-line">
+          <span title={caps?.binary}>{caps?.binary ?? "not found"}</span>
+          <button
+            className="button button-link"
+            onClick={() => {
+              setFailure(null);
+              open({ directory: false, defaultPath: caps?.binary })
+                .then((chosen) => {
+                  if (typeof chosen !== "string") return;
+                  return setLlamaServerPath(chosen).then((next) => {
+                    setSettings(next);
+                    flash("saved");
+                  });
+                })
+                .catch((e) => setFailure(String(e)));
+            }}
+          >
+            Choose a different one
+          </button>
+          {settings.llamaServerPath != null && (
+            <button
+              className="button button-link"
+              onClick={() =>
+                setLlamaServerPath(null)
+                  .then((next) => {
+                    setSettings(next);
+                    flash("searching again");
+                  })
+                  .catch((e) => setFailure(String(e)))
+              }
+            >
+              Find it for me
+            </button>
+          )}
+        </p>
       </section>
 
       <section className="panel">
@@ -215,46 +256,48 @@ export default function SettingsScreen({
           changing these never overwrites anything you have tuned.
         </p>
 
-        <ProfileForm
-          fitAvailable={caps?.flags.includes("--fit") ?? false}
-          value={defaults ?? settings.builtInDefaults}
-          maxCtx={null}
-          showAlias={false}
-          onChange={setDefaults}
-        />
+        <Disclosure title="Edit defaults" sub={defaultsSummary}>
+          <ProfileForm
+            fitAvailable={caps?.flags.includes("--fit") ?? false}
+            value={defaults ?? settings.builtInDefaults}
+            maxCtx={null}
+            showAlias={false}
+            onChange={setDefaults}
+          />
 
-        <div className="panel-actions">
-          <button
-            className="button button-primary"
-            onClick={() =>
-              setLaunchDefaults(defaults)
-                .then((next) => {
-                  setSettings(next);
-                  setDefaults(next.launchDefaults);
-                  flash("saved");
-                })
-                .catch((e) => setFailure(String(e)))
-            }
-          >
-            Save defaults
-          </button>
-          {settings.launchDefaults && (
+          <div className="panel-actions">
             <button
-              className="button"
+              className="button button-primary"
               onClick={() =>
-                setLaunchDefaults(null)
+                setLaunchDefaults(defaults)
                   .then((next) => {
                     setSettings(next);
                     setDefaults(next.launchDefaults);
-                    flash("back to the built-in values");
+                    flash("saved");
                   })
                   .catch((e) => setFailure(String(e)))
               }
             >
-              Reset
+              Save defaults
             </button>
-          )}
-        </div>
+            {settings.launchDefaults && (
+              <button
+                className="button"
+                onClick={() =>
+                  setLaunchDefaults(null)
+                    .then((next) => {
+                      setSettings(next);
+                      setDefaults(next.launchDefaults);
+                      flash("back to the built-in values");
+                    })
+                    .catch((e) => setFailure(String(e)))
+                }
+              >
+                Reset
+              </button>
+            )}
+          </div>
+        </Disclosure>
       </section>
     </>
   );

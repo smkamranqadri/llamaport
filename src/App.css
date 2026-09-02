@@ -497,20 +497,28 @@ body,
 
 /* Panels */
 
+/* Settings is a column of cards, as the artboard draws it: a ground of its own, a
+   sentence-case title, and the explanation under it rather than in a tooltip. */
 .panel {
-  margin-bottom: 16px;
-  padding: 14px 16px;
+  margin-bottom: 12px;
+  padding: 16px;
+  background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 11px;
 }
 
 .panel h2 {
-  margin: 0 0 12px;
-  font-size: 12px;
+  margin: 0 0 6px;
+  font-size: 14px;
   font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--text-muted);
+  color: var(--text);
+}
+
+.panel > .field-hint {
+  display: block;
+  max-width: 640px;
+  margin: 0 0 14px;
+  line-height: 1.45;
 }
 
 .panel-actions {
@@ -2281,4 +2289,34 @@ input[type="range"] {
 
 .card-sub.tone-bad {
   color: var(--danger);
+}
+
+/* Settings */
+
+.verdict-line {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  margin: 0 0 8px;
+}
+
+/* Two classes, because the card's own rule for a hint sets `display: block` and would
+   otherwise collapse the gap between the path and the link beside it. */
+.field-hint.path-line {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0;
+}
+
+.path-line > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.path-line .button-link {
+  flex: none;
+  padding: 0;
+  font-size: 12px;
 }
