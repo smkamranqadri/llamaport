@@ -220,7 +220,7 @@ export default function App() {
         <NavItem
           label="Library"
           icon={<StackIcon />}
-          active={screen === "library" && !selected}
+          active={screen === "library"}
           extra={running ? <span className="side-run-dot" /> : undefined}
           onClick={() => go("library")}
         />
@@ -228,7 +228,7 @@ export default function App() {
         <NavItem
           label="Downloads"
           icon={<DownloadIcon />}
-          active={screen === "downloads" && !selected}
+          active={screen === "downloads"}
           onClick={() => go("downloads")}
         />
         <div className="side-section">General</div>
@@ -237,7 +237,7 @@ export default function App() {
         <NavItem
           label="Settings"
           icon={<SlidersIcon />}
-          active={screen === "settings" && !selected}
+          active={screen === "settings"}
           onClick={() => go("settings")}
         />
         <div className="side-version">Llamaport {version}</div>
