@@ -7,17 +7,19 @@ Branch:   `main`, working tree clean. **`v0.6.1` is tagged at `5d8957d` and HEAD
           written here, because the commit that records it increments it. Why it
           matters is in [knowledge/technical.md](../knowledge/technical.md).
 
-Task:     **Nothing is in progress.** The code review's 22 findings landed on
-          2026-09-04 in four commits ([intent/review.md](../intent/review.md)),
-          and the author looked at the built bundle the same day: all four
-          things reported good, and one more asked for — the model screen had
-          never carried its owner's picture — landed in the commit after.
+Task:     **Release v0.7.0** ([intent/release.md](../intent/release.md)), the
+          first to carry the redesign, Appearance, Discover, the owner avatars,
+          the translucent sidebar, a CSP and a private API. Asked for
+          2026-09-04. The bump is committed (`chore: v0.7.0`); the tag waits
+          on two things below. Then: `CI=true bun run tauri build` for aarch64
+          and `--target universal-apple-darwin`, `codesign --verify --deep
+          --strict`, `gh release create`, download back and compare bytes.
 
           **The app is the author's: never launch, capture or drive it.** Render
           what can be rendered and then ask
           ([knowledge/technical.md](../knowledge/technical.md) Verify).
 
-Mode:     Standard. Nothing is part-finished.
+Mode:     Phase. Bumped, not tagged.
 
 Command:  export PATH="$HOME/.cargo/bin:$PATH"   # cargo is not on a non-login PATH
           bun run build
@@ -26,19 +28,20 @@ Command:  export PATH="$HOME/.cargo/bin:$PATH"   # cargo is not on a non-login P
           cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
           Each status on its own line, never after a pipe. Running it: `bun run tauri dev`.
 
-Blocker:  none. Three things are open and none of them blocks:
+Blocker:  **Two things before the tag, in this order.**
 
-          - **Two calls in Discover's quantisation picker the author has never
-            ruled on**: it returns `Q4_K_M` when there is no ceiling to measure
-            against, and it holds back llama.cpp's 1,024 MiB `--fit-target`
-            margin, which no row displays. Both were decided mid-build and both
-            are still only my judgement
-            ([intent/discover.md](../intent/discover.md)).
-          - **The unusable-window bug** — sightings, sizes, falsified
-            hypotheses, scripted recovery and two traps in
-            [intent/roadmap.md](../intent/roadmap.md) risks. It wants its own task.
-          - **Five checks nobody has run**, in
-            [intent/release.md](../intent/release.md).
+          - **The README screenshots, by the author** — chosen 2026-09-04 over
+            shipping without them a third time. `docs/launch.gif`,
+            `docs/running.png` and `docs/download.png` are what the README
+            shows and all predate the redesign; a `docs/discover.png` is new,
+            since the README has no Discover section yet and this release is
+            the first to carry the screen.
+          - **The security review of the network surface**, running as a
+            subagent over `v0.6.1..HEAD`, as v0.2.0's was. Its findings are
+            fixed before the tag or recorded as accepted.
+
+          Still open and not blocking: the two quant-picker calls, the
+          unusable-window bug, the five checks in release.md.
 
 Next:     **A release.** It is the first to carry Discover, the owner avatars, the
           translucent sidebar, a CSP and a **private API**, so a minor
