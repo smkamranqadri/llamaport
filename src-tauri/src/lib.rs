@@ -844,9 +844,17 @@ fn download_start(url: String, state: State<'_, AppState>) -> Result<Vec<Downloa
 fn discover_browse(
     sort: hub::Sort,
     search: Option<String>,
+    cursor: Option<String>,
     state: State<'_, AppState>,
-) -> Result<Vec<discover::Row>, String> {
-    discover::browse(&state.trees, sort, search, state.device_budget())
+) -> Result<discover::Page, String> {
+    discover::browse(&state.trees, sort, search, cursor, state.device_budget())
+}
+
+/// One repository: the facts it states, and every quantisation with its own verdict. The
+/// tree is nearly always the one the browsed row already fetched.
+#[tauri::command]
+fn discover_repo(repo: String, state: State<'_, AppState>) -> Result<discover::Detail, String> {
+    discover::detail(&state.trees, &repo, state.device_budget())
 }
 
 /// Hands the chosen quantisation to the queue that already exists. A shard set is several
@@ -1147,6 +1155,7 @@ pub fn run() {
             pi_apply,
             download_start,
             discover_browse,
+            discover_repo,
             discover_download,
             download_pause,
             download_resume,

@@ -3,7 +3,6 @@ import {
   appVersion,
   getSettings,
   listModels,
-  machineMemory,
   onCatalogChanged,
   onRunnerLog,
   onRunnerState,
@@ -132,7 +131,6 @@ export default function App() {
   const [ignoredOrphans, setIgnoredOrphans] = useState<number[]>([]);
   const [catalogVersion, setCatalogVersion] = useState(0);
   const [version, setVersion] = useState("");
-  const [ceiling, setCeiling] = useState<number | null>(null);
 
   // The config is the truth and the webview's copy is a cache of it, so the two are
   // reconciled once at boot — and while the mode is System, macOS gets the last word.
@@ -149,9 +147,6 @@ export default function App() {
 
   useEffect(() => {
     appVersion().then(setVersion).catch(() => {});
-    machineMemory()
-      .then((memory) => setCeiling(memory.deviceBudgetBytes))
-      .catch(() => {});
     runnerStatus().then(setRunner).catch(() => {});
     runnerLogs().then(setLogs).catch(() => {});
     const scan = () => orphanStatus().then(setOrphans).catch(() => {});
@@ -214,7 +209,7 @@ export default function App() {
       );
     }
     if (screen === "discover") {
-      return <Discover ceiling={ceiling} />;
+      return <Discover />;
     }
     if (screen === "downloads") {
       return <Downloads onShowInLibrary={showInLibrary} />;

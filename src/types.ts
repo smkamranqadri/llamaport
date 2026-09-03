@@ -379,6 +379,41 @@ export interface QuantPick {
   fits: boolean | null;
 }
 
+export interface DiscoverPage {
+  rows: DiscoverRow[];
+  /// Absent at the end of the listing, which is what turns Load more off.
+  next: string | null;
+}
+
+/// What the detail page states, and nothing it cannot back.
+export interface RepoFacts {
+  id: string;
+  downloads: number;
+  likes: number;
+  lastModified: string | null;
+  gated: boolean;
+  license: string | null;
+  /// Read off one file in the repository, so it is wrong when that file is a sidecar.
+  params: number | null;
+  architecture: string | null;
+  contextLength: number | null;
+}
+
+export interface QuantOffer {
+  candidate: QuantCandidate;
+  fits: boolean | null;
+  /// What the app would have taken on its own.
+  picked: boolean;
+}
+
+export interface DiscoverDetail {
+  facts: RepoFacts;
+  owner: string;
+  name: string;
+  quants: QuantOffer[];
+  note: string | null;
+}
+
 export interface DiscoverRow {
   id: string;
   owner: string;

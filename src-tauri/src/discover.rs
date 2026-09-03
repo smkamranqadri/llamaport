@@ -12,8 +12,8 @@ use std::time::Duration;
 
 use serde::Serialize;
 
-use crate::hub::{self, Entry, Http, Query, Sort};
-use crate::quant::{self, Pick};
+use crate::hub::{self, Entry, Facts, Http, Query, Sort};
+use crate::quant::{self, Candidate, Pick};
 
 const LANES: usize = 6;
 const TIMEOUT: Duration = Duration::from_secs(20);
@@ -59,21 +59,55 @@ impl Trees {
     }
 }
 
+/// A page of rows and the cursor that continues it. `next` is `None` at the end of the
+/// listing, which is what turns Load more off.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Page {
+    pub rows: Vec<Row>,
+    pub next: Option<String>,
+}
+
+/// One repository in full: the facts, and every quantisation with its own verdict.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Detail {
+    pub facts: Facts,
+    pub owner: String,
+    pub name: String,
+    pub quants: Vec<Offer>,
+    pub note: Option<String>,
+}
+
+/// A quantisation as the detail page offers it: what it is, what it costs, and whether the
+/// weights alone clear this machine. Never a claim that a launch will be good.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Offer {
+    pub candidate: Candidate,
+    pub fits: Option<bool>,
+    /// What the app would have taken on its own, so the list says which one that was.
+    pub picked: bool,
+}
+
 pub fn browse(
     trees: &Trees,
     sort: Sort,
     search: Option<String>,
+    cursor: Option<String>,
     ceiling: Option<u64>,
-) -> Result<Vec<Row>, String> {
+) -> Result<Page, String> {
     let http = Http::new(TIMEOUT);
-    let repos = hub::list(
+    let page = hub::list(
         &http,
         &Query {
             sort,
             search,
             limit: PAGE,
+            cursor,
         },
     )?;
+    let repos = page.repos;
 
     // A gated repository is skipped rather than fetched. Its tree answers 200 and its
     // files answer 401, so a size read here would sit above a Download that cannot work.
@@ -90,10 +124,74 @@ pub fn browse(
         }
     }
 
-    Ok(repos
+    Ok(Page {
+        rows: repos
+            .into_iter()
+            .map(|repo| row(trees, repo, ceiling))
+            .collect(),
+        next: page.next,
+    })
+}
+
+/// The detail page. One facts call, and the tree it very likely already has from the row
+/// the reader clicked.
+pub fn detail(trees: &Trees, repo: &str, ceiling: Option<u64>) -> Result<Detail, String> {
+    let http = Http::new(TIMEOUT);
+    let facts = hub::facts(&http, repo)?;
+
+    let (owner, name) = match facts.id.split_once('/') {
+        Some((owner, name)) => (owner.to_string(), name.to_string()),
+        None => (String::new(), facts.id.clone()),
+    };
+
+    if facts.gated {
+        return Ok(Detail {
+            facts,
+            owner,
+            name,
+            quants: Vec::new(),
+            note: Some("gated on Hugging Face — accept its terms there first".into()),
+        });
+    }
+
+    let entries = match trees.known(repo) {
+        Some(entries) => entries,
+        None => {
+            let entries = hub::tree(&http, repo)?;
+            trees.remember(repo, entries.clone());
+            entries
+        }
+    };
+
+    let quants = offers(&entries, ceiling);
+    let note = quants
+        .is_empty()
+        .then(|| "no quantisation this app can download".to_string());
+
+    Ok(Detail {
+        facts,
+        owner,
+        name,
+        quants,
+        note,
+    })
+}
+
+/// Every quantisation with its own verdict, largest first — which is how a repository's
+/// own file list reads and how a reader scans for the best they can take. The one the app
+/// would have taken on its own is marked rather than moved, so the ordering stays by size.
+fn offers(entries: &[Entry], ceiling: Option<u64>) -> Vec<Offer> {
+    let taken = quant::pick(entries, ceiling).map(|pick| pick.candidate.label);
+    let mut quants: Vec<Offer> = quant::candidates(entries)
         .into_iter()
-        .map(|repo| row(trees, repo, ceiling))
-        .collect())
+        .map(|candidate| Offer {
+            fits: quant::fits(candidate.size, ceiling),
+            picked: taken.as_deref() == Some(candidate.label.as_str()),
+            candidate,
+        })
+        .collect();
+    quants.sort_by_key(|offer| std::cmp::Reverse(offer.candidate.size));
+    quants
 }
 
 /// One repository's tree, or why it could not be read. A failure is per row rather than per
@@ -229,6 +327,44 @@ mod tests {
         assert_eq!(pick.candidate.label, "Q8_0");
         assert_eq!(pick.fits, Some(true));
         assert!(row.note.is_none());
+    }
+
+    #[test]
+    fn the_detail_list_marks_the_one_the_app_would_have_taken_without_reordering() {
+        let quants = offers(
+            &[
+                entry("Model-Q8_0.gguf", 30_000_000_000),
+                entry("Model-Q4_K_M.gguf", 8_500_000_000),
+                entry("Model-Q6_K.gguf", 17_000_000_000),
+                entry("mmproj-F16.gguf", 500_000_000),
+            ],
+            Some(20_000_000_000),
+        );
+        assert_eq!(
+            quants
+                .iter()
+                .map(|offer| (offer.candidate.label.as_str(), offer.fits, offer.picked))
+                .collect::<Vec<_>>(),
+            [
+                ("Q8_0", Some(false), false),
+                ("Q6_K", Some(true), true),
+                ("Q4_K_M", Some(true), false),
+            ],
+            "largest first, the projector gone, and exactly one marked"
+        );
+    }
+
+    #[test]
+    fn with_no_ceiling_the_detail_list_claims_no_verdict_at_all() {
+        let quants = offers(
+            &[
+                entry("Model-Q8_0.gguf", 30_000_000_000),
+                entry("Model-Q4_K_M.gguf", 8_500_000_000),
+            ],
+            None,
+        );
+        assert!(quants.iter().all(|offer| offer.fits.is_none()));
+        assert_eq!(quants.iter().filter(|offer| offer.picked).count(), 1);
     }
 
     #[test]

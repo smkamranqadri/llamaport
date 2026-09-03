@@ -46,12 +46,34 @@ pub struct Query {
     pub sort: Sort,
     pub search: Option<String>,
     pub limit: usize,
+    /// A `rel="next"` URL from an earlier page, followed as given.
+    pub cursor: Option<String>,
+}
+
+/// A body, and where the next page is if there is one.
+pub struct Fetched {
+    pub body: String,
+    /// From `Link: <…>; rel="next"`. The API paginates by opaque cursor rather than by
+    /// offset, so this URL is followed verbatim and never rebuilt.
+    pub next: Option<String>,
 }
 
 /// The client fetches through this rather than reaching for `ureq` itself, so the parsers
 /// and everything built on them run against canned bodies with no network.
 pub trait Transport: Send + Sync {
-    fn get(&self, url: &str) -> Result<String, String>;
+    fn get(&self, url: &str) -> Result<Fetched, String>;
+}
+
+/// `<https://…>; rel="next"`, and only that relation — the header also carries others.
+fn next_link(header: &str) -> Option<String> {
+    header.split(',').find_map(|part| {
+        if !part.contains("rel=\"next\"") {
+            return None;
+        }
+        let start = part.find('<')? + 1;
+        let end = part[start..].find('>')? + start;
+        Some(part[start..end].to_string())
+    })
 }
 
 pub struct Http {
@@ -70,9 +92,13 @@ impl Http {
 }
 
 impl Transport for Http {
-    fn get(&self, url: &str) -> Result<String, String> {
+    fn get(&self, url: &str) -> Result<Fetched, String> {
         match self.agent.get(url).call() {
-            Ok(response) => response.into_string().map_err(|e| e.to_string()),
+            Ok(response) => {
+                let next = response.header("link").and_then(next_link);
+                let body = response.into_string().map_err(|e| e.to_string())?;
+                Ok(Fetched { body, next })
+            }
             // 429 is the only status worth naming: the budget is unadvertised — no
             // rate-limit headers come back unauthenticated — so hitting it is the only
             // way anyone learns it is there.
@@ -97,6 +123,24 @@ pub struct Repo {
     pub gated: bool,
 }
 
+/// What the detail page states, and nothing it cannot back. Every field is optional
+/// because every one of them is genuinely absent on some repository.
+#[derive(Debug, Clone, Serialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct Facts {
+    pub id: String,
+    pub downloads: u64,
+    pub likes: u64,
+    pub last_modified: Option<String>,
+    pub gated: bool,
+    pub license: Option<String>,
+    /// Read off one file in the repository, so it is wrong when that file is a sidecar —
+    /// a 27B repository whose first GGUF is an MTP drafter reports 1.86B.
+    pub params: Option<u64>,
+    pub architecture: Option<String>,
+    pub context_length: Option<u64>,
+}
+
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct Entry {
@@ -108,15 +152,45 @@ pub struct Entry {
     pub lfs: bool,
 }
 
-pub fn list(transport: &dyn Transport, query: &Query) -> Result<Vec<Repo>, String> {
-    parse_listing(&transport.get(&listing_url(query))?)
+/// A page of repositories and the cursor that continues it.
+pub struct Page {
+    pub repos: Vec<Repo>,
+    pub next: Option<String>,
+}
+
+pub fn list(transport: &dyn Transport, query: &Query) -> Result<Page, String> {
+    let fetched = transport.get(&listing_url(query))?;
+    Ok(Page {
+        repos: parse_listing(&fetched.body)?,
+        next: fetched.next,
+    })
 }
 
 pub fn tree(transport: &dyn Transport, repo: &str) -> Result<Vec<Entry>, String> {
-    parse_tree(&transport.get(&tree_url(repo)?)?)
+    parse_tree(&transport.get(&tree_url(repo)?)?.body)
+}
+
+/// Everything the detail page states about a repository, in one call. `expand=gguf` is
+/// affordable here and not in a listing: one repository's chat template is kilobytes, and
+/// twenty-four of them were the 271 KB that kept it out of the browse call.
+pub fn facts(transport: &dyn Transport, repo: &str) -> Result<Facts, String> {
+    if !valid_repo_id(repo) {
+        return Err(format!("{repo} is not a repository id"));
+    }
+    let url = format!(
+        "{HOST}/api/models/{repo}?expand=downloads&expand=likes&expand=lastModified\
+&expand=gated&expand=gguf&expand=cardData"
+    );
+    parse_facts(&transport.get(&url)?.body)
 }
 
 pub fn listing_url(query: &Query) -> String {
+    // The cursor URL already carries the sort, the filter, the expands and the search it
+    // was produced for. Rebuilding any of that is how a second page comes back sorted
+    // differently from the first.
+    if let Some(cursor) = query.cursor.as_deref() {
+        return cursor.to_string();
+    }
     let mut url = format!(
         "{HOST}/api/models?filter=gguf&sort={}&direction={DIRECTION}&limit={}",
         query.sort.as_param(),
@@ -263,6 +337,57 @@ pub fn parse_listing(body: &str) -> Result<Vec<Repo>, String> {
         .collect())
 }
 
+#[derive(Deserialize)]
+struct RawGguf {
+    #[serde(default)]
+    total: Option<u64>,
+    #[serde(default)]
+    architecture: Option<String>,
+    #[serde(default)]
+    context_length: Option<u64>,
+}
+
+#[derive(Deserialize)]
+struct RawCard {
+    #[serde(default)]
+    license: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct RawFacts {
+    id: String,
+    #[serde(default)]
+    downloads: u64,
+    #[serde(default)]
+    likes: u64,
+    #[serde(default, rename = "lastModified")]
+    last_modified: Option<String>,
+    #[serde(default)]
+    gated: Option<RawGated>,
+    #[serde(default)]
+    gguf: Option<RawGguf>,
+    #[serde(default, rename = "cardData")]
+    card: Option<RawCard>,
+}
+
+pub fn parse_facts(body: &str) -> Result<Facts, String> {
+    let raw: RawFacts = serde_json::from_str(body).map_err(|e| e.to_string())?;
+    if !valid_repo_id(&raw.id) {
+        return Err(format!("{} is not a repository id", raw.id));
+    }
+    Ok(Facts {
+        id: raw.id,
+        downloads: raw.downloads,
+        likes: raw.likes,
+        last_modified: raw.last_modified,
+        gated: raw.gated.is_some_and(|gated| gated.is_gated()),
+        license: raw.card.and_then(|card| card.license),
+        params: raw.gguf.as_ref().and_then(|gguf| gguf.total),
+        architecture: raw.gguf.as_ref().and_then(|gguf| gguf.architecture.clone()),
+        context_length: raw.gguf.as_ref().and_then(|gguf| gguf.context_length),
+    })
+}
+
 /// Files only, and only those with a name this app could act on. Directories carry a size
 /// of zero and would otherwise read as empty files.
 pub fn parse_tree(body: &str) -> Result<Vec<Entry>, String> {
@@ -285,8 +410,11 @@ mod tests {
     struct Canned(&'static str);
 
     impl Transport for Canned {
-        fn get(&self, _: &str) -> Result<String, String> {
-            Ok(self.0.to_string())
+        fn get(&self, _: &str) -> Result<Fetched, String> {
+            Ok(Fetched {
+                body: self.0.to_string(),
+                next: None,
+            })
         }
     }
 
@@ -295,6 +423,7 @@ mod tests {
             sort,
             search: None,
             limit: 24,
+            cursor: None,
         }
     }
 
@@ -319,6 +448,56 @@ mod tests {
         });
         assert!(url.contains("search=qwen%20coder%26limit%3D1"), "{url}");
         assert_eq!(url.matches("limit=").count(), 1, "{url}");
+    }
+
+    #[test]
+    fn a_cursor_is_followed_verbatim_rather_than_rebuilt() {
+        // The cursor already encodes the sort, the filter, the expands and the search it
+        // was issued for. Rebuilding any of it is how page two comes back sorted unlike
+        // page one.
+        let cursor = "https://huggingface.co/api/models?filter=gguf&cursor=OPAQUE%3D%3D";
+        let url = listing_url(&Query {
+            cursor: Some(cursor.into()),
+            search: Some("ignored".into()),
+            ..query(Sort::Likes)
+        });
+        assert_eq!(url, cursor);
+    }
+
+    #[test]
+    fn the_next_page_is_read_off_the_link_header() {
+        let header = "<https://huggingface.co/api/models?cursor=ABC>; rel=\"next\"";
+        assert_eq!(
+            next_link(header).as_deref(),
+            Some("https://huggingface.co/api/models?cursor=ABC")
+        );
+        assert_eq!(next_link("<https://x/prev>; rel=\"prev\""), None);
+        assert_eq!(next_link("nonsense"), None);
+    }
+
+    #[test]
+    fn facts_read_what_the_detail_page_states_and_nothing_more() {
+        let facts = parse_facts(
+            r#"{"id":"unsloth/Model-GGUF","downloads":9553042,"likes":3406,
+                "lastModified":"2026-08-20T12:04:25.000Z","gated":false,
+                "gguf":{"total":27320697856,"architecture":"qwen35","context_length":262144},
+                "cardData":{"license":"apache-2.0"}}"#,
+        )
+        .expect("facts");
+        assert_eq!(facts.params, Some(27_320_697_856));
+        assert_eq!(facts.architecture.as_deref(), Some("qwen35"));
+        assert_eq!(facts.context_length, Some(262_144));
+        assert_eq!(facts.license.as_deref(), Some("apache-2.0"));
+        assert!(!facts.gated);
+    }
+
+    #[test]
+    fn facts_survive_a_repository_that_declares_almost_nothing() {
+        let facts = parse_facts(r#"{"id":"a/bare"}"#).expect("facts");
+        assert_eq!(facts.params, None);
+        assert_eq!(facts.license, None);
+        assert_eq!(facts.downloads, 0);
+        assert!(parse_facts(r#"{"id":"../evil"}"#).is_err());
     }
 
     #[test]
@@ -435,13 +614,13 @@ mod tests {
 
     #[test]
     fn the_client_composes_a_fetch_and_a_parse() {
-        let repos = list(
+        let page = list(
             &Canned(r#"[{"id":"a/one","downloads":9,"likes":1,"gated":"auto"}]"#),
             &query(Sort::Trending),
         )
         .expect("a listing");
-        assert_eq!(repos.len(), 1);
-        assert!(repos[0].gated);
+        assert_eq!(page.repos.len(), 1);
+        assert!(page.repos[0].gated);
 
         let entries = tree(
             &Canned(r#"[{"type":"file","path":"a.gguf","size":7,"lfs":{"size":7}}]"#),

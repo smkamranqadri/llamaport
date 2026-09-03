@@ -137,6 +137,15 @@ struct Group {
     size: u64,
 }
 
+/// Whether the weights alone clear the ceiling, once llama.cpp's own margin is charged.
+/// `None` means there is no ceiling to measure against, which is not the same as `false`.
+///
+/// The one place this question is answered, so a row and the detail list beside it cannot
+/// reach different verdicts about the same file.
+pub fn fits(size: u64, ceiling: Option<u64>) -> Option<bool> {
+    ceiling.map(|ceiling| size <= ceiling.saturating_sub(HEADROOM))
+}
+
 /// One entry per quantisation, shard sets summed and ordered, sidecars gone.
 pub fn candidates(entries: &[Entry]) -> Vec<Candidate> {
     let mut groups: Vec<Group> = Vec::new();
@@ -212,10 +221,9 @@ pub fn pick(entries: &[Entry], ceiling: Option<u64>) -> Option<Pick> {
     // Weights only, and that is the whole claim. What a cache costs cannot be known before
     // the file exists — there is no header to read — so this says a download is allowed and
     // never that a launch is good.
-    let usable = ceiling.saturating_sub(HEADROOM);
     let fitting: Vec<&Candidate> = candidates
         .iter()
-        .filter(|candidate| candidate.size <= usable)
+        .filter(|candidate| fits(candidate.size, Some(ceiling)) == Some(true))
         .collect();
 
     if fitting.is_empty() {

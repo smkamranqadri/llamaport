@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { discoverBrowse, discoverDownload, downloadStart } from "./api";
-import { formatFileSize, formatMemory } from "./format";
+import DiscoverDetail from "./DiscoverDetail";
+import { formatFileSize } from "./format";
 import { DownloadIcon, SearchIcon } from "./icons";
 import type { DiscoverRow, DiscoverSort } from "./types";
 
@@ -20,7 +21,7 @@ const LISTS = [
     id: "small",
     label: "Small & fast",
     sort: "trending" as DiscoverSort,
-    heading: "Trending on Hugging Face, smallest first",
+    heading: "What fits this Mac, smallest first",
   },
   {
     id: "downloads",
@@ -57,58 +58,61 @@ function updated(iso: string | null): string | null {
   return `updated ${Math.round(days / 365)} yr ago`;
 }
 
-/// The size against the ceiling, and never the word "fits".
+/// The size, and never the word "fits".
+///
+/// **The ceiling used to be printed beside it and had to go.** A row read "25.1 GB of
+/// 25.0 GB" while claiming to fit, because the size counts in decimal GB — what Finder and
+/// Hugging Face show for the same file — and the ceiling counted in binary GiB, which is
+/// what Activity Monitor shows for the same machine. Both printed "GB". One figure cannot
+/// be checked against the other, so only one is shown.
 ///
 /// All this knows is a file size — the model is not on disk, so there is no header to read
 /// and no cache to charge. Every term left out moves what a launch really needs upwards,
-/// so "will not fit" is safe to say and its opposite is not. Unsloth ships the verdict this
-/// refuses and their own source records it disagreeing with their memory bar on eight of
-/// nineteen sizes.
-function Sizing({ row, ceiling }: { row: DiscoverRow; ceiling: number | null }) {
+/// so "will not fit" is safe to say and its opposite is not.
+function Sizing({ row }: { row: DiscoverRow }) {
   if (!row.pick) return <span className="discover-note">{row.note}</span>;
-
-  const size = formatFileSize(row.pick.candidate.size);
-  if (row.pick.fits === null) {
-    return (
-      <span className="discover-size">
-        <span className="badge">{row.pick.candidate.label}</span>
-        <span>{size}</span>
-        <span className="discover-note">no size check — llama-server not found</span>
-      </span>
-    );
-  }
 
   return (
     <span className="discover-size">
-      <span className="badge">{row.pick.candidate.label}</span>
-      <span className={row.pick.fits ? undefined : "discover-over"}>
-        {ceiling == null ? size : `${size} of ${formatMemory(ceiling)}`}
+      <span className="badge quant-badge">{row.pick.candidate.label}</span>
+      <span className={row.pick.fits === false ? "discover-over" : undefined}>
+        {formatFileSize(row.pick.candidate.size)}
       </span>
-      {!row.pick.fits && (
-        <span className="discover-note">its weights alone are over this Mac</span>
+      {row.pick.fits === false && (
+        <span className="discover-note">over this Mac</span>
+      )}
+      {row.pick.fits === null && (
+        <span className="discover-note">llama-server not found, so no size check</span>
       )}
     </span>
   );
 }
 
-export default function Discover({ ceiling }: { ceiling: number | null }) {
+export default function Discover() {
   const [list, setList] = useState<ListId>("fits");
   const [rows, setRows] = useState<DiscoverRow[]>([]);
+  const [next, setNext] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [searched, setSearched] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [more, setMore] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
   const [got, setGot] = useState<string | null>(null);
+  const [opened, setOpened] = useState<string | null>(null);
 
   const chosen = LISTS.find((entry) => entry.id === list) ?? LISTS[0];
 
   const load = useCallback((sort: DiscoverSort, search: string | null) => {
     setBusy(true);
     setFailure(null);
-    discoverBrowse(sort, search)
-      .then(setRows)
+    discoverBrowse(sort, search, null)
+      .then((page) => {
+        setRows(page.rows);
+        setNext(page.next);
+      })
       .catch((e) => {
         setRows([]);
+        setNext(null);
         setFailure(String(e));
       })
       .finally(() => setBusy(false));
@@ -117,6 +121,20 @@ export default function Discover({ ceiling }: { ceiling: number | null }) {
   useEffect(() => {
     load(chosen.sort, searched);
   }, [chosen.sort, searched, load]);
+
+  /// Appends rather than replaces, and only ever follows the cursor the last page gave —
+  /// rebuilding the query would come back sorted differently from what is already on screen.
+  const loadMore = () => {
+    if (!next) return;
+    setMore(true);
+    discoverBrowse(chosen.sort, searched, next)
+      .then((page) => {
+        setRows((prev) => [...prev, ...page.rows]);
+        setNext(page.next);
+      })
+      .catch((e) => setFailure(String(e)))
+      .finally(() => setMore(false));
+  };
 
   const submit = (event: React.FormEvent) => {
     event.preventDefault();
@@ -147,14 +165,29 @@ export default function Discover({ ceiling }: { ceiling: number | null }) {
       .catch((e) => setFailure(String(e)));
   };
 
+  // Both of these filter to what fits and differ only in order, which is what makes them
+  // two questions rather than one: what can this Mac run, and what can it run quickest. A
+  // chip that says small must never list something over the ceiling.
+  const fitting = rows.filter((row) => row.pick !== null && row.pick.fits !== false);
   let shown = rows;
-  if (list === "fits") {
-    shown = rows.filter((row) => row.pick?.fits !== false && row.pick !== null);
-  }
+  if (list === "fits") shown = fitting;
   if (list === "small") {
-    shown = [...rows]
-      .filter((row) => row.pick !== null)
-      .sort((a, b) => (a.pick?.candidate.size ?? 0) - (b.pick?.candidate.size ?? 0));
+    shown = [...fitting].sort(
+      (a, b) => (a.pick?.candidate.size ?? 0) - (b.pick?.candidate.size ?? 0),
+    );
+  }
+
+  if (opened) {
+    return (
+      <DiscoverDetail
+        repo={opened}
+        onBack={() => setOpened(null)}
+        onQueued={(message) => {
+          setGot(message);
+          setOpened(null);
+        }}
+      />
+    );
   }
 
   return (
@@ -219,15 +252,19 @@ export default function Discover({ ceiling }: { ceiling: number | null }) {
 
           return (
             <div className="discover-row" key={row.id}>
-              <div className="discover-body">
+              <button
+                className="discover-body discover-open"
+                title="Every quantisation, and what each one costs"
+                onClick={() => setOpened(row.id)}
+              >
                 <span className="discover-head">
                   <span className="discover-name">{row.name}</span>
                   <span className="discover-owner">by {row.owner}</span>
                   {row.gated && <span className="badge badge-warn">Gated</span>}
                 </span>
                 <span className="card-sub">{facts.join(" · ")}</span>
-              </div>
-              <Sizing row={row} ceiling={ceiling} />
+              </button>
+              <Sizing row={row} />
               <button
                 className="button"
                 disabled={!row.pick}
@@ -241,6 +278,12 @@ export default function Discover({ ceiling }: { ceiling: number | null }) {
           );
         })}
       </div>
+
+      {next && !busy && (
+        <button className="button discover-more" disabled={more} onClick={loadMore}>
+          {more ? "Reading Hugging Face…" : "Load more"}
+        </button>
+      )}
     </>
   );
 }

@@ -7,7 +7,8 @@ import type {
   DownloadJob,
   DownloadOptions,
   DownloadProgress,
-  DiscoverRow,
+  DiscoverDetail,
+  DiscoverPage,
   DiscoverSort,
   HealthReport,
   LaunchPlan,
@@ -156,8 +157,14 @@ export function downloadStart(url: string): Promise<DownloadJob[]> {
 export function discoverBrowse(
   sort: DiscoverSort,
   search: string | null,
-): Promise<DiscoverRow[]> {
-  return invoke<DiscoverRow[]>("discover_browse", { sort, search });
+  cursor: string | null,
+): Promise<DiscoverPage> {
+  return invoke<DiscoverPage>("discover_browse", { sort, search, cursor });
+}
+
+/// One repository: its facts and every quantisation, each with its own verdict.
+export function discoverRepo(repo: string): Promise<DiscoverDetail> {
+  return invoke<DiscoverDetail>("discover_repo", { repo });
 }
 
 /// A shard set is several files and becomes several queued jobs.

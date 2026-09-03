@@ -20,6 +20,7 @@ fn query(sort: Sort) -> Query {
         sort,
         search: None,
         limit: 24,
+        cursor: None,
     }
 }
 
@@ -27,7 +28,7 @@ fn query(sort: Sort) -> Query {
 #[ignore = "reads the live Hugging Face index"]
 fn every_sort_returns_a_full_page_of_usable_rows() {
     for sort in [Sort::Trending, Sort::Downloads, Sort::Likes] {
-        let repos = hub::list(&http(), &query(sort)).expect("a listing");
+        let repos = hub::list(&http(), &query(sort)).expect("a listing").repos;
         assert_eq!(repos.len(), 24, "{sort:?} returned {} rows", repos.len());
         assert!(
             repos.iter().all(|repo| repo.id.contains('/')),
@@ -46,6 +47,7 @@ fn the_three_sorts_are_not_the_same_list() {
     let of = |sort| {
         hub::list(&http(), &query(sort))
             .expect("a listing")
+            .repos
             .into_iter()
             .map(|repo| repo.id)
             .collect::<Vec<_>>()
@@ -68,7 +70,8 @@ fn a_search_finds_a_named_model_and_the_term_survives_encoding() {
             ..query(Sort::Downloads)
         },
     )
-    .expect("a listing");
+    .expect("a listing")
+    .repos;
     assert!(!repos.is_empty(), "a two-word search returned nothing");
     assert!(
         repos
@@ -84,7 +87,8 @@ fn a_search_finds_a_named_model_and_the_term_survives_encoding() {
 fn the_cheap_expand_set_is_what_the_client_was_sized_for() {
     let body = http()
         .get(&hub::listing_url(&query(Sort::Trending)))
-        .expect("a listing body");
+        .expect("a listing body")
+        .body;
     assert!(
         body.len() < 20_000,
         "24 rows came to {} bytes; the set was measured at 4,582 and the reason \
@@ -137,7 +141,8 @@ fn a_gated_repository_is_flagged_before_anything_tries_to_download_it() {
             ..query(Sort::Trending)
         },
     )
-    .expect("a listing");
+    .expect("a listing")
+    .repos;
     let gated = repos.iter().filter(|repo| repo.gated).count();
     assert!(
         gated > 0,
@@ -227,4 +232,40 @@ fn the_picker_never_returns_a_sidecar_or_a_lone_shard_from_a_real_repository() {
             candidates.len()
         );
     }
+}
+
+#[test]
+#[ignore = "reads the live Hugging Face index"]
+fn a_second_page_follows_the_cursor_and_repeats_nothing() {
+    let first = hub::list(&http(), &query(Sort::Trending)).expect("page one");
+    let cursor = first.next.expect("page one carried no next link");
+    let second = hub::list(
+        &http(),
+        &Query {
+            cursor: Some(cursor),
+            ..query(Sort::Trending)
+        },
+    )
+    .expect("page two");
+
+    assert_eq!(second.repos.len(), 24, "page two came back short");
+    let seen: Vec<&String> = first.repos.iter().map(|repo| &repo.id).collect();
+    let repeated = second
+        .repos
+        .iter()
+        .filter(|repo| seen.contains(&&repo.id))
+        .count();
+    assert_eq!(repeated, 0, "page two repeated {repeated} of page one");
+}
+
+#[test]
+#[ignore = "reads the live Hugging Face index"]
+fn the_facts_call_carries_what_the_detail_page_states() {
+    let facts = hub::facts(&http(), "unsloth/Qwen3.8-27B-GGUF").expect("facts");
+    assert_eq!(facts.id, "unsloth/Qwen3.8-27B-GGUF");
+    assert!(facts.downloads > 0 && facts.likes > 0);
+    assert!(facts.params.is_some(), "no parameter count");
+    assert!(facts.architecture.is_some(), "no architecture");
+    assert!(facts.context_length.is_some(), "no trained context");
+    assert!(facts.license.is_some(), "no licence");
 }

@@ -1092,7 +1092,7 @@ input[type="range"] {
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-top: 16px;
+  margin: 16px 0 10px;
   padding: 11px 14px;
   background: color-mix(in srgb, #d99b28 10%, transparent);
   border: 1px solid color-mix(in srgb, #d99b28 35%, transparent);
@@ -2322,6 +2322,100 @@ input[type="range"] {
 }
 
 /* Discover */
+
+/* A quantisation name is usually short. When a repository names none, the label falls back
+   to the file's own stem — "Qwen3.8-Flash-Next-ROCmFP4-FAST-v2-ple16" is real — and without
+   a cap one row's badge pushes the size and the button out of line with every other row. */
+.quant-badge {
+  overflow: hidden;
+  max-width: 190px;
+  text-overflow: ellipsis;
+}
+
+/* The row's facts are the way into the detail page, so they are a button. It has to look
+   like the text it replaced and not like a control. */
+.discover-open {
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+.discover-open:hover .discover-name {
+  color: var(--accent);
+}
+
+.detail-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.detail-facts {
+  margin: 2px 0 14px;
+}
+
+.quant-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.quant-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 14px;
+  background: var(--bg-card2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.quant-label {
+  font-weight: 550;
+}
+
+/* Pushes the size and the button to the right whatever the label's width, so the figures
+   line up down the list and can be compared by eye. */
+.quant-size {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+
+.quant-fit {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  font-size: 11px;
+  border-radius: 50%;
+}
+
+.quant-fit.is-fitting {
+  color: var(--running);
+  background: color-mix(in srgb, var(--running) 18%, transparent);
+}
+
+.quant-fit.is-over {
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 18%, transparent);
+}
+
+.quant-fit.is-unknown {
+  color: var(--text-muted);
+  background: var(--badge-bg);
+}
+
+/* Its own class rather than Downloads' `.load-more`: this one is centred, and redefining
+   that would have moved a button on a screen this change is not about. */
+.discover-more {
+  align-self: center;
+  margin-top: 14px;
+}
 
 /* Wider than the Downloads field it shares a shape with, because on this screen the box is
    the primary way in rather than a way to paste one link. The artboard draws it about this
