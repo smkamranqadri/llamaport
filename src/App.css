@@ -142,6 +142,11 @@ body,
 }
 
 /* Vibrancy.
+   The material is pinned active in `tauri.conf.json` rather than following the window's
+   focus. macOS swaps to a flatter, greyer variant when an app goes to the back, which is
+   native behaviour and reads here as the sidebar going dark and coming back every time
+   another app is clicked.
+
    The window is transparent at every launch — `transparent` is set at creation and cannot
    be changed after — so this attribute is the only thing that decides whether any of it
    shows. Without it the app paints exactly as it always did.
