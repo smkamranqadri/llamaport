@@ -35,8 +35,8 @@ Blocker:  none. Open and not blocking:
             ruled on**: `Q4_K_M` with no ceiling, and the withheld 1,024 MiB
             `--fit-target` margin ([intent/discover.md](../intent/discover.md)).
           - **The unusable-window bug** ([intent/roadmap.md](../intent/roadmap.md)).
-          - **What v0.7.0 owes the author**: the five checks, the Discussions
-            post, a look at Discover's avatars under the new rule
+          - **An Intel Mac** for the universal build, open since v0.3.0. Every
+            other check v0.7.0 owed was met by the author on 2026-09-04
             ([intent/release.md](../intent/release.md)).
 
 Next:     **Nothing chosen.** The author's call. Candidates, none ahead of the

@@ -108,30 +108,22 @@ slice of the universal, and "the next page is not on Hugging Face" — a string
 only `12de686` introduces — is in both and zero times in the installed 0.6.1.
 Built with `CI=true`, downloaded back from GitHub and compared byte for byte.
 
-**Owed against it, needing the author**: the five checks under "Unverified"
-below, unchanged; the Show and tell post in llama.cpp's Discussions, which now
-claims less than the app does, since Discover is a network client and the post
-says nothing of it; and a look at the built bundle's Discover under the
-tightened avatar rule, where an owner whose picture is hosted off
-`huggingface.co` now shows the generic mark.
+**Checked by the author the same day, all good**: five launches from Finder,
+the Dock click, a queued row with nothing on disk surviving a restart, the
+folder picker on the signed bundle, the Discussions post brought up to date,
+and Discover's avatars under the tightened rule. **Only the Intel Mac remains**,
+as it has since v0.3.0, because nobody here has one.
 
 ## Unverified against v0.7.0
 
 Moved out of [state/current.md](../state/current.md) on 2026-09-02, where it had
-become a ledger. Five checks nobody has run, each needing a human at the
-machine, now owed against v0.7.0 as they were against v0.6.1:
+become a ledger. Four of the five were met by the author on 2026-09-04 against
+v0.7.0 — five Finder launches with nothing fullscreen, the Dock click, a queued
+row with nothing on disk coming back from a restart, and the folder picker on
+the signed bundle. One remains:
 
-- **Five launches from Finder** with nothing fullscreen.
-- **The Dock click.** The 2026-09-01 evidence was against v0.5.0 and does not
-  carry to this build.
-- A **queued download row with nothing on disk behind it** coming back from a
-  restart.
-- An **Intel Mac** running the universal build.
-- **The folder picker on a signed build.** `tauri-plugin-dialog` arrived with
-  Settings on 2026-09-03 and is the first native dialog this app opens; a `dev`
-  window says nothing about how it behaves inside a notarised bundle.
-
-The first two are owed against v0.6.1; two are older; the picker is new.
+- An **Intel Mac** running the universal build. Open since v0.3.0; nobody here
+  has one, and the Rosetta run is the nearest thing to evidence.
 
 ## v0.6.0 — shipped 2026-09-02
 
