@@ -1619,7 +1619,7 @@ input[type="range"] {
 
 .advanced {
   margin-top: 6px;
-  border-top: 1px solid var(--line, #2a2f36);
+  border-top: 1px solid var(--border);
   padding-top: 12px;
 }
 
@@ -1903,6 +1903,10 @@ input[type="range"] {
   color: var(--danger);
 }
 
+.pi-new {
+  color: var(--text-muted);
+}
+
 .pi-line {
   display: flex;
   gap: 8px;
@@ -2128,6 +2132,7 @@ input[type="range"] {
    read as part of "what is happening right now", and it is the only setting on this
    screen that changes the transfer already running. */
 .limit-select {
+  width: auto;
   padding: 1px 4px;
   font: inherit;
   color: var(--text-muted);

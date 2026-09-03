@@ -431,7 +431,7 @@ export default function ModelDetail({
                     openWebUi(port).catch((e) => setFailure(String(e)));
                   }}
                 >
-                  Open chat
+                  Web UI
                 </button>
               )}
               <button

@@ -53,7 +53,7 @@ export default function HealthPanel({ report }: { report: HealthReport }) {
         {report.checks.map((check) => (
           <li key={check.name} className={`check check-${check.status}`}>
             <span className="check-mark">{STATUS_MARK[check.status]}</span>
-            <span className="check-name">{check.name}</span>
+            <span>{check.name}</span>
             <span className="check-detail">{check.detail}</span>
             <span className="check-duration">{check.durationMs} ms</span>
           </li>

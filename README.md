@@ -40,9 +40,11 @@ alias, and a real chat completion — and reports what passed, what only warned,
 and how long the first token took. A ready model also opens llama.cpp's own Web
 UI in a second window; that chat interface is llama.cpp's, not Llamaport's.
 
-**Reports memory, never forecasts it.** Exact weights and KV-cache arithmetic
-before launch; live system memory and swap while running; no verdict in between.
-A forecast wrong by 2x gets believed, so it does not make one.
+**Sizes a launch against the real ceiling, and never forecasts speed.** Weights
+and KV-cache arithmetic before launch, judged against what the GPU will actually
+hand out and what is free right now, with a floor marked as a floor; live system
+memory and swap while running. How fast a setting is gets measured or stays
+unsaid — a forecast wrong by 2x gets believed, so it does not make one.
 
 **Downloads with working resume.** Paste the URL of a `.gguf` on Hugging Face. It
 transfers over four ranged connections, re-resolves the CDN redirect on every
@@ -151,8 +153,9 @@ bun run tauri dev
 - **No chat UI.** `llama-server` already ships one; Llamaport opens it.
 - **No Windows or Linux.** macOS only: the memory readings, the move-to-Trash and
   the config location are all Darwin, and none of it has an equivalent written.
-- **No profiles or presets.** One remembered setup per model, written by a
-  successful launch.
+- **No saved profiles to manage.** Three presets — Default, Best speed and
+  Model suggested — set the fields nobody wants to hand-tune, and each model
+  remembers only what it last launched with.
 - **One model at a time.** A busy port refuses the launch rather than moving to
   another one.
 - **No Hugging Face token.** Public repos only; a gated repo is reported plainly.
