@@ -170,8 +170,11 @@ A reviewer verified the CSP against Tauri 2.11.5's source rather than the docs:
 element exists to nonce so `'unsafe-inline'` survives for React's attributes,
 and the webui window is a separate webview the policy does not govern.
 
-**Still owed: the author's look at a built bundle**, because only a bundle
-carries the CSP — the dev webview is served by Vite and gets none. Four things
-to see: the pane paints and avatars show under the policy; the Web UI button;
-the Advanced border on a light palette; the Downloads status line and pi's
-"new file" mark.
+**The author's look, 2026-09-04, at the built bundle** (a bundle because only a
+bundle carries the CSP — the dev webview is served by Vite and gets none): the
+pane paints and avatars show under the policy, the Web UI button, the Advanced
+border on a light palette, the Downloads status line and pi's "new file" mark —
+"all look good". One more thing seen while looking: the model screen had never
+carried its owner's picture, which the rows got on 2026-09-03. Added before the
+title in both states, rendered against `App.css`, and landed as the commit after
+`e36dd86`.
