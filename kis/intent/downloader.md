@@ -1,207 +1,110 @@
-# Downloader milestone
+# Downloader
 
 Design lives in [docs/downloader-spec.md](../../docs/downloader-spec.md). This
-file holds only what the spec does not: the decisions taken, what was carried
-rather than met, and the limits found in the building.
-
-Live status is in [state/current.md](../state/current.md), not here.
+file holds only what the spec does not: decisions taken, what was carried
+rather than met, and limits found in the building.
 
 ## Decisions
 
-- **ureq + threads, not reqwest + tokio.** Enable ureq's default features for
-  TLS, one thread per segment, positioned writes through `FileExt::write_at`.
-  The codebase is blocking throughout and hands long work to `spawn_blocking`;
-  8 sockets do not need an async runtime. `tokio` is already compiled in via
-  tauri, but `reqwest` is not in the macOS build graph and would add ~40 crates.
-- **The rate limit is live.** `Control` carries it and the bucket re-reads it on
-  every charge, so a limit changed while a download runs applies to that
-  download. The alternative — fixing it in the `Spec` at the start — was
-  rejected: a limit is set while watching the transfer it is meant for.
-- **The floor on a limit is app policy, not engine mechanism.** `normalized_rate`
-  in `downloads.rs` bounds what may be asked for; the engine honours whatever it
-  is handed, which is what lets a test drive it at a byte a second.
-- **No Hugging Face token.** Public repos only; a gated repo is
-  detected on resolve and reported plainly. Most GGUF quants are public, and a
-  released app should not keep a bearer token in plaintext. The spec's
-  strip-`Authorization`-on-redirect rule stays dormant until this is revisited.
-- **sha256 verification defaults to on**, in the background, before the rename,
-  and is skippable.
-- **Downloads land in the configured models directory.**
+- **ureq and threads, not reqwest and tokio.** The codebase is blocking
+  throughout, and `reqwest` is not otherwise in the macOS build graph.
+- **The rate limit is live**, re-read on every charge, so a change mid-
+  download applies to it. Its floor is app policy in `downloads.rs`, not an
+  engine mechanism; the engine honours whatever it is handed.
+- **No Hugging Face token.** Public repos only; a gated repo is detected on
+  resolve and reported plainly, since a released app should not keep a
+  bearer token in plaintext.
+- **sha256 verification defaults to on**, in the background before the
+  rename, and is skippable. Downloads land in the configured models
+  directory.
 
-## Phase 1 — engine and Downloads screen — DONE 2026-08-02
+## Phase 1: engine and Downloads screen
 
-Every closing condition met except one, proved by a real 676 MB transfer that was
-killed, resumed, verified and landed in the models directory.
+Completed 2026-08-02. Every closing condition was met except two, carried
+forward rather than met: "beats a single connection" was never measured,
+since the observed rate varied 90 KB/s to 1.4 MB/s and the line, not the
+engine, looked like the limit; and stall detection ignores the spec's
+sibling-progress condition, reissuing any segment silent past `stall_after`
+rather than only one silent while its siblings move, accepted as is.
 
-Two carried forward rather than met:
+## Phase 2: the queue
 
-- **"Beats a single connection" was never measured.** The observed rate varied
-  90 KB/s to 1.4 MB/s and the line, not the engine, looked like the limit. It
-  needs a like-for-like comparison against `curl` before anyone claims it.
-- **Stall detection ignores the spec's sibling-progress condition.** Any segment
-  silent past `stall_after` is reissued, bounded by the 5-attempt limit, rather
-  than only one silent while siblings move. Deliberate and accepted.
+Completed 2026-08-04. One transfer at a time stays true; a second request
+now waits instead of being refused. The manager gains a `Queued` state and
+one invariant, that nothing Active and something Queued means the head of
+the queue starts, which every settle path goes through.
 
-## Phase 2 — the queue — DONE 2026-08-04
+### Decisions
 
-One transfer at a time stays true. What changes is what happens to the second
-request: it waits instead of being refused.
-
-The manager gains a `Queued` state and one invariant — **nothing Active and
-something Queued means the head of the queue starts.** Every settle path goes
-through it, so a transfer that completes, fails, is discarded or is paused all
-hand the pipe to the next in line.
-
-### Decided
-
-- **Both `start` and `resume` enqueue.** They refuse today for the same reason
-  and with the same sentence, and `resumable` says so on purpose. Queueing only
-  new starts would move the wall rather than remove it: the first time a user
-  pauses one file and tries to resume another, they meet "this app downloads one
-  file at a time" with a queue visibly running behind it.
-- **A queued row is persisted, and comes back Paused.** It is the first
-  unfinished work in this app with nothing on disk describing it — no `.part`,
-  no sidecar — so `downloads.json` has to hold it or quitting loses the URLs.
-  It returns as a Paused row with zero bytes, a state the screen already draws
-  and `resume` already re-validates the URL for. Rejected: coming back and
-  carrying on, which would make launching the app fetch from a URL read off
-  disk with no click. The config directory is untrusted input and that is the
-  shape of the hole v0.2.0 fixed.
-- **One invariant, no stop button.** Pause therefore starts the next file, and
-  stopping everything means pausing each in turn. Accepted for a first cut
-  rather than overlooked: a queue-paused flag is a second piece of state that
-  has to persist, show, and be reasoned about on every settle path. Add it when
-  the missing button actually bites.
+- **Both `start` and `resume` enqueue.** Queueing only new starts would move
+  the wall rather than remove it: pausing one file and resuming another
+  would otherwise meet the same refusal with a queue running behind it.
+- **A queued row is persisted, and comes back Paused.** Nothing on disk
+  describes it, so `downloads.json` has to hold it or quitting loses the
+  URL. Auto-resuming it on return was rejected: the config directory is
+  untrusted input.
+- **One invariant, no stop button.** Pausing one file starts the next; a
+  queue-paused flag was deferred as extra state to persist on every settle
+  path, added only if the missing control actually bites.
 
 ### Scope
 
 `Queued` on the job, the invariant in the manager, `admit` and `resumable`
-enqueueing rather than refusing, queued rows through persist and restore, and a
-screen that shows a queue position, stops disabling the Download button and
-stops blocking Resume and Retry.
-
-Out: reordering, a depth limit, parallel transfers, a queue-paused control,
-halting after repeated failures, anything resembling Discover, and measuring
-four segments against a single connection.
+enqueueing rather than refusing, queued rows through persist and restore,
+and a screen showing queue position instead of disabling Download or
+blocking Resume and Retry. Out of scope: reordering, a depth limit, parallel
+transfers, a queue-paused control, halting after repeated failures, Discover.
 
 ### Closing conditions
 
-1. A second URL submitted during a transfer adds a Queued row and returns no
-   error; the Download button is no longer disabled.
-2. Complete, Failed, Discarded and Paused each start the head of the queue.
-3. A duplicate URL is refused, and so is a different URL resolving to the same
-   file name — against Active, Paused and Queued rows alike.
-4. Resume on a paused row while something runs enqueues rather than refusing.
-5. Quit with three queued, relaunch: three Paused rows, URLs intact, paths
-   rebuilt from the models directory, Resume live on all three.
-6. A queued row in `downloads.json` whose URL is not a Hugging Face `.gguf` URL
-   does not appear at all, and the engine is never reached for it.
-7. A file that appeared in the models directory while a job waited is not
-   overwritten — the job settles Failed saying it is already there.
-8. Clear finished leaves queued rows alone.
+Met 2026-08-04: a second URL adds a Queued row without error; Complete,
+Failed, Discarded and Paused each start the head of the queue; a duplicate
+URL is refused against Active, Paused and Queued rows alike; three queued
+jobs survive a quit and relaunch as three Paused rows with Resume live on
+all three; and a file appearing in the models directory while a job waits is
+not overwritten, settling the job Failed instead.
 
 ### Risks
 
-- `download.rs` is not touched. The queue is a manager concern; if the engine
-  needs a change, the design is wrong and the work stops rather than spreads.
-- The advance must run on the transfer's own thread after `finish` has released
-  the jobs lock. Starting the next job from inside `finish` takes the same mutex
-  and deadlocks. This is the most likely way to get it wrong.
-- A discarded active job is removed from the list inside `finish`, so the
-  advance must run after that removal or it reads the dead row as Active.
-- `admit`'s duplicate scan is the only place where a missed case corrupts a file
-  rather than annoying a user: two queued jobs for one file name would open a
-  second `.part` over bytes the first is writing.
-- `dest.exists()` is checked at enqueue and goes stale while the job waits. It
-  has to be re-checked when the job actually starts.
-- A restored queued row is the first Paused row with no `.part` behind it.
-  `adopted()` sets `resumable = false` when the partial is gone; applying that
-  here brings the whole queue back with dead Resume buttons.
-- `blocked={active != null}` in `Downloads.tsx` disables Resume and Retry
-  everywhere. Left in place it makes the feature invisible from the screen.
+`download.rs` is untouched by the queue; if the engine needed a change, the
+design was wrong. The advance runs on the transfer's own thread after
+`finish` releases the jobs lock, since starting it inside `finish` deadlocks
+on the same mutex. `dest.exists()`, checked at enqueue, is re-checked when
+the job starts since the first check goes stale while it waits, and a
+restored queued row has no `.part` behind it, so `adopted()`'s usual
+`resumable = false` cannot apply there.
 
-### What the building found
+## What the building found
 
-Three defects, none of them caught by the suite. All three were found by reading
-what was on disk rather than by a test, and each now has one that fails without
-its fix.
-
-- **`restore` rebuilt `path` from an unvalidated `file_name`**, so `../` in
-  `downloads.json` reached out of the models directory. It predates the queue and
-  is **live in v0.2.0**. The existing test pinned the stored `path` and nobody had
-  asked where the replacement came from.
-- **A restored queued row zeroed its byte count** while its `.part` sat on disk,
-  and — holding that file's path — shadowed the `adopt` row that knew better. The
-  test that covered it seeded a row with no `.part`, which is the case that does
-  not have the problem.
-- **The queue survived exactly one restart.** A row restored as Paused stopped
-  being written to the only file that remembered it. That is what produced the
-  rule now in [knowledge/technical.md](../knowledge/technical.md): the history
-  file holds whatever nothing else on disk describes.
-
-The first two were caught by reading `downloads.json` between runs. Worth
-repeating on anything that persists: read the file the app actually wrote.
-
-## Verification
-
-`cargo test`, `cargo clippy -- -D warnings`, `cargo fmt --check`,
-`bun run build` — then a real transfer. Tests alone have never been enough to
-close work on this subsystem, and were not enough for the speed limit either:
-what proved that was watching a running download change rate.
-
-Agreed 2026-08-02: the proof is a small (~1 GB) public GGUF from a repo such as
-bartowski or unsloth, killed mid-flight and resumed, verified against the real
-Hugging Face CDN. A full 13-21 GB run is a separate decision to be asked for
-explicitly, not assumed.
-
-Use the tdd skill for the engine: the retry taxonomy and resume logic are cheap
-to get wrong and expensive to discover at 97% of 21 GB. The same applies to the
-queue's settle-and-advance path for the same reason.
-
-Phase 2 adds two proofs the suite cannot give. Two small public GGUFs queued
-back to back, the first paused mid-flight, and the second seen starting on its
-own. Then the app quit with one still queued and relaunched, and the row seen
-coming back. The restore path also wants the test the resume fix got: a planted
-`downloads.json` row whose URL is not Hugging Face, against an engine that
-panics if it is reached at all.
+Three defects, none caught by the suite, each found by reading what was on
+disk and each now guarded by a test that fails without its fix: a path
+traversal live in v0.2.0, where `restore` rebuilt `path` from an unvalidated
+`file_name` so `../` in `downloads.json` could reach out of the models
+directory; a restored queued row that zeroed its byte count while its
+`.part` sat on disk, shadowing the `adopt` row that knew better; and a queue
+that survived exactly one restart, since a row restored as Paused stopped
+being written to the only file that remembered it. That last one produced
+the rule in [knowledge/technical.md](../knowledge/technical.md) that the
+history file holds whatever nothing else on disk describes.
 
 ## Known limits of the engine
 
-Found while planning Discover, which was then dropped ([roadmap.md](roadmap.md)).
-They are facts about the engine and outlive that plan.
+Found while planning Discover in August 2026; they are facts about the engine
+and outlive that plan.
 
-- Hugging Face omits `x-linked-size` and `x-linked-etag` on non-LFS files, and
-  the engine refuses a file with no declared size. In a repo tree an `lfs` object
-  on the entry is exactly the condition under which those headers exist.
-- A quant too big for one file ships as `{name}-00001-of-00003.gguf`. The engine
-  takes one file per job, so a split set is three URLs — queued back to back
-  since 2026-08-04, one at a time but unattended.
-- ~~Pause is not a state.~~ It is one as of 2026-08-03: the UI wanted the button,
-  and the row that survives a restart needed a name.
-  [persistence.md](persistence.md).
-- ~~One at a time is enforced by refusing, not queueing.~~ There is a `Queued`
-  state as of 2026-08-04, and the rule it was written to explain is now in
-  [knowledge/technical.md](../knowledge/technical.md). Phase 2 below.
+- Hugging Face omits `x-linked-size` and `x-linked-etag` on non-LFS files. The
+  `lfs` flag on a tree entry is what says the size headers will exist, and
+  the quant picker skips non-LFS entries since 2026-09-04
+  ([review.md](review.md)).
+- A quant too big for one file ships as `{name}-00001-of-00003.gguf`. The
+  engine takes one file per job, so a split set queues as several URLs, one
+  at a time but unattended.
 - `resolution_against_a_silent_server_is_bounded_by_its_timeouts` guards less
-  than its name claims: it pins that *some* timeout bounds resolution, not which
-  one — removing either the read timeout or the overall timeout alone still
-  passes. Tighten it if that code is touched.
+  than its name claims: it pins only that some timeout bounds resolution.
+  Tighten it if that code is touched.
 
-## Proof of the queue, 2026-08-04
+## Verified
 
-Moved here from State once v0.3.0 shipped: this is phase 2's evidence, and it
-belongs with the work rather than with whatever is current.
-
-- **A four-deep queue drained itself in the running app**, unattended, one file
-  at a time and in the order it was given: Ternary-Bonsai 27B, then 8B, then 4B,
-  then 1.7B, alongside North-Mini-Code resuming from a 19 GB `.part` and
-  finishing. Around 48 GB through four consecutive hand-offs without a click.
-  That is the invariant, proved by the app rather than by the suite.
-- Queueing, the advance on a pause, and Discard were each confirmed on screen.
-  Discard had never been looked at in the running app before this.
-- **Resume takes its turn**: two paused rows recovered after a restart, both
-  clicked, one started and the other waited.
-- Three defects, none found by the suite. One by reading the code — a path
-  traversal live in v0.2.0 — and two by reading `downloads.json` between runs:
-  a restored row that zeroed a byte count its `.part` contradicted, and a queue
-  that survived exactly one restart. Each has a test that fails without its fix.
+Verified 2026-08-02 and 2026-08-04: all four checks passed. A real transfer
+was killed mid-flight, resumed, and verified against its sha256, and a
+four-deep queue drained about 48 GB unattended in the running app.

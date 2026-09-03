@@ -1,661 +1,388 @@
 # Technical
 
-Tauri 2 desktop app. Rust backend, React 19 + TypeScript frontend built by Vite,
-bun as the package manager. macOS only, either architecture.
+Tauri 2 desktop app. Rust backend, React 19 and TypeScript frontend built by
+Vite, bun as the package manager. macOS only, either architecture: nothing in
+the source is ARM-only, and the shipped `.dmg` being `aarch64` is a fact about
+the build machine, not the code.
 
-**Nothing in the source is ARM-only** — there is no `cfg(target_arch)` anywhere,
-and the shipped `.dmg` being `aarch64` was a fact about the build machine rather
-than about the code. What is Darwin-bound is `sysmem.rs` entire (`sysctl` names,
+What is Darwin-bound is `sysmem.rs` entire (`sysctl` names,
 `proc_pid_rusage`), the Trash through `NSFileManager`, `probe.rs`'s Homebrew
-fallbacks, `~/Library/Application Support` and `open -R`. That list is what a
+fallbacks, `~/Library/Application Support` and `open -R`. That is what a
 Linux port would cost, and it is why the answer is no rather than not yet.
+
+Working rules for whoever codes here are in [AGENTS.md](../../AGENTS.md).
 
 ## Layout
 
 ```text
 src-tauri/src/
-  lib.rs       tauri commands, AppState, tray, window; the seam to the UI
-  catalog.rs   scan the models directory, group shard sets, disk space
+  lib.rs       tauri commands, AppState, tray, window
+  catalog.rs   scan models directory, group shards, disk space
   gguf.rs      GGUF header parser
   estimate.rs  weights and KV-cache arithmetic
-  probe.rs     discover llama-server, probe its accepted flags
+  probe.rs     discover llama-server, probe accepted flags
   runner.rs    spawn, supervise, telemetry, orphan detection
-  activity.rs  the Activity Monitor's rows: every llama-server, with memory and CPU
+  activity.rs  every llama-server process, memory and CPU
   health.rs    the ordered model test
-  download.rs  the transfer engine: resolve, segments, resume, verify
-  hub.rs       the Hugging Face index behind a Transport trait
+  download.rs  transfer engine: resolve, segments, resume, verify
+  hub.rs       Hugging Face index behind a Transport trait
   quant.rs     which file in a repository to fetch
-  discover.rs  a page of rows: one listing, then a tree per row over six lanes
-  downloads.rs the job manager the commands drive; admission and settling
-  store.rs     the single JSON config under Application Support
-  speeds.rs    what a model did, and the settings it did it under
-  tune.rs      the candidate ladder, the shared prompt, the measurement
+  discover.rs  browse listing, a tree per row over six lanes
+  downloads.rs job manager: admission and settling
+  store.rs     the JSON config under Application Support
+  speeds.rs    what a model did, and under what settings
+  tune.rs      candidate ladder, shared prompt, measurement
   sysmem.rs    machine memory readings via libc
   profile.rs   launch settings -> argv
 src/
-  App.tsx        the shell: sidebar, screen routing, runner and orphan state
-  Library.tsx    the model list; FirstRun.tsx is what it shows when empty
-  ModelDetail.tsx  one model, stopped or running; Presets.tsx picks how it runs
-  ProfileForm.tsx  ProfileFields and AdvancedFields, shared with Settings
+  App.tsx        shell: sidebar, routing, runner and orphan state
+  Library.tsx    model list; FirstRun.tsx for the empty state
+  ModelDetail.tsx  one model; Presets.tsx picks how it runs
+  ProfileForm.tsx  ProfileFields, AdvancedFields, shared with Settings
   SettingsScreen.tsx, Downloads.tsx, HealthPanel.tsx
-  Discover.tsx   the browse screen; DiscoverDetail.tsx one repository's quantisations
-  OwnerAvatar.tsx  the publisher's picture, one lookup per owner per process
-  Disclosure.tsx a folding row; theme.ts writes data-theme and data-mode on the root
-  Memory.tsx     Stat, launchCost and MemoryBar: what a launch costs against the ceilings
-  Telemetry.tsx  Card, Sparkline and TelemetryPanel, shared with Activity.tsx
-  TunePanel.tsx  the measurement ladder; PiPanel.tsx writes pi's two files
+  Discover.tsx   browse screen; DiscoverDetail.tsx one repo's quants
+  OwnerAvatar.tsx  publisher picture, one lookup per owner per process
+  Disclosure.tsx a folding row; theme.ts sets data-theme/data-mode
+  Memory.tsx     Stat, launchCost, MemoryBar: launch cost against ceilings
+  Telemetry.tsx  Card, Sparkline, TelemetryPanel, shared with Activity.tsx
+  TunePanel.tsx  measurement ladder; PiPanel.tsx writes pi's files
   icons.tsx      every SVG the UI draws
   api.ts, types.ts, format.ts, diff.ts
-src-tauri/tests/   integration tests; real_* need a model, a binary or the network
-                   common/ isolates the config directory; call it before any runner
-                   stylesheet.rs reads ../src/App.css; the only test of the frontend
+src-tauri/tests/   integration tests; real_* need a model, binary or network
+                   common/ isolates the config directory
+                   stylesheet.rs reads ../src/App.css, the only frontend test
 ```
 
-Both long-running subsystems report through a trait they own rather than calling
-Tauri: the runner through `EventSink`, the downloader through `ProgressSink`.
-That is what makes spawn -> Ready -> telemetry -> stop, and resolve -> transfer
--> verify, testable against a stand-in with no window. Follow the pattern rather
-than adding a third idiom.
+## Architecture
 
-Returning new state to a caller is not the same as announcing it. A command hands
-its snapshot to the window, but the tray has no caller and learns everything from
-the event stream, so a state change that only returns leaves the menu bar stale.
-Assert on what was emitted, not only on the snapshot: the snapshot is right in
-exactly the case this gets wrong.
+The runner and the downloader report through a trait they own (`EventSink`,
+`ProgressSink`) rather than calling Tauri directly, which makes spawn ->
+Ready -> telemetry -> stop, and resolve -> transfer -> verify, testable
+against a stand-in with no window. New subsystems should follow the
+pattern. Returning new state to a caller is not the same as announcing it:
+a command hands its snapshot to the window, but the tray has no caller and
+learns everything from the event stream, so a state change that only
+returns leaves the menu bar stale.
+
+A synchronous Tauri command runs on the main thread, and the window cannot
+paint while it does. `discover_browse` once held that thread for two and a
+half seconds of network calls, so a loading state React had already been
+told to render never appeared. `async fn` moves a command onto the async
+runtime; anything touching the network is `async` for this reason, and so
+is anything reaching `runner::inspect_port` or `capabilities()` on a miss
+(three process spawns). An `async` command that borrows `State` must
+return `Result`.
+
+`write_atomic` renames a fresh temporary into place. It does not carry a
+file's mode across, so a writer of a file the app does not own must read
+the mode first and set it back. Its temporary name is
+`path.with_extension("tmp")`, one per destination rather than per writer,
+so two threads writing the same file race on it; a read-modify-write on
+one of these files needs a mutex around the whole operation.
 
 Config is one JSON file at schema 8, every field `#[serde(default)]`, with
-unknown keys preserved through a load/save round-trip. `migrate` strips keys the
-app deliberately retired, so a new field must never reuse a retired name — serde
-would claim it first and adopt settings from a build several schemas old.
+unknown keys preserved through a load/save round trip. `migrate` strips
+keys the app deliberately retired, so a new field must never reuse a
+retired name, or serde would adopt settings from a build several schemas
+old. A retired key must be checked for shape, not only name: `lastRun` on
+real v1 configs was a map of model id to timestamp, the shape a later
+launch-time field wanted.
 
-Finished downloads live beside it in `downloads.json`, written atomically on
-state transitions and never on a progress tick. A file of its own because a
-transfer settles often and the config holds the models directory, the
-llama-server path and every remembered launch — an unreadable history should cost
-the user their history and nothing else.
-
-It holds more than the history: **whatever nothing else on disk remembers.** A
-transfer that moved bytes is described by the sidecar beside its `.part`, which
-cannot go stale while it runs, and that account is left to own it. A queued row
-has no `.part` and no sidecar, and neither does the Paused row a queued one comes
-back as — so both are written here, and `only_record_of` is where that is
-decided. Writing only the queued state made the queue survive one restart and not
-the next.
-
-What a model actually did is a third file, `speeds.json`, appended when a run that
-reached Ready and generated something settles — on either path out, the user
-stopping it or the process exiting. Its rows hold the run's *totals*, not a tick's
-snapshot, and the rates are derived so nothing on disk can disagree with itself. A
-row is keyed on everything that can move the number and stamped with the build.
-Split out for the same reason as the history above.
-
-**The suite writes none of this.** `store::use_config_dir` takes the directory
-once, and the tests that can start a runner call `common::isolate_config_dir`
-first. Before that existed, `cargo test` wrote `runner.pid` and `last-run.log`
-into the directory the installed app was using, and the log sitting there was test
-output.
+## Storage
 
 Everything the app keeps lives in `~/Library/Application Support/llamaport`:
-that config, `downloads.json`, `speeds.json`, the runner pidfile, the last run
-log, and `avatars/`.
+the config file, `downloads.json`, `speeds.json`, the runner pidfile, the
+last run log, and `avatars/`.
 
-**`avatars/` is one small file per owner, and the shape is the point.** A single
-map would have several threads writing it at once, and `write_atomic` names its
-temporary after the destination — one name per file, not per writer — so they
-would race on it. A file each removes the question. An empty file is a remembered
-miss and is worth as much as a hit: the owners with no picture publish the most
-repositories, so they are asked for the most often. Kept a month, because an
-avatar changing is cosmetic and no row can show that it has. The author's own run
-filled it with 16 owners at 140 KB.
+- **`config.json`** holds the models directory, the llama-server path and
+  every remembered launch profile.
+- **`downloads.json`** holds finished and in-progress transfer state,
+  written atomically on state transitions, never on a progress tick, so an
+  unreadable history costs the user only their history. It also holds
+  whatever nothing else on disk remembers: a running transfer is described
+  by the sidecar beside its `.part`, but a queued row (and the Paused row
+  it becomes on restart) has neither, so both live here. `only_record_of`
+  decides which account owns a row.
+- **`speeds.json`** is appended when a run that reached Ready and
+  generated something settles, on either exit path. Its rows hold the
+  run's totals, not a tick's snapshot, and are keyed on everything that
+  can move the number and stamped with the build.
+- **`avatars/`** is one small file per owner rather than one shared map,
+  because several threads can write it at once and `write_atomic`'s
+  temporary is named per destination, not per writer. An empty file is a
+  remembered miss worth as much as a hit, since owners with no picture
+  publish the most repositories. Kept a month, since an avatar changing is
+  cosmetic and no row can show that it has.
+- `store::adopt_legacy_config_dir` takes over the directory left under the
+  old `llama-cpp-hub` name, once, as the first statement in `setup`.
 
-`store::adopt_legacy_config_dir`
-takes over the directory left under the old `llama-cpp-hub` name, once, as the
-first statement in `setup` — before the pidfile is read or the config is loaded,
-both of which are in that same block. It is the no-argument wrapper;
-`adopt_legacy_dir` is the pair-of-paths helper the tests drive.
-
-## Run
-
-```bash
-bun install
-bun run tauri dev
-```
-
-## Verify
-
-**A UI change is checked against the mockup rendered, never against the code
-that generated it.** Established 2026-09-02 after four passes of the redesign
-were handed over as matching and none did; the fifth rendered the artboard,
-looked at it, and found a missing control in a minute
-([intent/redesign.md](../intent/redesign.md)).
-
-Both halves are scriptable without the author — but scripting the app half
-takes their window, so ask before doing it while they are at the machine:
-
-- **The mockup.** The canvas artboards under the scratchpad are `.dc.html` —
-  plain markup inside `<x-dc>`/`<helmet>` wrappers. Strip the wrappers, hoist
-  the `<style>` into `<head>`, serve the directory with `python3 -m
-  http.server`, and open it in Chrome to screenshot.
-- **The app.** `screencapture -x -o -l <window id>` takes the window alone,
-  with no desktop around it and without raising it. The id comes from
-  `CGWindowListCopyWindowInfo` in a one-file Swift script — the app's webview
-  exposes no accessibility tree, and System Events refuses to focus it
-  (`-25208`), so this is the only route.
-- **A window that will not photograph.** `screencapture -l` answers "could not
-  create image from window" when the window is hidden or on another Space,
-  which `kCGWindowIsOnscreen` reports as `on=false`. `osascript -e 'tell
-  application "System Events" to set visible of process "llamaport" to true'`
-  makes it capturable — and unlike `frontmost`, that call is permitted here.
-  Waiting for `on=true` does not work; the window can sit that way for
-  minutes.
-- **Wait for the window's bounds to stop moving before capturing.** A window
-  restored from the tray animates open from the menu-bar icon, and
-  `screencapture` reading it mid-zoom returns an image whose horizontal lines
-  slope several pixels across the width. It looks like a real capture and it
-  lies about alignment: one session read a stagger in the preset cards off such
-  an image and went looking for CSS that could not have produced it. Poll
-  `CGWindowListCopyWindowInfo` until the size repeats, then take the shot. And
-  **never resize the window through System Events** — `set size of window 1`
-  collapses it rather than resizing it ([intent/roadmap.md](../intent/roadmap.md)).
-- **The app is the author's. Never drive it unasked.** Ruled 2026-09-02: do not
-  launch it, capture it, restore it from the tray or touch it with `osascript` —
-  ask the author for the screenshot and wait. When the author asks for a launch,
-  as on 2026-09-04 for the screenshots, `bun run tauri dev` in the background
-  is the route, stopped once they say the captures are in — a Rust edit
-  restarts it under them. And the collapsed-window sightings in
-  [intent/roadmap.md](../intent/roadmap.md) follow the session's launches only;
-  the author has never seen one. Everything above steals focus or the
-  window from a person who is using the machine, one stray click has already
-  landed in their browser, and their eye is the acceptance test regardless. The
-  window half of the method stays written down because it is how the app half
-  was taken before the ruling, not because it is the route to take now.
-- **What can be rendered without the app, render.** The panel's own DOM against
-  `src/App.css` in headless Chrome is a real check of metrics, tokens and both
-  appearances, and it costs the author nothing: item 4's mock render caught a
-  green row marked "fastest" over a sentence naming a different setting. It is
-  not a substitute for the author's look — it renders what the code was meant
-  to emit, not what React emitted — so it goes before the ask, not instead.
-- **Reaching a screen behind a click.** The webview forgets its React state on
-  every hot reload, so the model screen cannot be photographed by opening it
-  by hand and then editing. Patch a temporary `useEffect` into `App.tsx` that
-  selects a model on mount, capture, revert it, and prove the revert with
-  `git diff --stat src/App.tsx` before the four commands run again.
-
-`tools/fits.py MODEL.gguf` is a **second opinion on `estimate.rs`**, not a
-convenience. The suite only ever sizes synthetic headers; the script sizes a
-real file in the models directory by an independent route, so a disagreement
-between them is a finding rather than a nuisance. Checked 2026-08-31 and they
-agree: 204 MiB for `qwen2.5-0.5b` at 32,768 with all 24 layers charged, 680 MiB
-for Ornith at 65,536 with 10 of 40 charged.
-
-It reads the two ceilings the same way the app now does — `llama-server
---list-devices` for the GPU working set, `vm_stat` for what is free — so a
-disagreement there is a finding too. `--run` launches the winner and reports real
-tokens per second, which `tune.rs` is the Rust port of and is checked against.
-
-
-Also in the README. Both copies are deliberate: the session anchor loads this
-one, contributors read that one. Not a duplication to clean up.
-
-```bash
-bun run build
-cargo test --manifest-path src-tauri/Cargo.toml
-cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
-cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
-```
-
-`cargo` is not on the PATH of a non-interactive shell here — it lives in
-`~/.cargo/bin`, which only a login shell picks up. Without it all three cargo
-commands exit **127**, which is "command not found" wearing the shape of a
-failing check. Export it first: `export PATH="$HOME/.cargo/bin:$PATH"`.
+The test suite writes none of this: `store::use_config_dir` takes the
+directory once, and any test that can start a runner calls
+`common::isolate_config_dir` first.
 
 ## pi
 
-The app's only outward integration, read off the author's own config 2026-09-02.
+The app's only outward integration, read off the author's own config on
+2026-09-02.
 
-`~/.pi/agent/models.json` is hand-maintained and has exactly one top-level key,
-`"providers"`. Each provider is `{ baseUrl, api, apiKey, models[] }`, optionally
-with `compat` or `authHeader`; each model is `{ id, name, contextWindow,
-maxTokens, reasoning, input[], cost{} }`. Five local providers: `local-llama` and
-`unsloth` on 8888, `mlx-lm` and `omlx` on 8080, `ollama` on 11434. `omlx` is the
-default. Sibling `.bak`, `.save` and `.backup` files already accumulate beside it.
+`~/.pi/agent/models.json` is hand-maintained, one top-level key
+`"providers"`. Each provider is `{ baseUrl, api, apiKey, models[] }`,
+optionally `compat` or `authHeader`; each model is `{ id, name,
+contextWindow, maxTokens, reasoning, input[], cost{} }`. Five local
+providers: `local-llama` and `unsloth` on 8888, `mlx-lm` and `omlx` on 8080,
+`ollama` on 11434, with `omlx` the default.
 
-- **A provider is not enough to reach a model.** `~/.pi/agent/settings.json` holds
-  `enabledModels`, a list of `"<provider>/<model id>"` strings, and pi will not offer
-  a model until it is named there. That file also holds `defaultModel`,
-  `defaultProvider`, `theme` and the rest of pi's settings. Established 2026-09-02
-  by the author, who wrote a provider and still had to enable it by hand.
-- **pi re-reads both files live.** A write to `models.json` or `settings.json` while pi
-  is running is picked up with no restart: proved 2026-09-02 by writing both from the
-  app with pi open and finding the model immediately selectable. So nothing the app
-  writes here needs to tell the user to restart anything.
-- **A provider carries exactly one `baseUrl`, shared by every model under it.**
-  So models cannot be accumulated under one provider without redirecting the
-  older ones wherever the newest points.
-- **A `baseUrl` is a declaration, not evidence that anything is bound there.**
-  Only one server can hold a port; whoever holds it answers to every provider
-  entry naming it. Two entries on 8080 are a naming ambiguity, not a conflict.
-- **`--alias` is the id an OpenAI-compatible client addresses.** `default_alias`
-  turns a display name into it, and already produces `qwen3.6-35b-a3b` — the id
-  the author wrote by hand under `local-llama`.
-- **Anything the app writes outside its own directory needs the taken-once
-  override** that `store::use_config_dir` gives Application Support, and a test
-  that cannot run without it. The file at risk here belongs to another tool.
+- A provider is not enough to reach a model: `~/.pi/agent/settings.json`
+  holds `enabledModels`, a list of `"<provider>/<model id>"` strings, and pi
+  will not offer a model until it is named there.
+- pi re-reads both files live, with no restart needed.
+- A provider carries exactly one `baseUrl`, shared by every model under it,
+  so models cannot be accumulated under one provider without redirecting
+  the older ones wherever the newest points. A `baseUrl` is a declaration,
+  not evidence anything is bound there: only one server can hold a port,
+  and two entries naming the same port are a naming ambiguity, not a
+  conflict.
+- `--alias` is the id an OpenAI-compatible client addresses; `default_alias`
+  turns a display name into it, and already produces `qwen3.6-35b-a3b`.
+- Anything the app writes outside its own directory needs the taken-once
+  override that `store::use_config_dir` gives Application Support, since the
+  file at risk belongs to another tool.
 
 ## The Hugging Face API
 
 Measured against the live API on 2026-09-03 while planning
-[intent/discover.md](../intent/discover.md), and cross-read against Unsloth's
-shipped hub, which calls it from their frontend.
+[intent/discover.md](../intent/discover.md), and cross-read against
+Unsloth's shipped hub, which calls the same API from their frontend.
 
-- **The sorts that exist** are `downloads` (30-day), `likes`, `trendingScore`,
-  `lastModified` and `createdAt`. `downloadsAllTime` is **rejected as a sort**
-  and accepted as an `expand`. `lastModified` and `createdAt` work and return
-  sludge — the top three of each were repos with zero downloads — so neither is
-  usable without a popularity floor. `trendingScore` is **descending only**:
-  `direction=1` is refused with "only descending sort is supported".
-- **`expand=gguf` on the listing call** returns `total` (parameter count),
-  `architecture` and `context_length` per repo, so a browse row can carry a
-  parameter count and the trained context with no per-repo call. It also drags in
-  the whole `chat_template`, which is kilobytes a row. **It is read off one file
-  in the repo and is wrong when that file is a sidecar**:
-  `HauhauCS/…-27B-…-MTP-GGUF` reports 1.86B parameters for a 27B model because
-  the repo's first GGUF is the MTP drafter.
-- **`full=true` carries `siblings` — filenames with no sizes.** Sizes come only
-  from `/api/models/{repo}/tree/main?recursive=true`, so a size on screen costs a
-  call per repo. `recursive=true` is required: quants live in subdirectories
-  (`BF16/`, `MTP/`) as often as at the root.
-- **A tree holds traps beside the quants.** `MTP/mtp-*.gguf` drafters, `mmproj-*`
-  projectors, and `BF16/…-00001-of-00002.gguf` shard halves sit in the same
-  listing as real quants. A rule that takes the largest file that fits picks a
-  drafter or one shard of a set. `lfs` on an entry is what says the size headers
-  will exist ([intent/downloader.md](../intent/downloader.md)).
-- **`gated` is `false`, `"auto"` or `"manual"`**, and only `full=true` returns
-  it. Four of the top 50 trending GGUF repos are gated. **The tree call returns
-  200 for a gated repo and `resolve` returns 401**, so a screen that does not
-  read the flag will show a size, pass a fit filter, offer a download and fail.
-- **Tags do not carry task domain on GGUF repos.** Over the top 50 trending, the
-  `code` tag appears **0 times** and `conversational` appears **46**. So a Coding
-  filter has no backing at all and a Chat filter removes four rows in fifty.
-  Unsloth files models by modality instead — Reasoning, Vision, Audio,
-  Embeddings, Image generation — and offers neither Coding nor Chat.
-- **No rate-limit headers come back unauthenticated.** The budget is unadvertised,
-  not absent.
-- **A mixture of experts needs two signals and neither is close to complete.** Over 300
-  GGUF repositories sampled 2026-09-03: the uploader's `moe` tag covers **35**, an
-  architecture whose name contains `moe` covers **34**, **only 13 carry both**, and the
-  union is **56**. The tag catches `deepseek4`, `laguna` and `qwen4exp`, whose
-  architectures say nothing — `qwen4exp` is a 131B-A6B — and the architecture catches
-  `unsloth/Qwen3-Coder-30B-A3B-Instruct-GGUF`, which nobody tagged. Each alone misses
-  about two in five. Hugging Face's own `?other=moe` is `filter=gguf,moe` on the API and
-  is the tag half only.
-
-  Neither is a guess from a repository's name: a tag is a claim its uploader made and an
-  architecture is read out of the file, where `-A3B` in a title is a naming habit.
-  Certainty for a model on disk stays `gguf::Metadata::is_moe`, which reads a real
-  expert count the index does not carry.
-
-- **An owner's picture is two endpoints, not one.**
-  `/api/organizations/{owner}/overview` carries `avatarUrl`, and answers **404 for a
-  person** — `/api/users/{owner}/overview` is the other half. Fifteen distinct owners
-  appear in a page of twenty-four and the same handful publish most of what trends, so
-  this caches extremely well. Measured 2026-09-03: unsloth 5.0 KB, DavidAU 15.1 KB,
-  served as webp.
-
-- **`num_parameters=min:20B,max:40B` is a real API filter, and its figure is better than
-  ours.** `gguf.total` is read off one file — the `HauhauCS` repository above reports
-  1.86B — and that same repository still lands correctly in the API's 20–40B band. Filter by parameters at the server and never by
-  arithmetic over `gguf.total`. `min:` and `max:` are independently optional.
-
-- **One GGUF repository in six is not a language model.** Over 300 sampled 2026-09-03
-  across all three sorts: 104 `image-text-to-text`, 97 `text-generation`, **48 with no
-  `pipeline_tag` at all** — `unsloth/Qwen3.8-27B-GGUF` among them — and 51 that
-  `llama-server` cannot serve, led by `automatic-speech-recognition` at 13.
-  **So the filter has to be a denylist.** Keeping only the known-good tags would hide the
-  48 untagged, which include some of the best models on the site; refusing the known-bad
-  tags costs only a media model that slips through under a tag nobody has seen yet.
-  `image-text-to-text` is kept — those are vision language models and the server runs them.
-- **The listing paginates by opaque cursor, in a `Link: <…>; rel="next"` header**, not by
-  offset. The cursor already encodes the sort, the filter, the expands and the search it
-  was issued for, so it is followed verbatim; rebuilding any of it is how page two comes
-  back sorted unlike page one.
-- **One call gives a repository everything a detail page needs**:
-  `?expand=downloads&likes&lastModified&gated&gguf&cardData` returns the counts, the
-  licence, the parameter count, the architecture and the trained context. `expand=gguf` is
-  affordable for one repository and not for twenty-four — its `chat_template` is what made
-  a listing 271 KB.
-- **A tree per row is the cost of a size, so it is fanned out.** Twenty-four trees take
-  **13.7 seconds in a queue and 2.3 seconds across six lanes**, measured 2026-09-03. `ureq`
-  is blocking and there is no async runtime, so that is six threads.
-- **`catalog::quant_from_name` is the one spelling of a quantisation.** It handles the `UD-`
-  prefix and `TQ` quants, and `catalog::parse_shard` splits `-00001-of-00002` — all 461 real
-  shard files sampled use five digits. `quant.rs` was first written with private copies of
-  both and they were worse, which would have had the Library and Discover print one
-  quantisation two ways.
-- **A fit badge computed from file size over-claims, and there are numbers on
-  it.** Unsloth's `classifyGgufFit` scores `size × 1.15 + 1 GB` against 97% of the
-  card in five classes — `fits | marginal | partial | ram | oom`. Their own
-  comments record that badge and memory bar **on the same row** disagreed on
-  **11 of 19 sizes**, that sharing one constant took it to **8 of 19**, and that
-  the residual eight are the estimator itself. Their context term is a flat 1 GB
-  "at a typical 4K window", where this app runs 65,536 with an f16 cache. This is
-  the same finding as "fit does not mean it works", arrived at from outside, and
-  it is why nothing in this app prints "fits" beside a file size it has not
-  opened.
+- Sorts: `downloads` (30-day), `likes`, `trendingScore`, `lastModified`,
+  `createdAt`. `downloadsAllTime` is rejected as a sort, accepted only as
+  an `expand`. `lastModified` and `createdAt` return sludge (zero-download
+  repos at the top), unusable without a popularity floor. `trendingScore`
+  is descending only.
+- `expand=gguf` on the listing returns `total` (parameter count),
+  `architecture` and `context_length` per repo with no per-repo call, but
+  drags in the whole `chat_template` (kilobytes a row) and is read off one
+  file, so it is wrong when that file is a sidecar:
+  `HauhauCS/...-27B-...-MTP-GGUF` reports 1.86B parameters for a 27B model
+  because its first GGUF is the MTP drafter.
+- `full=true` carries `siblings`, filenames with no sizes. Sizes come only
+  from `/api/models/{repo}/tree/main?recursive=true` (required, since
+  quants live in subdirectories like `BF16/` as often as at the root), so a
+  size on screen costs a call per repo. A tree holds traps beside the
+  quants too: MTP drafters, `mmproj-*` projectors, and shard halves, so a
+  rule that takes the largest file that fits can pick the wrong one. `lfs`
+  on an entry is what says the size headers will exist.
+- `gated` is `false`, `"auto"` or `"manual"`, returned only by `full=true`.
+  Four of the top 50 trending GGUF repos are gated; the tree call returns
+  200 for a gated repo while `resolve` returns 401, so a screen that
+  ignores the flag will offer a download that fails. Tags do not carry
+  task domain either: `code` appears 0 times and `conversational` 46 over
+  the same top 50, so a Coding filter has no backing (Unsloth files
+  models by modality instead). No rate-limit headers come back
+  unauthenticated; the budget is unadvertised, not absent.
+- A mixture of experts needs two signals, neither complete. Over 300 GGUF
+  repositories sampled 2026-09-03: the uploader's `moe` tag covers 35, an
+  architecture name containing `moe` covers 34, only 13 carry both, and the
+  union is 56. Certainty for a model on disk stays
+  `gguf::Metadata::is_moe`, which reads a real expert count the index does
+  not carry.
+- An owner's picture is two endpoints (`/api/organizations/{owner}/overview`
+  for an org, `/api/users/{owner}/overview` for a person, the org one
+  404s for a person); fifteen distinct owners appeared in a page of
+  twenty-four, so this caches well. `num_parameters=min:20B,max:40B` is a
+  real filter and more reliable than `gguf.total`, since the `HauhauCS`
+  repository above still lands correctly in the 20-40B band at the
+  server: filter by parameters there, never by arithmetic over
+  `gguf.total`.
+- One GGUF repository in six is not a language model. Over 300 sampled
+  2026-09-03: 104 `image-text-to-text`, 97 `text-generation`, 48 with no
+  `pipeline_tag` at all, and 51 that `llama-server` cannot serve. The
+  filter has to be a denylist: known-good tags alone would hide the 48
+  untagged, some among the best models on the site.
+- The listing paginates by an opaque cursor in a `Link: <...>; rel="next"`
+  header, not by offset, and already encodes the sort, filter, expands and
+  search, so it must be followed verbatim.
+- One call gives a repository everything a detail page needs:
+  `?expand=downloads&likes&lastModified&gated&gguf&cardData`, affordable
+  for one repository but not for twenty-four at once, which is why a tree
+  per row is fanned out instead: twenty-four trees take 13.7 seconds in a
+  queue and 2.3 seconds across six lanes, measured 2026-09-03.
+- `catalog::quant_from_name` is the one spelling of a quantisation,
+  handling the `UD-` prefix and `TQ` quants; `catalog::parse_shard` splits
+  `-00001-of-00002` (all 461 real shard files sampled use five digits).
+- A fit badge computed from file size over-claims. Unsloth's
+  `classifyGgufFit` scores `size × 1.15 + 1 GB` against 97% of a device's
+  memory in five classes; their own comments record that badge and their
+  memory bar disagreeing on 11 of 19 sizes on the same row, and the
+  residual after fixing a shared constant is the estimator itself. This is
+  the same finding as "fit does not mean it works", and it is why nothing
+  in this app prints "fits" beside a file size it has not opened.
 
 ## Constraints
 
-- **Installed memory is the wrong ceiling, and "fits" is not "works".** On this
-  M2 Pro `llama-server -lv 10` reports `MTL0 : Apple M2 Pro (25559 MiB, 25558
-  MiB free)` against `CPU : 32768 MiB` — the Metal working set is **25,559 MiB
-  (26.80 GB)**, not the 34.36 GB installed, and llama.cpp keeps `--fit-target`'s
-  1,024 MiB below it. Read the real figure from that log line rather than
-  computing a fraction of RAM.
+- **Installed memory is the wrong ceiling, and "fits" is not "works".** On
+  an M2 Pro, `llama-server -lv 10` reports a Metal working set of 25,559 MiB
+  (26.80 GB) against 34.36 GB installed; read that log line rather than
+  computing a fraction of RAM. Ornith at its full 262,144 context needs
+  23,931 MiB with a `q8_0` cache and fits, 26,335 MiB with `f16` and does
+  not. A memory sum says a launch is allowed, never that it is good.
 
-  Two ceilings bite, and arithmetic against either can still be wrong. Ornith at
-  its full 262,144 context needs 23,931 MiB with a `q8_0` cache and fits, and
-  26,335 MiB with `f16` and does not. Separately, what is *available* is far
-  below both: 14.83 GB free with 6.26 of 7.17 GB of swap already used, on a
-  machine whose spec sheet says 32 GB.
+- **A green suite says nothing about the sentence beside a figure.** Figures
+  and Fitting each shipped arithmetic that was tested and correct under
+  wrong captions, every one found by looking at the built app, none by the
+  suite ([intent/defects.md](../intent/defects.md) has the record). A
+  phase is not done when the suite is green, but when somebody has looked.
 
-  This corrected a claim made in this project on 2026-08-31 — that the inherited
-  `q8_0` cache was buying memory nobody needed at a cost to quality. Against the
-  real ceiling it is what buys the full context. The author's objection, "fit
-  does not mean it works", is the rule: a memory sum says a launch is *allowed*,
-  never that it is good, and only running it says the second.
+- **An artboard is the spec for the shape, not for the facts.** Downloads'
+  own mockup caption claimed downloads survive quitting the app; a
+  relaunch actually restores them Paused with Resume live
+  ([intent/downloader.md](../intent/downloader.md)). Every claim a mockup
+  makes about behaviour is checked against the code or phase file that
+  proved it, and corrected in place when wrong.
 
-- **A green suite says nothing about the sentence beside the number.** Figures
-  and Fitting each shipped arithmetic that was tested, mutation-checked and
-  correct, under captions that were wrong: a cache stat reading "≥ 0 MB" hinted
-  "some layers are not counted" on a dense model where every layer was counted,
-  a panel reading two different plans at once, a raw sentinel printed as `0`, and
-  a form naming a context its own command contradicted. Seven defects across the
-  two phases, every one found by the author looking at the built app and none by
-  the suite. Anything that puts prose next to a figure earns a look before it is
-  called done.
+- **macOS vibrancy costs a private API, and the config flag alone does not
+  enable it.** `transparent: true` needs `macOSPrivateApi: true` in
+  `tauri.conf.json` and the `macos-private-api` Cargo feature on `tauri`,
+  which the Tauri CLI adds on its own the next time it runs the app. It
+  bars the App Store permanently, accepted since this app has always
+  shipped unsigned through GitHub. `state: "followsWindowActiveState"`
+  flattens the material whenever the app goes to the back, which reads as
+  a glitch on a fixed chrome surface, so it is pinned to `active`.
+  Headless Chrome will not draw an `NSVisualEffectView`, so a render
+  proves only that the CSS stops painting, nothing about the blur.
 
-  **The running tally is in [intent/defects.md](../intent/defects.md)**: thirty-eight
-  by 2026-09-03 across nine phases, every one found by the author looking, two
-  caught by the suite and both after the fact. It is the argument for this rule.
-  A phase is not done when the suite is green; it is done when somebody has looked.
+- **Every request this app makes goes through Rust; the webview loads
+  nothing remote.** Avatars are fetched in Rust and handed over as
+  `data:` URIs, at 5-15 KB almost free. `bundle.security.csp` (set since
+  2026-09-04) omits `script-src`, since Tauri adds `'self'` and a hash per
+  bundled script, but Tauri injects the CSP only into assets served over
+  `tauri://localhost`, so `bun run tauri dev` runs with no policy at all;
+  only a built bundle enforces it.
 
-  Three rules the tally produced, kept here because they bind:
+- **The probe cache is stamped on the binary's mtime and size, taken before
+  the probe runs.** A Homebrew upgrade replaces the file in place; stamped
+  after, a file replaced mid-probe would be remembered under the old flags
+  for good. An `Err` stays cached until the path is set again.
 
-  - **A stale assertion is worse than no assertion**: it reports success for the
-    thing it was written to forbid. The MoE mark shipped dead behind a test that
-    asserted the old URL shape.
-  - **Compare a window effect against another app before treating its behaviour
-    as a bug.** The launch flash was chased until ChatGPT's app showed the same;
-    there was no way to tell from inside this one.
-  - **Do the render comparison first, not after a round of corrections.** The
-    four defects the method caught rather than the author all fell out of
-    putting the artboard, its stylesheet or every palette beside the app before
-    anything was changed.
+- **`select` is `width: 100%` across this stylesheet**, for the forms the
+  app is mostly made of. A select that sits beside something has to opt out
+  and re-state the right padding, since the shared rule paints the chevron
+  there.
 
-- **An artboard is the spec for the shape, not for the facts.** Downloads' own
-  caption read "Downloads survive quitting the app — they pick up where they
-  left off", and they do not: a relaunch restores them Paused with Resume live,
-  which this project had already verified and written down
-  ([intent/downloader.md](../intent/downloader.md)). Matching the drawing
-  faithfully would have shipped a false sentence in the app's voice. Every claim
-  a mockup makes about behaviour is checked against the code or the phase file
-  that proved it, and corrected in place when it is wrong.
+- **A `var(--x)` with nothing behind it is invisible.** CSS does not error;
+  the property simply inherits, and the result looks nearly right.
+  `src-tauri/tests/stylesheet.rs` fails on any bare `var(--x)` the
+  stylesheet does not define; it is the only test this project has of the
+  frontend. A `var(--x, fallback)` is deliberately not a defect, which is
+  how the fixed ambers and greens in
+  [intent/appearance.md](../intent/appearance.md) are written.
 
-- **macOS vibrancy costs a private API, and the config flag alone does not enable it.**
-  `transparent: true` needs `macOSPrivateApi: true` in `tauri.conf.json` *and* the
-  `macos-private-api` Cargo feature on the `tauri` dependency. The Tauri CLI adds that
-  feature to `Cargo.toml` when it next runs the app, which is how it arrived here —
-  swept into a commit unnoticed. **A private API bars the App Store permanently**;
-  accepted, because this app has always shipped unsigned through GitHub.
+- **A palette is seven anchors; the surfaces are mixed from them.**
+  `App.css` holds ground, text, muted text, line, accent, running and danger
+  per theme, and derives sidebar, card, card2, hover, badge, input, code and
+  faint from those once in `:root`. `theme.ts` writes `data-theme` and
+  `data-mode` on the root before the first render, so there is no
+  `prefers-color-scheme` query in the stylesheet. Anything painted on the
+  accent uses `--on-accent`, never `#fff`: three of the palettes are pale
+  enough that white is unreadable on them.
 
-- **Three knobs, and they are tuned against each other.** The material
-  (`windowEffects.effects`), its state, and the CSS tint over it.
-  - `sidebar` is the semantically right material for a sidebar and one of the most
-    opaque; under a 72% palette tint the effect read as though nothing had happened.
-    `underWindowBackground` lets considerably more through. Changing one without the
-    other overshoots.
-  - **`state: "followsWindowActiveState"` flattens the material whenever the app goes
-    to the back.** That is native — a Finder sidebar does it — and on a fixed chrome
-    surface it reads as a glitch. Pin it to `active`.
-  - The ground is painted on `:root`, so a transparent window needs it moved to the
-    content pane or the whole window goes through, not a fifth of it.
+- **`--fit` is on by default, and this app used to suppress it by naming
+  every value.** llama.cpp's `--fit` adjusts unset arguments to fit device
+  memory (`--fit-target` default 1024 MiB, `--fit-ctx` floor default
+  4,096 tokens). Measured 2026-08-31 with nothing set: `qwen2.5-0.5b` came up
+  at its full 32,768 context and `Qwen3.6-35B-A3B` at 262,144, on a 32 GB
+  machine.
 
-- **A window effect cannot be checked the way every other UI change here is.** Headless
-  Chrome will not draw an `NSVisualEffectView`, so the render proves the CSS stops
-  painting and nothing about the blur. This is the one kind of change where the author's
-  look is the *first* check rather than the last, and it showed: the effect shipped
-  defaulted off, then with a tint that hid it, then flattening on every app switch. A
-  fourth suspected defect was closed by looking at ChatGPT's app instead, which flashes
-  on open exactly the same way.
+- **A model's recommended sampling settings are already applied, and the
+  app gets them by passing nothing.** `libllama` reads a
+  `general.sampling.*` block out of the GGUF header and uses each field as
+  the server default: the same binary reported `temp 0.8, top_k 40` for a
+  model without the block and `temp 1.0, top_k 20` for one with it. Adding
+  `--temp` or `--top-k` to the launch would overrule the model's
+  recommendation, though a request field still beats the server default.
+  Nothing on screen shows a value was the model's choice rather than a
+  fallback.
 
-- **Every request this app makes goes through Rust, and that is worth keeping.** The
-  webview loads nothing remote — an `<img src>` at a CDN would have been the first
-  exception, in an app whose `csp` was `null` and would not have stopped it. Avatars are
-  fetched in Rust and handed over as `data:` URIs instead, which at 5–15 KB costs almost
-  nothing. `bundle.security.csp` is set since 2026-09-04 (the CSP note below); `default-src
-  'self'` now refuses the exception before anyone writes it.
+- **The models and config directories hold untrusted input.** A `.part`, a
+  `.part.json` and `downloads.json` are files anything with write access
+  can create, and each names something the app then acts on: a URL to
+  fetch, a path to write, a path to delete. Every one is re-validated on
+  the way in; two live security holes came from forgetting this. A `.part`
+  is opened with `O_NOFOLLOW`, never a plain `open`. `admit` is not the
+  only gate a transfer passes: anything that starts one validates the URL
+  itself, and `resume` once did not. A restored row's file name is
+  validated too, not only its path: `join("../evil")` on
+  `models_dir.join(file_name)` lands outside the intended directory, and
+  `Path::starts_with` is not a guard either, since it compares components
+  without resolving them (`avatars/..` starts with `avatars`). Validate
+  the name, never the joined path; `hub::valid_segment` is the one rule,
+  shared with repository ids. A `.part` and its sidecar are named from the
+  destination, `{dest}.part` and `{dest}.part.json`, found by scanning for
+  the sidecar suffix; `catalog::scan` filters on `.gguf` and never sees
+  either.
 
-- **A synchronous Tauri command runs on the main thread, and the window cannot paint
-  while it does.** `discover_browse` spends two and a half seconds on the network and held
-  that thread for all of it, so the loading state React had already been told to render
-  never appeared and the app read as frozen. `async fn` moves a command to the async
-  runtime. Anything here that touches the network is `async` for this reason and not for
-  tidiness — and so is anything that reaches `runner::inspect_port` (two HTTP calls with a
-  timeout each on a busy port) or `capabilities()` on a miss (three process spawns).
-  Thirteen commands were still `fn` on 2026-09-04, `launch_plan` among them on a 200 ms
-  debounce. **An `async` command that borrows `State` must return `Result`**; `api.ts`
-  does not notice, since `invoke` already returns a promise.
+- **One transfer at a time is enforced by queueing, not by refusing.** The
+  invariant is one line: nothing `Active` and something `Queued` means the
+  head of the queue starts, on the finishing transfer's own thread after
+  the jobs lock is released; promoting from inside the settle path takes
+  the same mutex and deadlocks. A queued job carries the `Options` it was
+  admitted on, since it starts with no caller to ask. What `admit` checked
+  can be hours stale by the time a queued job starts, so the destination
+  is re-checked at the moment of promotion.
 
-- **The probe cache is stamped on the binary's mtime and size, taken before the probe
-  runs.** A Homebrew upgrade replaces the file in place; stamped after, a file replaced
-  mid-probe would be remembered under the old flags for good. An `Err` stays cached until
-  the path is set again, as before.
+- **`AppState::save_config` takes the config lock itself, and a
+  `std::sync::Mutex` is not reentrant.** Anything that edits the config must
+  drop its guard before saving; calling it while holding the guard deadlocks
+  that path outright.
 
-- **Tauri injects the CSP only into assets it serves over `tauri://localhost`.** With
-  `build.devUrl` set, Vite serves the dev webview and Tauri injects nothing, so
-  `devCsp` is inert here and `bun run tauri dev` runs with no policy at all — only a built
-  bundle exercises `bundle.security.csp`. The policy omits `script-src` on purpose:
-  Tauri adds `'self'` and a hash for every bundled script. `'unsafe-inline'` on
-  `style-src` survives because `dist/index.html` has no `<style>` element to nonce; it is
-  what React's inline `style` attributes need. `ipc:` is the macOS IPC scheme. Read off
-  tauri 2.11.5's source on 2026-09-04, not the docs, which do not say.
+- **`Ready` is announced on every telemetry tick, not once**, so a listener
+  that acts on it acts dozens of times per run and must be idempotent;
+  `store::stamp_if_newer`, keyed on `started_secs`, is the guard.
 
-- **An edit whose anchor does not match changes nothing and says nothing.** Four times
-  in one session: `.sort-select` written twice before it existed, `expand=gguf` added to
-  a listing URL it never reached, and a memory file left saying the wrong number. The
-  cause each time was an anchor that `cargo fmt` or an earlier edit had already
-  reformatted — a one-line array split across lines, a margin changed from 4px to 8px.
-  **Assert that every anchor is present and unique before replacing it**, and read back
-  what landed rather than what was intended. Rust catches none of this: an absent
-  `expand` leaves an `Option` that is simply always `None`.
+- **There is no frontend test framework.** Every test is Rust; TypeScript is
+  covered by `tsc` and by looking at the screen.
 
-- **`select` is `width: 100%` across this stylesheet**, for the forms the app is mostly
-  made of. A select that sits beside something — a chip row, a status line — has to opt
-  out and re-state the right padding, because the shared rule paints the chevron there.
+- **macOS substitutes an em dash for `--` inside the webview's text
+  fields**, corrupting any flag typed into a field before it reaches Rust.
+  A field that takes flags undoes the substitution; only a leading dash
+  can be one, since substitution needs two hyphens. A field whose value is
+  a parsed list rendered back as text cannot be typed into either, since
+  the separator is dropped as it is typed; such a field keeps its own text
+  and re-seeds from props only when they disagree.
 
-- **A `var(--x)` with nothing behind it is invisible, and this project writes one about
-  once a quarter.** The redesign shipped three greys painted with `--muted` and a highlight
-  with `--surface-raised`, neither of which `App.css` has ever defined; Discover wrote
-  `--muted` a fourth time. CSS does not error, the property simply inherits, and the result
-  looks nearly right. `src-tauri/tests/stylesheet.rs` now fails on any bare `var(--x)` the
-  stylesheet does not define — it is the only test this project has of the frontend, since
-  there is no framework for one. A `var(--x, fallback)` is deliberately not a defect: CSS
-  paints the fallback, which is how the three fixed ambers and greens
-  ([intent/appearance.md](../intent/appearance.md)) are written.
+- **`on_window_event` fires for every window**, so any handler there must
+  check `window.label()`; the close-hides-instead rule belongs to the main
+  window alone.
 
-- **A palette is seven anchors; the surfaces are mixed from them.** `App.css`
-  holds ground, text, muted text, line, accent, running and danger per theme,
-  and derives sidebar, card, card2, hover, badge, input, code and faint from
-  those once in `:root`. Adding a palette is a block of seven declarations, and
-  hand-picking a fifteenth value for one theme is how the two lists drifted
-  apart before ([intent/appearance.md](../intent/appearance.md)). `theme.ts`
-  writes `data-theme` and `data-mode` on the root before the first render, so
-  there is no `prefers-color-scheme` query anywhere in the stylesheet: System is
-  resolved in one place. Anything painted on the accent uses `--on-accent`,
-  never `#fff` — three of the palettes are pale enough that white is unreadable
-  on them.
+- **`sysinfo`'s plain `refresh_processes` leaves `cmd()` empty**, populated
+  only by `refresh_processes_specifics` with a `ProcessRefreshKind` that
+  asks for it. Nothing errors; a parser over the empty command line
+  returns `None` forever, which made `detect_orphans` name an unknown
+  model on an unknown port for the life of the feature.
 
-- **`--fit` is on by default, and this app suppresses it by naming every value.**
-  It "adjusts unset arguments to fit in device memory" (`--fit [on|off]`,
-  default `on`; `--fit-target` a per-device margin, default 1024 MiB;
-  `--fit-ctx` a floor, default 4096). Every argument the launch fills in is one
-  it may no longer size. This app always passes `-c` and `-ngl`, so on every
-  launch it makes the feature inert. Measured 2026-08-31 on build b10360 with
-  nothing set: `qwen2.5-0.5b` came up at 32,768 and `Qwen3.6-35B-A3B` at
-  262,144, each the model's whole trained context, the second on a 32 GB
-  machine at 6.7 GB resident.
+- HTTP is `ureq` with `default-features = false, features = ["tls"]`
+  (rustls plus webpki-roots), blocking, one thread per connection, no
+  async runtime. Rust edition 2021; dependencies are deliberately few
+  (`serde`, `sha2`, `sysinfo`, `ureq`, `libc`).
 
-- **A model's recommended sampling settings are already applied, and the app
-  gets them by passing nothing.** `libllama` reads a `general.sampling.*` block
-  out of the GGUF header — `sequence`, `top_k`, `top_p`, `min_p`, `temp`,
-  `penalty_last_n`, `penalty_repeat`, `xtc_probability`, `xtc_threshold`,
-  `mirostat`, `mirostat_tau`, `mirostat_eta` — and uses each as the server
-  default. Proved 2026-08-30 on build b10360 against `/props`: the same binary
-  and flags reported `temp 0.8, top_k 40` for a model without the block
-  (`qwen2.5-0.5b`) and `temp 1.0, top_k 20` for one with it
-  (`Qwen3.6-35B-A3B`, whose header declares exactly those). So adding `--temp`
-  or `--top-k` to the launch would **overrule the model's own recommendation**,
-  which is the opposite of what a sampling form would be for. A request field
-  still beats the server default, so any client that sends one wins over both.
-  What the app is missing is not the values but the display: nothing on screen
-  says 1.0 was the model's choice rather than a fallback, and a `--temp` typed
-  into extra arguments silently replaces it with no indication.
+## Releases
 
-- **Tauri does not sign the bundle unless an identity is configured, and an unsigned
-  bundle is not "unsigned" to macOS — it is broken.** Without
-  `bundle.macOS.signingIdentity`, the `.app` carries only the ad-hoc signature the
-  linker puts on the arm64 executable: `flags=0x20002(adhoc,linker-signed)`,
-  `Info.plist=not bound`, `Sealed Resources=none`. `codesign --verify` then says
-  *code has no resources but signature indicates they must be present*, and a
-  quarantined copy is refused outright as **"is damaged and can't be opened. You
-  should move it to the Trash"** — with no **Open Anyway** button anywhere, because
-  macOS never got far enough to ask. Every release from v0.1.0 to v0.6.0 shipped
-  this, and the README documented a flow that could not work.
-
-  `"signingIdentity": "-"` fixes it: `flags=0x10002(adhoc,runtime)`, `Info.plist
-  entries=14`, `Sealed Resources version=2`, and `codesign --verify --deep --strict`
-  reports valid on disk. `spctl` still rejects it, which is correct — ad-hoc is not
-  notarization, so the user meets the ordinary unidentified-developer dialog, and
-  that one **Open Anyway** does dismiss.
-
-  **Check the artefact with `codesign --verify --deep --strict`, not by eye.** The
-  `.dmg` mounts, the app looks fine, and it launches perfectly from a local copy —
-  quarantine is the only thing that exposes it, which is why five releases went out
-  with it.
-
-- **`write_atomic` does not carry a file's mode across.** It renames a fresh temporary
-  into place, and a fresh file is born at the process umask rather than at the mode of
-  the file it replaces. Writing pi's `models.json` this way took it from `600` to `644` —
-  a file holding five API keys, made world-readable on the author's own machine, and
-  found by looking at `ls -l` after the first real write rather than by any test. Any
-  writer of a file the app does not own must read the mode first and set it back.
-
-- **`write_atomic` cannot take two writers at once.** Its temporary is
-  `path.with_extension("tmp")` — one name per destination, not per writer — so two
-  threads writing the same file race on it and the loser's rename fails with
-  `NotFound`. Every caller is serialised today, and any new one must be: a
-  read-modify-write on one of these files needs a mutex around the whole pair, not
-  just faith in the rename. Found by removing `store::append_speed`'s lock and
-  watching a concurrent-append test fail on the collision rather than on the lost
-  row it was written for. Losing a row silently is the failure it prevents in
-  production, where writers are serialised — the collision is what happens when
-  they are not.
-- **`sysinfo`'s plain `refresh_processes` leaves `cmd()` empty.** The argv is only
-  populated by `refresh_processes_specifics` with a `ProcessRefreshKind` that asks
-  for it. Nothing errors: the process list is complete and correct, every entry
-  simply has no command line, so a parser over it returns `None` forever. That is
-  what made `detect_orphans` name an unknown model on an unknown port for the
-  life of the feature, with the parser and its tests entirely correct. Proved
-  2026-09-02 by a throwaway test printing `cmd=[]` for a live `llama-server`.
-- HTTP is `ureq` with `default-features = false, features = ["tls"]`, which is
-  rustls plus webpki-roots. Blocking, one thread per connection — there is no
-  async runtime and nothing needs one.
-- Rust edition 2021; deps are deliberately few (`serde`, `sha2`, `sysinfo`,
-  `ureq`, `libc`).
-- No comments that narrate what code does; the codebase keeps them for
-  non-obvious why only.
-- The shell here is **zsh**, so `$PIPESTATUS` is not the array you want —
-  bash's name for it. It expands to nothing, `echo "x: ${PIPESTATUS[0]}"` prints
-  an empty status, and the command reads as though it reported success. zsh's own
-  is `$pipestatus` (lowercase). The rule below is the reliable answer either way.
-- **Tag a release with `git tag -a`.** `git tag` alone makes a lightweight tag,
-  and `git describe --exact-match` only considers annotated ones — so the check
-  that guards against building something other than the tag fails while nothing
-  is wrong. Every tag in this repository is annotated; v0.5.0 was created
-  lightweight, caught by that check, and recreated.
-- **A tag at the release commit is not a tag at HEAD.** Memory commits land after
-  it, so `git describe --exact-match` on HEAD is expected to find nothing once
-  syncing has happened. Before building an artefact, check out the tag or verify
-  the distance — assuming they were identical is what put a build of HEAD in the
-  v0.3.0 release ([intent/release.md](../intent/release.md)).
-- Capture a command's exit status directly. `cmd | tail -3; echo $?` reports
-  `tail`'s status, which reported a failing clippy as clean twice in one session.
-- **A new test is not trusted until the code it covers has been gutted and the
-  test watched to fail.** Used on every phase since the downloader, and it has
-  paid twice: two tests that passed for the wrong reason, and a guard nothing
-  would have noticed the loss of. A green suite is not the claim; a suite that
-  fails when the code is wrong is.
-- **Read the file the app actually wrote.** Four defects in this project were
-  found by looking — at the screen, or at `downloads.json` between runs — and
-  none of them by the suite. Anything that persists state earns this check.
-- macOS substitutes an em dash for `--` inside the webview's text fields, so a
-  flag typed into any field is corrupted before it reaches Rust and
-  `llama-server` rejects it. A field that takes flags undoes the substitution on
-  input. Only a token's leading dash can be one — substitution needs two
-  hyphens, so hyphens inside `--cache-type-k` are the user's own.
-- A field whose value is a parsed list rendered back as text cannot be typed
-  into: the separator is dropped the instant it is typed. Such a field keeps its
-  own text and re-seeds from props only when they disagree.
-- `on_window_event` fires for every window, so any handler there must check
-  `window.label()`. The close-hides-instead rule is the main window's alone.
-- A `.part` and its sidecar are named from the destination — `{dest}.part` and
-  `{dest}.part.json` — so a partial is found by scanning the models directory for
-  the sidecar suffix and stripping it. `catalog::scan` filters on the `.gguf`
-  extension and will never see either.
-- The models directory and the config directory hold **untrusted input**. A `.part`,
-  a `.part.json` and `downloads.json` are files anything with write access can
-  create, and each of them names something the app then acts on — a URL to fetch,
-  a path to write, a path to delete. Every one is re-validated on the way in.
-  Two live holes came from forgetting this.
-- A `.part` is opened with `O_NOFOLLOW` (`custom_flags`), never a plain `open`.
-  `lstat`-then-open is two syscalls with a window between them, which is not a
-  guard against a link planted on purpose.
-- `admit` is not the only gate a transfer passes. Anything that starts one —
-  today `start` and `resume` — validates the URL itself. Resume once did not, and
-  that asymmetry was the whole vulnerability.
-- A restored row's **file name** is validated too, not only its path. `path` is
-  rebuilt as `models_dir.join(file_name)`, and `join("../evil")` lands outside
-  the directory the rebuild was meant to confine it to. Rebuilding a path from an
-  untrusted name is not a check.
-- **And neither is `Path::starts_with`.** It compares components without resolving
-  them, so `avatars/..` starts with `avatars` and a containment test written to stop
-  exactly that returns true. The avatar cache shipped with that guard for an hour and
-  its own test caught it. **Validate the name, never inspect the joined path** —
-  `hub::valid_segment` is the one rule, shared with repository ids.
-- One transfer at a time is enforced by **queueing**, not by refusing. The
-  invariant is one line — nothing `Active` and something `Queued` means the head
-  of the queue starts — and every path a transfer can settle on runs it, on the
-  finishing transfer's own thread after the jobs lock is released. Promoting from
-  inside the settle path takes the same mutex and deadlocks.
-- A queued job carries the `Options` it was admitted on, because it starts on a
-  thread with no caller to ask. The rate limit is the one term that stays live:
-  `set_rate_limit` rewrites it on waiting rows as well as on the running one.
-- What `admit` checked can be hours stale by the time a queued job starts. The
-  destination is re-checked at the moment of promotion, and a file that landed
-  meanwhile fails that row rather than being written over.
-- `AppState::save_config` takes the config lock itself, and a `std::sync::Mutex` is
-  not reentrant. Anything that edits the config must drop its guard — a scoped
-  block — before saving. Calling it while holding the guard deadlocks that path
-  outright, and the paths that edit the config are launching and settling.
-- **`Ready` is announced on every telemetry tick, not once.** The `runner:state`
-  stream carries the current state, so a listener that acts on Ready acts dozens
-  of times per run. Anything it does must be idempotent or guarded against the
-  repeat; `store::stamp_if_newer` is the guard, keyed on `started_secs`, which
-  moves only when a process is spawned.
-- A retired key must be checked for *shape*, not only for name. `lastRun` on real
-  v1 configs is a map of model id to timestamp — the shape a launch-time field
-  wants — so naming that field `lastRun` would have serde adopt five-year-old
-  values as this build's. Proved by naming it that and watching the test fail.
-- There is no frontend test framework. Every test is Rust, in `src-tauri/tests/`
-  or an inline `#[cfg(test)]` module; TypeScript is covered by `tsc` and by
-  looking at the screen. Logic worth testing belongs in Rust until that changes.
+- Tauri signs nothing without `bundle.macOS.signingIdentity` configured, and
+  the ad-hoc signature the linker leaves is not "unsigned" to macOS, it is
+  broken: a quarantined copy is refused as "is damaged and can't be opened",
+  with no **Open Anyway** button. `"signingIdentity": "-"` fixes it: `spctl`
+  still rejects the result correctly, since ad-hoc is not notarization, so a
+  user meets the ordinary unidentified-developer dialog, whose **Open
+  Anyway** does work.
+- Check a release artefact with `codesign --verify --deep --strict`, not by
+  eye. The `.dmg` mounts and the app launches fine from a local copy either
+  way; quarantine is the only thing that exposes a broken signature.
+- Tag a release with `git tag -a`. A lightweight tag is invisible to `git
+  describe --exact-match`, so a check meant to guard against building the
+  wrong commit passes while nothing is right.
+- A tag at the release commit is not a tag at HEAD: memory commits land
+  after it. Check out the tag, or verify the distance, before building an
+  artefact ([intent/release.md](../intent/release.md)).
+- `CI=true` is mandatory for `tauri build`. Without it, the disk image step
+  drives Finder through Apple events and fails. The command is in the
+  README's build section.

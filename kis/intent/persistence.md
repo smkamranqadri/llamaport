@@ -1,182 +1,75 @@
-# Persistence phase
+# Persistence
 
-Asked for by the author on 2026-08-03, using the app: download history vanishes
-on restart, an incomplete download appears to be lost, the Library cannot mark a
-favourite or delete a model, and there is nowhere to set launch defaults.
+Asked for by the author on 2026-08-03 and completed the same day, shipped in
+v0.2.0. Download history vanished on restart, an incomplete download appeared
+to be lost, the Library could not mark a favourite or delete a model, and
+there was nowhere to set launch defaults.
 
-Three parcels, executed in order. Live status is in
-[state/current.md](../state/current.md), not here.
+## The asks
 
-## What the asks turned out to be
+The bytes were never lost. A cancelled or interrupted transfer leaves its
+`.part` and sidecar in the models directory, and starting the same URL again
+resumes it; what was lost on restart was the job row, and the files were
+invisible to the Library besides, since `catalog::scan` filters on the
+`.gguf` extension.
 
-**The bytes were never lost.** A cancelled or interrupted transfer leaves its
-`.part` and sidecar in the models directory and starting the same URL again
-resumes — recorded in [downloader.md](downloader.md) as "Pause is not a state".
-What is lost on restart is the *job row*, so there is no button to press. The
-files themselves are invisible to the Library because `catalog::scan` filters on
-the `.gguf` extension, so they accumulate unseen.
-
-That reframes parcel 1: it is not "persist the job list", it is "let the disk
-speak". Two stores, one job each.
-
-- The **disk** owns unfinished transfers. A sidecar carries `sourceUrl`, `total`
-  and per-segment `completed` ([download.rs](../../src-tauri/src/download.rs)),
-  which is everything a Paused row needs, and it is the only copy that cannot go
-  stale while a transfer runs.
-- **`downloads.json`** owns finished history alone — complete, failed,
-  discarded — because those have no on-disk trace to recover from. Nothing
-  writes byte counts to it, so nothing in it can disagree with reality.
-
-Scanning for orphaned `.part` files was cut from the first draft of this plan
-and put back. Without it the parcel fixes nothing that already happened:
-`downloads.json` starts empty on first run, so every partial the author already
-has stays as unreachable as before. It is also not extra work — it is the
-sidecar read the restore already needed, minus the requirement that a row exist
-first.
+Two stores split the work: the disk owns unfinished transfers, through the
+sidecar that already carries `sourceUrl`, `total` and per-segment progress,
+and `downloads.json` owns finished history alone, since completed, failed
+and discarded entries have no on-disk trace to recover from. A startup scan
+for orphaned `.part` files keeps older partials from being left stranded.
 
 ## Decisions
 
-- **`Paused` replaces `Cancelled`.** Cancel already keeps the bytes; it was a
-  pause wearing the wrong name.
-- **Pause keeps, Discard deletes.** Discard removes the `.part` and sidecar and
-  frees the space. It must delete on the settle path inside the spawned thread,
-  not where the cancel is signalled — `control.cancel()` returns while the
-  engine is still writing.
-- **Resume reuses the job's id** rather than starting a new one, so a paused
-  transfer resumed twice is one row in the history and not three.
-- **Interrupted transfers are never auto-resumed.** They come back Paused and
-  wait to be asked. Auto-resume fires network traffic at startup unasked, and
-  with several partials it would need a queue — which this app deliberately does
-  not have.
-- **A sidecar without its `.part`, or a `.part` without its sidecar, is junk.**
-  `download.rs` already trusts a sidecar only alongside the file it describes.
-  Such a pair is listed as unresumable with a Discard rather than hidden, because
-  hidden is how it got to be a problem.
-- **History is uncapped and the screen paginates** — 25 finished rows at a time,
-  client-side, since the whole file loads anyway. A cap would be a number nobody
-  has evidence for, and the author downloads many files.
+- **`Paused` replaces `Cancelled`.** Cancel already kept the bytes; it was a
+  pause with the wrong name. Pause keeps the files; Discard deletes them, on
+  the settle path inside the spawned thread rather than when cancellation is
+  signalled, since the engine keeps writing after `control.cancel()` returns.
+- **Resume reuses the job's id**, so a paused transfer resumed twice is one
+  history row, not three. Interrupted transfers are never auto-resumed; they
+  come back Paused and wait to be asked. A sidecar without its `.part` is
+  listed unresumable, with a Discard option, rather than hidden. History
+  itself is uncapped; the screen paginates 25 rows at a time, since the whole
+  file loads anyway and no cap has evidence behind it.
 - **Launch defaults seed, they do not override.** A model with no `lastUsed`
-  entry opens its form from the defaults instead of `Profile::default()`.
-  Anything ever launched still opens on its own last successful launch. This is
-  not the profile system v3 removed, and it does not reopen that decision.
-- **The field is named `launchDefaults`, not `defaultProfile`.** `migrate` strips
-  `"defaultProfile"` from `extra` because v3 retired it. A real field of that
-  name would be claimed by serde before `extra` ever saw it, silently adopting
-  launch settings from a build two schemas old. The retired key stays retired.
-- **Delete moves to Trash.** A mistaken delete of a 20 GB file should be
-  recoverable. Refused for the model the runner is currently running, and a
-  shard set is deleted as one unit.
+  entry opens its form from the defaults; anything ever launched keeps
+  opening on its own last launch. The field is `launchDefaults`, not the
+  retired `defaultProfile`, which would otherwise let serde adopt settings
+  from a build two schemas old.
+- **Delete moves the model to Trash**, using `osascript -l JavaScript`
+  reaching `NSFileManager` rather than Finder automation or an added crate.
+  Refused for the running model, and a shard set deletes as one unit. The
+  row supplies its own confirmation, since `window.confirm` returns no
+  usable answer in this webview.
 
-## Parcel 1 — downloads survive a restart — DONE 2026-08-03
+## What was built
 
-`downloads.json` beside the config, written atomically on state transitions and
-never on a progress tick. `DownloadState` gains `Paused`. A startup scan of the
-models directory for `*.gguf.part.json` synthesizes a Paused row per sidecar, and
-runs again when the models directory changes. Pause, Resume and Discard commands.
-Downloads paginates its finished rows.
-
-Touches `downloads.rs`, `download.rs` (one public accessor — `Sidecar` is
-private), `store.rs`, `lib.rs`, `Downloads.tsx`, `api.ts`, `types.ts`.
-
-Use the tdd skill here. The state machine and the reconciliation are the same
-class of thing as the resume logic: cheap to get wrong, expensive to discover.
-
-## Parcel 2 — favourites and delete — DONE 2026-08-03
-
-`favourites` in `Config`, keyed on the existing model id — `(size, hash of the
-leading bytes)`, stable across renames and directory moves
-([catalog.rs](../../src-tauri/src/catalog.rs)), the same key `lastUsed` uses.
-Schema goes to 6. A star in the row; favourites sort above everything, then
-alphabetical as now. Delete moves to Trash.
-
-The second half of that ordering is **SUPERSEDED — see
-[last-used.md](last-used.md)**: within each group the list now sorts by most
-recent activity, not alphabetically, and the schema has moved on to 7. Favourites
-above everything is unchanged.
-
-**Trash is settled, 2026-08-03, and by neither option the plan weighed.** The
-choice looked like Finder-via-`osascript` (no dependency, but a one-time
-Automation prompt that on an unsigned app looks alarming) against the `trash`
-crate (no prompt, at the cost of the objc2 tree). `osascript -l JavaScript` is a
-third: it reaches `NSFileManager.trashItemAtURL` through the ObjC bridge, so it
-never involves Finder, never prompts, and adds nothing to `Cargo.toml`. Probed
-before it was designed around — a file in `/tmp` was trashed and left its
-location.
-
-Settled by the first real deletion: the author deleted a model and it was in the
-Trash.
-
-The confirmation cannot be `window.confirm` — it returns no usable answer in this
-webview, so guarding on it refuses every delete instead of asking about one. The
-row asks for itself.
-
-## Parcel 3 — launch defaults — DONE 2026-08-03
-
-`launch_defaults: Option<Profile>` in `Config`, a Settings panel reusing
-`ProfileForm` with `showAlias={false}` — an alias is per-model and derived from
-the name, so it is not a thing to default — and `profile::seed` deciding
-precedence: draft, then `last_used`, then the defaults, then `Profile::default`.
-
-Whole profiles, never a merge. Taking the context from one and the cache types
-from another produces a combination nobody chose and the screen cannot explain.
+Three parcels: downloads surviving a restart, on `downloads.json` beside the
+config; favourites and delete, keyed on the existing model id, schema to 6;
+and launch defaults, `launch_defaults: Option<Profile>` in `Config` with a
+Settings panel reusing `ProfileForm`.
 
 ## Acceptance
 
-- Quit mid-transfer, reopen: the job is Paused with the bytes the sidecar
-  records, and Resume finishes the file to a verified sha256.
-- A `.part` left by the *current* build, before any of this exists, is Paused
-  after upgrading and resumes to a verified file.
-- A sidecar with no `.part` beside it is listed unresumable, offers no Resume,
-  and Discard removes it.
-- Discard on a running transfer leaves no `.part` and no sidecar, and the space
-  comes back.
-- Completed and failed rows survive a restart; Clear empties them and they stay
-  empty across a restart.
-- A favourited model sorts to the top and is still favourited after a restart,
-  after a rename, and after a directory move.
+- Quit mid-transfer, reopen: the job is Paused with the sidecar's bytes, and
+  Resume finishes it to a verified sha256, including a `.part` left by an
+  earlier build. A sidecar with no `.part` is unresumable and offers no
+  Resume; Discard clears a job's `.part` and sidecar and frees the space.
+- Completed and failed rows survive a restart; Clear empties them and keeps
+  them empty. A favourited model sorts to the top and stays favourited after
+  a restart, a rename, and a directory move.
 - Delete puts the file in Trash, is refused for the running model, and takes
-  every part of a shard set.
-- A never-launched model opens on the defaults; a launched one opens on its own
-  `lastUsed`.
-- A v1 config on disk does not have its old `defaultProfile` adopted as
-  `launchDefaults`.
+  every part of a shard set. A never-launched model opens on the defaults; a
+  launched one opens on its own `lastUsed`, and a v1 config's `defaultProfile`
+  is never adopted as `launchDefaults`.
 
 ## Out of scope
 
-Queueing — one at a time still refuses rather than queues. Auto-resume on
+Queueing; at the time one at a time still refused rather than queued
+(added 2026-08-04, [downloader.md](downloader.md)). Auto-resume on
 launch. A named-preset profile system. A configurable history cap.
 
-## Proof — not recorded
+## Verified
 
-**This phase was marked done in 2026-08-03 without a proof section**, and it is
-the only completed phase here without one. Noticed by the audit on 2026-08-31 and
-left as a gap rather than filled: nobody knows now what was actually run, and
-writing something plausible would turn an honest hole into a false record. What
-is known is only what the commits of that day show.
-
-Every phase since carries proof, and the habit of recording it started here by
-its absence.
-
-## Verification
-
-The four commands in [knowledge/technical.md](../knowledge/technical.md), green,
-with each status captured directly. Then per parcel, because tests alone have
-never been enough to close work on the downloader and were not enough for the
-speed limit either:
-
-- **P1** — a real Hugging Face transfer of about 1 GB, killed by quitting the
-  app, restored, resumed and sha256-verified. Plus a real Discard, and a real
-  pre-existing `.part` recovered.
-- **P2** — a real delete into a real Trash, and a favourite surviving a real
-  restart.
-- **P3** — both seeding paths in the running app.
-
-Each new test checked against a gutted implementation. The UI half is covered by
-`tsc` and by looking at the screen; there is still no frontend test framework.
-
-What P1 actually recovered, kept because it is the evidence the recovery was
-found rather than seeded: a 16.45 GiB partial already in the models directory
-with 5.66 GiB on disk, left by an earlier build that recorded nothing — adopted
-and resumed. And a 676 MB transfer stopped at 135,397,705 bytes, which a manager
-built from scratch, holding nothing, found at 135,496,009 and carried to the
-expected sha256.
+No proof was recorded for this phase at the time, and the gap is kept as is
+rather than filled with a reconstructed record.

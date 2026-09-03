@@ -1,185 +1,100 @@
 # Fitting
 
-Planned 2026-08-31. The app names `-c` and `-ngl` on every launch, and both
-overrule a llama.cpp default that is better than the value being passed.
+Planned and completed 2026-08-31. Shipped in v0.4.0. The app stopped passing
+`-c` and `-ngl` on every launch, so llama.cpp's own fitter can size them.
 
-Live status is in [state/current.md](../state/current.md), not here.
+## Purpose
 
-## What is actually wrong
+llama.cpp's `--fit` option is on by default. It adjusts any argument the launch
+leaves unset so the model fits device memory. The app passed both `-c` and
+`-ngl` on every launch, which switched the fitter off each time without saying
+so.
 
-**`--fit` is on by default and this app makes it inert.** It "adjusts unset
-arguments to fit in device memory", defaults to `on`, and every argument the
-launch fills in is one it may no longer size. Filling both in is not a
-neutral act — it is switching the feature off, once per launch, silently.
+Two measurements made this worth fixing:
 
-It genuinely constrains rather than merely defaulting, which is the thing worth
-measuring before building anything on it. Left alone, `llama-server` b10360 gave
-`qwen2.5-0.5b` its whole 32,768-token context and `Qwen3.6-35B` its whole
-262,144 on a 32 GB machine. Forced to reserve a 30 GiB margin with
-`--fit-target`, it dropped the 0.5B to **4,096** — `--fit-ctx`'s floor. So the
-fitter both grants and withholds ([knowledge/technical.md](../knowledge/technical.md)).
+- Left to itself, `llama-server` gave `qwen2.5-0.5b` its full 32,768-token
+  context and `Qwen3.6-35B` its full 262,144 on a 32 GB machine. Forced to
+  reserve a large margin, it dropped the small model to 4,096, which is the
+  `--fit-ctx` floor. The fitter both grants and withholds.
+- The app passed `-ngl all`. llama.cpp's default is `auto`. Where the weights
+  do not fit, `auto` spills layers to the CPU and `all` insists on the GPU.
 
-**`-ngl` is the same defect in the riskier field.** llama.cpp's own default is
-`auto`; this app passes `all`. Where the weights do not fit, `auto` spills and
-`all` insists.
-
-The context number is also the one thing a user has to invent at every launch.
-65,536 is a value the author picked once. Left to fit, llama.cpp chose 262,144
-for the hybrid on this machine — four times more, and not a number anybody
-would have guessed at.
+The context value was also the one number a user had to invent at every launch.
 
 ## Decisions
 
-- **Auto is stored as `ctx: 0`, and that is a borrowed vocabulary rather than an
-  invented sentinel.** llama.cpp's own `--help` spells "loaded from model" as
-  `0`. It costs no config schema bump and leaves every saved number alone. Say so
-  in the code, so it is not later "fixed" into an `Option` and a schema 8.
-- **Auto is gated on `--fit` being present in the probed `--help`, and this is
-  the load-bearing decision.** Omitting `-c` on a build without the fitter does
-  not fit anything — llama.cpp falls back to the model's *trained* context, which
-  is 262,144 for the file on this disk, and allocates against it with nothing to
-  stop it. Ungated, this phase is a way to exhaust a machine's memory. Gated, it
-  is a convenience. If anything here is cut, cut everything else first.
+- **Auto is stored as `ctx: 0`.** llama.cpp's own help uses `0` for "loaded
+  from model", so this borrows an existing meaning. It needs no config schema
+  change and leaves every saved number alone.
+- **Auto is offered only when the probed `--help` lists `--fit`.** Without the
+  fitter, omitting `-c` makes llama.cpp allocate the model's trained context,
+  which can exhaust a machine. This gate is the safety of the whole phase.
 - **Auto omits the flag rather than passing a word for it.** The fitter adjusts
-  *unset* arguments, and `auto` is already llama.cpp's default for `-ngl`, so
-  omitting is unambiguous where passing `-ngl auto` is a guess about how the
-  fitter reads it. The shown command gets shorter, which is honest: the app
-  really is saying less.
-- **A never-launched model opens on Auto; a launched one keeps its number.** The
-  existing rule stands unchanged — defaults seed a model nobody has launched and
-  never overrule one that has ([knowledge/project.md](../knowledge/project.md)).
-- **Auto gives up the pre-launch cache figure, and gets it back at Ready.**
-  There is no context to size against until the server picks one. Before launch
-  the panel shows weights as a marked floor; at Ready it sizes the cache at the
-  `n_ctx` the server reports, which `runner.rs` already reads from `/props` and
-  the screen already prints as a footnote. That footnote becomes the answer.
-- **`bounded` will carry two reasons and needs two sentences.** "Some layers are
-  not counted" and "no context has been chosen yet" are different facts, and one
-  note for both would be a gentle lie.
-- **The runner is not threaded into `build_plan`.** Plan-building knows nothing
-  about what is running and should keep not knowing. The frontend holds both
-  already; the seam belongs there or in an explicit context override.
+  unset arguments, and `auto` is already llama.cpp's default for `-ngl`. The
+  shown command gets shorter, which reflects what the app is doing.
+- **A never-launched model opens on Auto. A launched model keeps its number.**
+  This follows the seeding rule in [knowledge/project.md](../knowledge/project.md).
+- **Under Auto, the memory panel shows weights as a floor before launch.** At
+  Ready it sizes the cache at the `n_ctx` the server reports, which the runner
+  already reads from `/props`.
+- **A bounded figure carries its reason.** "Some layers are not counted" and
+  "no context has been chosen yet" are different facts and get different
+  sentences.
+- **Plan-building does not know what is running.** The frontend joins the plan
+  and the runner state.
 
-## Parcel 1 — hand the flags back — DONE 2026-08-31
+## What was built
 
-`profile.rs` defaults `ctx` to 0 and `ngl` to `auto`, and `args()` omits each
-where that is what it holds. The probe decides whether Auto is offered at all.
-`ProfileForm.tsx` grows an Auto position on the context control.
+1. `profile.rs` defaults `ctx` to 0 and `ngl` to `auto`, and `args()` omits
+   each where that is what it holds. The probe decides whether Auto is offered.
+   The context control gains an Auto position.
+2. `estimate.rs` gains the second bounded reason. Before launch, Auto shows
+   weights as a floor and names the context as the missing term. At Ready, the
+   cache is priced at the server's own `n_ctx`.
 
-**Measure before relying on it:** that omitting `-ngl` is what the fitter means
-by unset is assumed, not established. `-c` was measured; this was not. Settle it
-the same way — a launch with the flag absent, read back from `/props` — before
-the parcel closes rather than after.
+## Acceptance
 
-## Parcel 2 — the panel under Auto — DONE 2026-08-31
+All met 2026-08-31.
 
-`estimate.rs` gains the second bounded reason. Before launch, Auto shows weights
-as a floor naming the context as what is missing. At Ready, the cache is sized
-at the server's own `n_ctx` rather than at a profile field that holds 0.
+- With `--fit` present and context on Auto, the argv carries no `-c`, and the
+  shown command agrees with the argv.
+- With `ngl` on auto, the argv carries no `-ngl`. With `all` or a number, it
+  does.
+- With `--fit` absent, Auto is not offered and nothing omits `-c`. A test
+  covers this case because it is the one that can exhaust a machine.
+- A remembered profile of 65,536 still launches with `-c 65536`.
+- A config missing `ctx` deserializes to Auto. One carrying a number keeps it.
+- Before launch under Auto, the weights show as a floor with a reason that names
+  the context, worded differently from the uncounted-layers reason.
+- At Ready under Auto, the cache figure is sized at the server's `n_ctx`.
+- Ornith launched under Auto comes up with a larger context than the 65,536
+  the author had been typing by hand.
 
-## Proof — 2026-08-31
+## Verified
 
-**The assumption the plan told itself to measure first, measured first.** Omitting
-`-ngl` is what the fitter means by unset. Under a forced 31,500 MiB margin on the
-0.5B, `-ngl` omitted put all 24 layers on **CPU** — the fitter spilling — while
-`-ngl all` put all 24 on **MTL0**, the fitter overruled. So `all` was not a
-neutral default; it was preventing the machine from being protected.
+Verified 2026-08-31: all four checks passed. Launches against the real server
+showed that omitting `-ngl` lets the fitter spill layers to the CPU, and that
+Ornith with neither flag came up at 262,144 tokens. The author confirmed the
+Auto wording, the shorter command, and both memory-panel states on screen.
 
-`--fit` also constrains rather than merely defaulting: the same forced margin
-took that model's context from 32,768 to **4,096**, which is `--fit-ctx`'s floor.
-
-**Parcel 1 proved by launching, which is the only thing that could.** Ornith run
-with no `-c` and no `-ngl` — the argv the app now builds — came up at
-**262,144** tokens, four times the 65,536 that had been typed by hand, at 4.8 GB
-resident. An explicit `-c 8192` still yields 8,192, so the remembered path is
-untouched.
-
-The four commands green, **197 tests**, up from 191. Four mutations watched to
-fail: pretending every build can fit (which is the dangerous one — it failed the
-absent-fitter test), never omitting `-ngl`, defaulting back to a guessed number,
-and pricing Auto like an ordinary context, which would put "plus 0 B of KV
-cache" on the screen.
-
-Three existing tests asserted the old default of 65,536 and `all`. They were
-changed rather than worked around: each encoded the decision this phase
-reverses, and one of them — that a field falls back within its own profile
-rather than across to another — keeps its point intact and only changes the
-value it falls back to.
-
-**Seen on screen 2026-08-31, and looking is what finished it.** Under Auto the
-context field reads "fitted to memory", the command names neither `-c` nor
-`-ngl`, and the memory panel reads "≥ 644 MB to allocate — weights 644 MB, and
-the cache is not counted here." Once Ready the same panel reads "848 MB to
-allocate — weights 644 MB plus 204 MB of KV cache at 32,768 tokens", priced at
-the context the server fitted, with no `≥` because at a known context it is
-exact. That second plan fetch was the part most likely to fail and it did not.
-
-**Four defects the suite could not reach, all found by looking:**
-
-- `Current profile` printed the raw `0` that carries the Auto meaning.
-- That panel read two plans at once — `Current profile` from the live form and
-  the cache from the plan fetched at mount — so a cache priced at 32,768 sat
-  beside a profile reading 0. Every figure on the screen now comes from one
-  source.
-- The cache stat said "≥ 0 MB" hinted "a floor — some layers are not counted",
-  which is **the wrong reason**: on a dense 0.5B every layer is counted, and the
-  real reason is that no context has been chosen. The decision above says in as
-  many words that `bounded` carries two facts and needs two sentences; it was
-  honoured in the memory panel and forgotten in the stat beside it. A wrong
-  explanation beside a correct number is worse than no explanation, and no test
-  can see it.
-- Switching Auto off set a flat 65,536 without clamping to the model's maximum,
-  so the form read 65,536 while the command under it read `-c 32768`. The slider
-  clamps what it displays, which is what let the mismatch look settled.
-
-A fifth was mine from further back: `SettingsScreen.tsx` kept its own hardcoded
-copy of the built-in profile, so changing `Profile::default()` in Rust left the
-Settings form still offering 65,536 and `all` — and saving anything there would
-have frozen the old values into the config. The copy is deleted; Rust now sends
+Five defects were found on screen and fixed the same day: a raw `0` shown in
+the profile panel, two plans shown at once, the wrong reason on the cache
+floor, an unclamped 65,536 when Auto was switched off, and a hard-coded copy of
+the built-in profile in the Settings screen. Rust now sends
 `built_in_defaults` and the screen renders what it is told.
 
 ## Out of scope
 
-Everything else in [gaps.md](gaps.md). Auto for cache types, parallel slots or
-batch sizes. `--fit-target` and `--fit-ctx` as controls — their defaults stand,
-and the second is why Auto can hand back 4,096 rather than nothing. A config
-schema bump, which `ctx: 0` exists to avoid.
-
-## Acceptance
-
-- `--fit` present and ctx Auto: argv carries no `-c`, and the shown command
-  agrees with the argv.
-- `ngl` auto: argv carries no `-ngl`. `all` or a number: it does, as today.
-- **`--fit` absent: Auto is not offered and nothing omits `-c`.** Covered by a
-  test, because this is the case that can exhaust a machine.
-- A remembered profile of 65,536 still launches with `-c 65536`.
-- A config missing `ctx` deserializes to Auto; one carrying a number keeps it.
-- Before launch under Auto: weights shown as a floor, the reason naming the
-  context, worded differently from the uncounted-layers reason.
-- At Ready under Auto: the cache figure is sized at the server's `n_ctx`.
-- Ornith launched under Auto comes up, and the context the server reports is
-  larger than the 65,536 that had been typed by hand.
-
-## Verification
-
-The four commands, each status captured on its own line and never after a pipe.
-Every new test gutted and watched to fail before it is trusted
-([knowledge/technical.md](../knowledge/technical.md)).
-
-A green suite finishes neither parcel. What `--fit` does is llama.cpp's
-behaviour and not this app's, so the outcome is settled by launching: once under
-Auto, reading back what the server chose, and once with an explicit number to
-show the remembered path is untouched.
+Auto for cache types, parallel slots or batch sizes. `--fit-target` and
+`--fit-ctx` as controls. A config schema change, which `ctx: 0` exists to
+avoid.
 
 ## Risks
 
-- **The gate is the whole safety story.** Without `--fit`, omitting `-c` asks a
-  262,144-token cache of a 32 GB machine. The test for the absent case matters
-  more than any other test in this phase.
-- That omitting a flag is what the fitter means by unset is measured for `-c`
-  and assumed for `-ngl`. Parcel 1 measures it.
+- The gate on `--fit` is the whole safety story. The test for the absent case
+  matters more than any other in this phase.
 - `--fit` floors at 4,096, so Auto can hand back far less context than expected
-  on a loaded machine. Showing the server's own figure at Ready is what makes
-  that visible instead of mysterious.
-- Assumes no config on disk omits `ctx`. True of every profile this app has
-  written; the test is the guard rather than the assumption.
+  on a loaded machine. Showing the server's own figure at Ready makes that
+  visible.
+- The change assumes no config on disk omits `ctx`. That is true of every
+  profile the app has written, and a test guards it.
