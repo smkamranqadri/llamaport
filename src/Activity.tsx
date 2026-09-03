@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { activitySnapshot } from "./api";
 import { formatMemory } from "./format";
 import { pressureText } from "./Memory";
+import { Card } from "./Telemetry";
 import type { Activity, ActivityProcess } from "./types";
 
 /// How often the machine is asked. A CPU percentage is a difference between two polls, so
@@ -9,55 +10,6 @@ import type { Activity, ActivityProcess } from "./types";
 const EVERY_MS = 2000;
 
 const SPARK_POINTS = 40;
-
-function Sparkline({ values }: { values: number[] }) {
-  if (values.length < 2) return null;
-  const max = Math.max(...values, 1);
-  const points = values
-    .map((v, i) => `${(i / (SPARK_POINTS - 1)) * 100},${20 - (v / max) * 20}`)
-    .join(" ");
-
-  return (
-    <svg className="spark" viewBox="0 0 100 20" preserveAspectRatio="none">
-      <polyline points={points} />
-    </svg>
-  );
-}
-
-function Card({
-  label,
-  value,
-  sub,
-  subTone,
-  fill,
-  spark,
-}: {
-  label: string;
-  value: string;
-  sub?: string;
-  /// A verdict rather than a quantity, so it carries the colour the figure does not.
-  subTone?: "ok" | "bad";
-  fill?: number | null;
-  spark?: number[];
-}) {
-  return (
-    <div className="card">
-      <span className="card-label">{label}</span>
-      <span className="card-figure">
-        <span className="card-big">{value}</span>
-        {spark && spark.length > 1 && <Sparkline values={spark} />}
-      </span>
-      {sub && (
-        <span className={`card-sub${subTone ? ` tone-${subTone}` : ""}`}>{sub}</span>
-      )}
-      {fill != null && (
-        <div className="bar">
-          <span style={{ width: `${Math.min(100, Math.max(0, fill * 100))}%` }} />
-        </div>
-      )}
-    </div>
-  );
-}
 
 /// What a row is, said rather than colour-coded: a stray server is the one thing on this
 /// screen the app did not start, and the whole point of showing it is that it is not ours.
@@ -196,7 +148,13 @@ export default function ActivityScreen() {
       </div>
 
       <div className="cards activity-cards">
-        <Card label="Total CPU" value={cpuValue} sub="across the whole Mac" spark={spark} />
+        <Card
+          label="Total CPU"
+          value={cpuValue}
+          sub="across the whole Mac"
+          spark={spark}
+          capacity={SPARK_POINTS}
+        />
         <Card label="Memory" value={memoryValue} sub={memorySub} fill={memoryFill} />
         <Card label="GPU memory" value={gpuValue} sub={gpuSub} fill={gpuFill} />
         <Card

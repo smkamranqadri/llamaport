@@ -101,19 +101,14 @@ fn block(serving: &Serving, reasoning: bool) -> Value {
 /// guess. Unparseable is a failure and must stay one — overwriting a file we could not
 /// read is how a hand-maintained config gets destroyed.
 fn document(path: &Path) -> Result<Option<Value>, String> {
-    let raw = match fs::read_to_string(path) {
-        Ok(raw) => raw,
-        Err(error) if error.kind() == ErrorKind::NotFound => return Ok(None),
-        Err(error) => return Err(format!("{} could not be read: {error}", path.display())),
+    let Some(parsed) = parsed(
+        path,
+        "Nothing was written — fix the file by hand, or the next write would take everything \
+         else in it with the fix.",
+    )?
+    else {
+        return Ok(None);
     };
-
-    let parsed: Value = serde_json::from_str(&raw).map_err(|error| {
-        format!(
-            "{} is not valid JSON ({error}). Nothing was written — fix the file by hand, \
-             or the next write would take everything else in it with the fix.",
-            path.display()
-        )
-    })?;
 
     if !parsed.get("providers").is_some_and(Value::is_object) {
         return Err(format!(
@@ -124,6 +119,20 @@ fn document(path: &Path) -> Result<Option<Value>, String> {
     }
 
     Ok(Some(parsed))
+}
+
+fn parsed(path: &Path, not_written: &str) -> Result<Option<Value>, String> {
+    let raw = match fs::read_to_string(path) {
+        Ok(raw) => raw,
+        Err(error) if error.kind() == ErrorKind::NotFound => return Ok(None),
+        Err(error) => return Err(format!("{} could not be read: {error}", path.display())),
+    };
+    serde_json::from_str(&raw).map(Some).map_err(|error| {
+        format!(
+            "{} is not valid JSON ({error}). {not_written}",
+            path.display()
+        )
+    })
 }
 
 fn providers(document: &Value) -> Option<&serde_json::Map<String, Value>> {
@@ -230,18 +239,9 @@ fn render_enabled(entries: &[String]) -> String {
 }
 
 fn settings_document(path: &Path) -> Result<Option<Value>, String> {
-    let raw = match fs::read_to_string(path) {
-        Ok(raw) => raw,
-        Err(error) if error.kind() == ErrorKind::NotFound => return Ok(None),
-        Err(error) => return Err(format!("{} could not be read: {error}", path.display())),
+    let Some(parsed) = parsed(path, "Nothing was written to either file.")? else {
+        return Ok(None);
     };
-
-    let parsed: Value = serde_json::from_str(&raw).map_err(|error| {
-        format!(
-            "{} is not valid JSON ({error}). Nothing was written to either file.",
-            path.display()
-        )
-    })?;
 
     if !parsed.is_object() {
         return Err(format!(

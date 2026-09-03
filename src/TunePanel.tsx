@@ -201,12 +201,14 @@ export default function TunePanel({
     ladder = rows.map((row) => row.candidate);
   }
 
-  const fastest = rows
-    .filter((row) => tps(row, "gen") != null)
-    .reduce<TuneOutcome | null>(
-      (best, row) => (best == null || tps(row, "gen")! > tps(best, "gen")! ? row : best),
-      null,
-    );
+  let fastest: TuneOutcome | null = null;
+  for (const row of rows) {
+    const gen = tps(row, "gen");
+    if (gen == null) continue;
+    if (fastest == null || gen > tps(fastest, "gen")!) {
+      fastest = row;
+    }
+  }
 
   // Once it is over the marked row is the one the button applies, which is not always the
   // quickest reading: the suggestion prefers the widest context among readings too close

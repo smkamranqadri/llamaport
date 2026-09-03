@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { discoverBrowse, discoverDownload, downloadStart } from "./api";
 import DiscoverDetail from "./DiscoverDetail";
-import { formatFileSize } from "./format";
+import { formatCount, formatFileSize, formatRelative } from "./format";
 import { CloseIcon, DownloadIcon, SearchIcon } from "./icons";
 import OwnerAvatar from "./OwnerAvatar";
 import type { DiscoverRow, DiscoverSort, ParamBand } from "./types";
@@ -38,23 +38,11 @@ const BANDS: ReadonlyArray<{ id: string; label: string; band: ParamBand }> = [
 ];
 type SortId = (typeof SORTS)[number]["id"] | typeof BY_SIZE;
 
-function compact(count: number): string {
-  if (count >= 1_000_000) return `${(count / 1_000_000).toFixed(1)}M`;
-  if (count >= 1000) return `${Math.round(count / 1000)}k`;
-  return String(count);
-}
-
 function updated(iso: string | null): string | null {
   if (!iso) return null;
   const at = Date.parse(iso);
   if (Number.isNaN(at)) return null;
-  const days = Math.floor((Date.now() - at) / 86_400_000);
-  if (days <= 0) return "updated today";
-  if (days === 1) return "updated yesterday";
-  if (days < 30) return `updated ${days} days ago`;
-  const months = Math.round(days / 30);
-  if (months < 12) return `updated ${months} mo ago`;
-  return `updated ${Math.round(days / 365)} yr ago`;
+  return `updated ${formatRelative(at / 1000)}`;
 }
 
 /// The size, and never the word "fits".
@@ -204,6 +192,13 @@ export default function Discover({
     );
   }
 
+  let heading: string = chosen.heading;
+  if (searched) {
+    heading = `Matching “${searched}”`;
+  } else if (sort === BY_SIZE) {
+    heading = "Trending on Hugging Face, smallest first";
+  }
+
   return (
     <>
       <header className="screen-header">
@@ -291,13 +286,7 @@ export default function Discover({
         </div>
       )}
 
-      <h2 className="group-label">
-        {searched
-          ? `Matching “${searched}”`
-          : sort === BY_SIZE
-            ? "Trending on Hugging Face, smallest first"
-            : chosen.heading}
-      </h2>
+      <h2 className="group-label">{heading}</h2>
 
       {busy && (
         <div className="discover-list">
@@ -324,7 +313,7 @@ export default function Discover({
       <div className="discover-list">
         {!busy &&
           shown.map((row) => {
-          const facts = [`${compact(row.downloads)} downloads this month`];
+          const facts = [`${formatCount(row.downloads)} downloads this month`];
           const when = updated(row.lastModified);
           if (when) facts.push(when);
           if (row.quants > 0) {

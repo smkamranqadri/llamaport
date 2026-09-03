@@ -1,5 +1,5 @@
 import { AUTO_CTX } from "./ProfileForm";
-import type { Profile, SpeedKey, SpeedSummary } from "./types";
+import type { Profile, SpeedSummary } from "./types";
 
 /// The fields a preset owns. Alias, port, jinja and extra arguments are the user's and
 /// no preset touches them.
@@ -20,15 +20,8 @@ function matches(form: Profile, partial: Partial<SpeedFields>): boolean {
   );
 }
 
-function pick(profile: Profile): SpeedFields {
-  return {
-    ctx: profile.ctx,
-    ngl: profile.ngl,
-    parallel: profile.parallel,
-    cacheTypeK: profile.cacheTypeK,
-    cacheTypeV: profile.cacheTypeV,
-    flashAttn: profile.flashAttn,
-  };
+export function speedFields(source: SpeedFields): SpeedFields {
+  return Object.fromEntries(SPEED_KEYS.map((key) => [key, source[key]])) as SpeedFields;
 }
 
 // A div rather than a button: the disabled Best-speed card carries a live Measure
@@ -99,11 +92,11 @@ export function selectedPreset({
   fitAvailable: boolean;
 }): Which {
   const suggestion = summary?.suggestion ?? null;
-  if (suggestion && matches(form, suggestionFields(suggestion))) return "best";
+  if (suggestion && matches(form, speedFields(suggestion))) return "best";
   if (fitAvailable && matches(form, { ctx: AUTO_CTX, ngl: "auto" })) {
     return "fitted";
   }
-  if (defaults && matches(form, pick(defaults))) return "default";
+  if (defaults && matches(form, speedFields(defaults))) return "default";
   return null;
 }
 
@@ -112,17 +105,6 @@ export function presetName(which: Which): string | null {
   if (which === "fitted") return "Model suggested";
   if (which === "default") return "Default";
   return null;
-}
-
-export function suggestionFields(key: SpeedKey): SpeedFields {
-  return {
-    ctx: key.ctx,
-    ngl: key.ngl,
-    parallel: key.parallel,
-    cacheTypeK: key.cacheTypeK,
-    cacheTypeV: key.cacheTypeV,
-    flashAttn: key.flashAttn,
-  };
 }
 
 /// Three named ways to run, over machinery that already exists: the launch defaults, the
@@ -156,9 +138,9 @@ export default function Presets({
   const suggestion = summary?.suggestion ?? null;
   const measured = summary?.confidence === "tuned";
 
-  const bestPartial = suggestion == null ? null : suggestionFields(suggestion);
+  const bestPartial = suggestion == null ? null : speedFields(suggestion);
   const fittedPartial: Partial<SpeedFields> = { ctx: AUTO_CTX, ngl: "auto" };
-  const defaultPartial = defaults == null ? null : pick(defaults);
+  const defaultPartial = defaults == null ? null : speedFields(defaults);
 
   const derived = selectedPreset({ form, defaults, summary, fitAvailable });
   const selected = picked ?? derived;
@@ -191,6 +173,13 @@ export default function Presets({
     }
   }
 
+  let measureLabel = "Measure again";
+  if (measuring) {
+    measureLabel = "Measuring…";
+  } else if (suggestion == null) {
+    measureLabel = "Measure";
+  }
+
   const measureButton = (
     <button
       className="button button-link"
@@ -201,7 +190,7 @@ export default function Presets({
         onMeasure();
       }}
     >
-      {measuring ? "Measuring…" : suggestion == null ? "Measure" : "Measure again"}
+      {measureLabel}
     </button>
   );
 

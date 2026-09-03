@@ -14,7 +14,7 @@ import {
   tuneStatus,
 } from "./api";
 import { formatContext, formatFileSize, formatMemory } from "./format";
-import { bytesOr, pressureText, Stat } from "./Memory";
+import { bytesOr, launchCost, MemoryBar } from "./Memory";
 import { CloseIcon, CopyIcon, PiIcon, PlayIcon, StopIcon } from "./icons";
 import Disclosure from "./Disclosure";
 import { AdvancedFields, AUTO_CTX, ProfileFields } from "./ProfileForm";
@@ -23,9 +23,10 @@ import PiPanel from "./PiPanel";
 import Presets, {
   presetName,
   selectedPreset,
-  suggestionFields,
+  speedFields,
   type Which,
 } from "./Presets";
+import { Card, SPARK_POINTS, TelemetryPanel } from "./Telemetry";
 import TunePanel from "./TunePanel";
 import type {
   HealthReport,
@@ -37,8 +38,6 @@ import type {
   Telemetry,
   TuneReport,
 } from "./types";
-
-const SPARK_POINTS = 60;
 
 function Facts({ model }: { model: ModelEntry }) {
   const md = model.metadata;
@@ -64,292 +63,6 @@ function Facts({ model }: { model: ModelEntry }) {
         </div>
       ))}
     </dl>
-  );
-}
-
-function Card({
-  label,
-  value,
-  sub,
-  tone,
-  fill,
-}: {
-  label: string;
-  value: string;
-  sub?: string;
-  tone?: "ok" | "bad";
-  /// 0 to 1, drawn as a bar under the figure.
-  fill?: number | null;
-}) {
-  return (
-    <div className="card">
-      <span className="card-label">{label}</span>
-      <span className={`card-big${tone ? ` tone-${tone}` : ""}`}>{value}</span>
-      {sub && <span className="card-sub">{sub}</span>}
-      {fill != null && (
-        <div className="bar">
-          <span style={{ width: `${Math.min(100, Math.max(0, fill * 100))}%` }} />
-        </div>
-      )}
-    </div>
-  );
-}
-
-/// What this launch asks of the machine, in one sentence. The bar and the folded row
-/// both read it, so the summary can never disagree with the panel under it.
-function launchCost(
-  plan: LaunchPlan,
-): { wants: string; breakdown: string; verdict: string; tone: "ok" | "warn" | "bad" } | null {
-  const estimate = plan.estimate;
-  if (estimate == null) return null;
-
-  const budget = plan.deviceBudgetBytes;
-  const free = plan.memory.availableBytes;
-  const strained =
-    plan.memory.pressure === "warning" || plan.memory.pressure === "critical";
-  const { weightsBytes, kvBytes, totalBytes, bounded } = estimate;
-  const over = budget != null && totalBytes > budget;
-  const crowded = free != null && totalBytes > free;
-
-  let sign = "";
-  if (bounded) {
-    sign = "≥ ";
-  }
-  let wants = `${sign}${formatMemory(totalBytes)}`;
-  let breakdown = `${formatMemory(weightsBytes)} weights + ${formatMemory(kvBytes)} cache at ${plan.profile.ctx.toLocaleString()} tokens`;
-  if (kvBytes === 0) {
-    wants = `${sign}${formatMemory(weightsBytes)}`;
-    breakdown = "weights only — no context chosen, so the cache is not counted";
-  }
-
-  // Two questions, and the verdict is the worse of them. Fitting the GPU says a launch is
-  // allowed; it says nothing about a machine with nothing left to give.
-  let verdict = "fits";
-  let tone: "ok" | "warn" | "bad" = "ok";
-  if (over) {
-    verdict = "over the GPU limit";
-    tone = "bad";
-  } else if (budget == null) {
-    verdict = "ceiling unknown";
-    tone = "warn";
-  } else if (strained) {
-    verdict = "fits, but the machine is under pressure";
-    tone = "bad";
-  } else if (crowded) {
-    verdict = "fits the GPU, not what is free";
-    tone = "warn";
-  } else if (budget != null && totalBytes < budget * 0.6) {
-    verdict = "fits comfortably";
-  }
-
-  return { wants, breakdown, verdict, tone };
-}
-
-function MemoryBar({ plan }: { plan: LaunchPlan }) {
-  const { memory } = plan;
-
-  // Four figures, and the ceiling among them is the one the app used to get wrong: it
-  // compared against installed memory, which nothing allocates from.
-  const budget = plan.deviceBudgetBytes;
-  const free = memory.availableBytes;
-  const strained = memory.pressure === "warning" || memory.pressure === "critical";
-
-  // Free memory is only good or bad relative to what is being asked of it, so the
-  // figure cannot be coloured until the launch's size is known. Green beside a warning
-  // that says the opposite is the bug this closes.
-  const machineStats = (wants: number | null) => {
-    let freeTone: "ok" | "warn" | "bad" | undefined;
-    if (free != null) {
-      freeTone = "ok";
-      if (wants != null && free < wants) {
-        freeTone = "warn";
-      }
-      if (strained || free < 1024 * 1024 * 1024) {
-        freeTone = "bad";
-      }
-    }
-    return (
-      <div className="telemetry-stats">
-        <Stat
-          label="GPU limit"
-          value={budget == null ? "Unknown" : formatMemory(budget)}
-          hint={budget == null ? "this build does not report it" : "what a launch must fit inside"}
-        />
-        <Stat
-          label="Free right now"
-          value={bytesOr(free)}
-          tone={freeTone}
-          hint={`macOS pressure ${pressureText(memory.pressure)}`}
-        />
-        <Stat label="Swap in use" value={bytesOr(memory.swapUsedBytes)} hint="paging costs speed" />
-        <Stat label="Installed" value={bytesOr(memory.installedBytes)} hint="the machine's spec" />
-      </div>
-    );
-  };
-
-  if (!plan.estimate) {
-    return (
-      <div className="memory">
-        <p className="empty-detail">
-          Not enough header metadata to size this model's cache.
-        </p>
-        {machineStats(null)}
-      </div>
-    );
-  }
-
-  const { weightsBytes, kvBytes, totalBytes, bounded, boundNote } = plan.estimate;
-  // The bar is drawn against the ceiling a launch has to fit inside, falling back to
-  // installed memory only where the build would not say what that ceiling is.
-  const ceiling = budget ?? plan.totalMemory;
-  const scale = Math.max(ceiling, totalBytes);
-  const width = (n: number) => `${(n / scale) * 100}%`;
-
-  const cost = launchCost(plan)!;
-
-  return (
-    <div className="memory">
-      <div className="memory-bar">
-        <span className="seg seg-weights" style={{ width: width(weightsBytes) }} />
-        <span className="seg seg-kv" style={{ width: width(kvBytes) }} />
-        <span className="memory-limit" style={{ left: `${(ceiling / scale) * 100}%` }} />
-      </div>
-
-      <div className="telemetry-stats">
-        <Stat label="This launch wants" value={cost.wants} hint={cost.breakdown} />
-        <Stat label="Against the limit" value={cost.verdict} tone={cost.tone} />
-      </div>
-
-      {bounded && boundNote && <p className="field-hint">{boundNote}</p>}
-
-      {machineStats(totalBytes)}
-    </div>
-  );
-}
-
-function Sparkline({ values }: { values: number[] }) {
-  if (values.length < 2) return null;
-  const max = Math.max(...values, 1);
-  const points = values
-    .map((v, i) => `${(i / (SPARK_POINTS - 1)) * 100},${20 - (v / max) * 20}`)
-    .join(" ");
-
-  return (
-    <svg className="spark" viewBox="0 0 100 20" preserveAspectRatio="none">
-      <polyline points={points} />
-    </svg>
-  );
-}
-
-// Falls back to the server's last-request figure because a bare delta reads 0 the
-// instant generation stops, which looks like the number is broken.
-function rate(
-  live: number | null | undefined,
-  last: number | null | undefined,
-  digits: number,
-) {
-  if (live != null && live > 0) return `${live.toFixed(digits)} tok/s`;
-  if (last != null && last > 0) return `${last.toFixed(digits)} tok/s last`;
-  return "—";
-}
-
-function TelemetryPanel({
-  runner,
-  telemetry,
-  history,
-}: {
-  runner: RunnerSnapshot;
-  telemetry: Telemetry | null;
-  history: number[];
-}) {
-  const kv = telemetry?.kvCacheUsage;
-  const deferred = telemetry?.requestsDeferred ?? 0;
-
-  return (
-    <div className="telemetry">
-      <div className="telemetry-row">
-        <span className="telemetry-label">KV cache</span>
-        <div className="kv-bar">
-          <span style={{ width: `${Math.min(100, (kv ?? 0) * 100)}%` }} />
-        </div>
-        <span className="telemetry-value">
-          {kv == null ? "—" : `${Math.round(kv * 100)}%`}
-        </span>
-      </div>
-
-      <div className="telemetry-stats">
-        <div>
-          <span className="telemetry-label">Generation</span>
-          <span className="telemetry-value">{rate(telemetry?.genTps, telemetry?.lastGenTps, 1)}</span>
-          <Sparkline values={history} />
-        </div>
-        <div>
-          <span className="telemetry-label">Prompt eval</span>
-          <span className="telemetry-value">
-            {rate(telemetry?.promptTps, telemetry?.lastPromptTps, 0)}
-          </span>
-        </div>
-        <div>
-          <span className="telemetry-label">Tokens generated</span>
-          <span className="telemetry-value">
-            {telemetry?.tokensGenerated == null
-              ? "—"
-              : Math.round(telemetry.tokensGenerated).toLocaleString()}
-          </span>
-        </div>
-        <div>
-          <span className="telemetry-label">Tokens prompted</span>
-          <span className="telemetry-value">
-            {telemetry?.tokensPrompt == null
-              ? "—"
-              : Math.round(telemetry.tokensPrompt).toLocaleString()}
-          </span>
-        </div>
-        <div>
-          <span className="telemetry-label">Queue</span>
-          <span className="telemetry-value">
-            {telemetry?.requestsProcessing ?? 0} active
-            {deferred > 0 && `, ${deferred} waiting`}
-          </span>
-        </div>
-        <Stat
-          label="System memory"
-          value={
-            telemetry?.systemUsedBytes != null &&
-            telemetry?.systemTotalBytes != null
-              ? `${formatMemory(telemetry.systemUsedBytes)} of ${formatMemory(telemetry.systemTotalBytes)}`
-              : "Unavailable"
-          }
-        />
-        <Stat
-          label="macOS pressure"
-          value={pressureText(telemetry?.pressure)}
-        />
-        <Stat label="Swap in use" value={bytesOr(telemetry?.swapUsedBytes)} />
-        <Stat
-          label="Process footprint"
-          value={bytesOr(telemetry?.processFootprintBytes)}
-          hint="excludes GPU-resident weights"
-        />
-      </div>
-
-
-      <div className="telemetry-row">
-        <span className="telemetry-label">Health</span>
-        <span className="telemetry-value">
-          <span className={`dot state-${telemetry?.healthOk ? "ready" : "starting"}`} />
-          {telemetry?.healthOk
-            ? " responding now"
-            : " process alive, endpoint not answering"}
-        </span>
-      </div>
-
-      {runner.serverCtx != null && (
-        <p className="field-hint">
-          server reports {runner.serverCtx.toLocaleString()} tokens of context
-        </p>
-      )}
-    </div>
   );
 }
 
@@ -466,7 +179,7 @@ export default function ModelDetail({
           const key = next.suggestion;
           if (key == null) return;
           setPicked("best");
-          setForm((current) => current && { ...current, ...suggestionFields(key) });
+          setForm((current) => current && { ...current, ...speedFields(key) });
         })
         .catch(() => {});
     }

@@ -1,18 +1,12 @@
 import { useEffect, useState } from "react";
 import { discoverDownload, discoverRepo } from "./api";
-import { formatContext, formatFileSize } from "./format";
+import { formatContext, formatCount, formatFileSize } from "./format";
 import { ChevronLeftIcon, DownloadIcon } from "./icons";
 import type { DiscoverDetail as Detail, QuantOffer } from "./types";
 
 function params(count: number): string {
   if (count >= 1e9) return `${(count / 1e9).toFixed(count >= 1e11 ? 0 : 1)}B`;
   return `${Math.round(count / 1e6)}M`;
-}
-
-function counted(count: number): string {
-  if (count >= 1_000_000) return `${(count / 1_000_000).toFixed(1)}M`;
-  if (count >= 1000) return `${Math.round(count / 1000)}k`;
-  return String(count);
 }
 
 /// A green tick for what the weights clear and a red ring for what they do not — the only
@@ -58,8 +52,8 @@ export default function DiscoverDetail({
 
   const facts: string[] = [];
   if (detail) {
-    facts.push(`${counted(detail.facts.downloads)} downloads this month`);
-    facts.push(`${counted(detail.facts.likes)} likes`);
+    facts.push(`${formatCount(detail.facts.downloads)} downloads this month`);
+    facts.push(`${formatCount(detail.facts.likes)} likes`);
     if (detail.facts.params) facts.push(`${params(detail.facts.params)} parameters`);
     if (detail.facts.architecture) facts.push(detail.facts.architecture);
     if (detail.facts.contextLength) {
