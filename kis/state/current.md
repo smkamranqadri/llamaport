@@ -31,19 +31,18 @@ Command:  export PATH="$HOME/.cargo/bin:$PATH"   # cargo is not on a non-login P
 
 Blocker:  none. Open and not blocking:
 
-          - **Two calls in Discover's quantisation picker the author has never
-            ruled on**: `Q4_K_M` with no ceiling, and the withheld 1,024 MiB
-            `--fit-target` margin ([intent/discover.md](../intent/discover.md)).
           - **An Intel Mac** for the universal build, open since v0.3.0. Every
             other check v0.7.0 owed was met by the author on 2026-09-04
             ([intent/release.md](../intent/release.md)).
 
-Next:     **Nothing chosen.** The author's call. Candidates, none ahead of the
-          others: the two picker rulings, and the Show HN that has sat drafted
-          since August ([intent/release.md](../intent/release.md)). Library
-          search was listed here and had shipped on 2026-09-02; the window bug
-          was listed here and turned out to follow the session's launches, not
-          the author's ([intent/roadmap.md](../intent/roadmap.md)).
+Next:     **Nothing chosen.** The author's call. The one standing candidate is
+          the Show HN that has sat drafted since August
+          ([intent/release.md](../intent/release.md)). Three things listed here
+          on 2026-09-04 closed the same day without code: Library search had
+          shipped on 2026-09-02, the window bug follows the session's launches
+          and not the author's ([intent/roadmap.md](../intent/roadmap.md)), and
+          the two picker calls were ruled kept as they are
+          ([intent/discover.md](../intent/discover.md)).
 
 Where the project stands: [intent/roadmap.md](../intent/roadmap.md).
 What the app is for: [intent/direction.md](../intent/direction.md).

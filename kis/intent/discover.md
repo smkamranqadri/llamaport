@@ -185,13 +185,14 @@ rather than folded silently into the text above.
   not say what to do without a ceiling. Returning nothing would make Discover a
   dead screen in exactly the first-run case it matters most, and falling back to
   installed memory is the measurement error this project started from
-  ([knowledge/technical.md](../knowledge/technical.md)).
+  ([knowledge/technical.md](../knowledge/technical.md)). **Ruled 2026-09-04:
+  kept as is.**
 - **The picker charges 1,024 MiB below the working set.** The approved wording
   said "with headroom" and the first cut had none — it picked 26.3 GB against a
   26.8 GB ceiling, leaving nothing for a cache. The margin is llama.cpp's own
   `--fit-target` default rather than a number invented here. **The row still
-  prints the raw working set**, so that 1 GB is not visible anywhere; whether
-  that reads as a gap is the author's call.
+  prints the raw working set**, so that 1 GB is not visible anywhere. **Ruled
+  2026-09-04: kept as is**, margin and row both.
 - **Two chips filter and two sort.** Fits this Mac filters on the pick; Small &
   fast orders the same trending list smallest first, which is an ordering rather
   than a claim about what "small" is; the other two change `sort=`.
