@@ -53,8 +53,13 @@ a new capability and this app's first read-only network client, so a minor rathe
 than a patch. Two things it owes beyond the usual closing conditions:
 
 - **A security review of the network surface**, as v0.2.0 had and for the same
-  reason: Discover parses third-party JSON into paths and URLs. That review
-  changed what v0.2.0 shipped and this one has more surface to look at.
+  reason: Discover parses third-party JSON into paths and URLs, and now renders a
+  stranger's image. That review changed what v0.2.0 shipped and this one has more
+  surface to look at. Two things for it to start on: `bundle.security.csp` is
+  `null`, and nothing depends on it staying loose now that avatars are fetched in
+  Rust rather than by the window; and the guards on an owner's name and an
+  image's size were both written in this phase and one of them was wrong on the
+  first try ([knowledge/technical.md](../knowledge/technical.md)).
 - **The README screenshots, which have now waited behind two phases.** They were
   Next before the redesign and Next again after it, and Discover took the slot on
   2026-09-03 by the author's choice ([discover.md](discover.md)). The UI is

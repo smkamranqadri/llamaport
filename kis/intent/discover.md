@@ -337,3 +337,34 @@ real app would never produce.
 Three lessons, all in [knowledge/technical.md](../knowledge/technical.md): assert
 every edit's anchor; a stale assertion reports success for the thing it forbids;
 and a rendered mock proves the stylesheet, never the data behind it.
+
+
+## The fifth ask: an owner's picture, 2026-09-03
+
+Asked for on Discover, then for Library and Downloads, then for a cache. All
+three built (`3c3bbd8`, `4073600`).
+
+**Where the owner comes from differs by screen, and one difference is
+permanent.** A Downloads row carries its URL, so `hub::owner_of` reads the owner
+off it — in Rust, because the window parsing a download URL a second way is how
+two rules drift apart. **A Library row has a file path and nothing else**: a
+`.gguf` on disk carries no publisher. It is matched against the download history
+by path, so a model this app fetched shows its picture and one copied into the
+models directory by hand shows the generic mark. That case cannot be closed by
+looking harder at the file, and the row is honest about it rather than inventing
+a publisher from a file name.
+
+**The fallback is one generic mark, not a coloured initial.** A letter invents a
+distinction between owners the app has no basis for, and a row whose origin is
+unknown should look like every other unknown.
+
+**The picture is fetched in Rust rather than pointed at with an `<img src>`**,
+which keeps the invariant that every request this app makes goes through one
+place. The reasoning and the `csp` note are in
+[knowledge/technical.md](../knowledge/technical.md).
+
+**Two of this work's defects were the app's own guards, and tests caught both**
+before the author saw anything: a containment check that used
+`Path::starts_with`, which is lexical and let `..` through; and a size cap on a
+stranger's image that had no test at all until it was pulled out of the fetch.
+Ten mutations were applied across the two commits and all ten were caught.

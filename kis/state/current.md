@@ -24,10 +24,12 @@ Task:     **Discover is built**, in two commits on 2026-09-03 (`7c9369f`,
           corrected four facts and supplied the fit badge this project then
           refused.
 
-          **The author has looked four times and found fifteen things; all are
-          built** (`d9ed796`, `ca5d7af`, `8c8db9d`, `951fd98`). Sorts and filters
-          now split, which is the shape offered while planning and declined —
-          using it is what changed the answer.
+          **The author has looked five times and asked for eighteen things; all
+          are built** (`d9ed796`, `ca5d7af`, `8c8db9d`, `951fd98`, `3c3bbd8`,
+          `4073600`). Sorts and filters now split, which is the shape offered
+          while planning and declined — using it is what changed the answer. The
+          last round added an owner's picture to all three list screens, cached
+          on disk under Application Support.
 
           **Two of the fifteen were things nobody reported.** Discover was
           offering models `llama-server` cannot run, one GGUF repository in six,
@@ -53,11 +55,16 @@ Blocker:  none.
           own task; and **the checks nobody has run**, in
           [intent/release.md](../intent/release.md).
 
-Next:     **A fifth look at Discover.** Four rounds have found fifteen things and
-          the rate is not obviously falling. Unseen running: the split controls,
-          the parameter band, the MoE badge — which has never once worked in a
-          build the author has opened — the loading state, the confirmation and
-          the sidebar count.
+Next:     **A sixth look.** Five rounds, eighteen things, and the rate is not
+          obviously falling. Unseen running: the split controls, the parameter
+          band, the MoE badge — which has never once worked in a build the author
+          has opened — the loading state, the confirmation and the sidebar count.
+          **Avatars are the exception: the author's own run on 2026-09-03 filled
+          the cache with 16 owners at 140 KB**, so that much is known to work.
+
+          Nothing about Discover is planned beyond answering the next look. The
+          screen has taken five rounds of correction and none of them came from
+          the plan.
 
           **`parakeet-tdt-0.6b-v3.q8_0.gguf` is still in the models directory**
           and Llamaport cannot run it. Nothing deletes it — that is the author's
@@ -91,11 +98,11 @@ What the app is for: [intent/direction.md](../intent/direction.md).
 ## Proof
 
 The four commands green, each status captured on its own line and never after a
-pipe. **300 tests**, from 261 before Discover.
+pipe. **308 tests**, from 261 before Discover.
 
 Two suites need something this machine has and CI would not: `real_launch` and
 `real_tune` need the binary and a real model, and **`real_hub` needs the
-network** — twelve tests holding the assumptions the Hugging Face parsers rest
+network** — fourteen tests holding the assumptions the Hugging Face parsers rest
 on, so a change at the API's end fails here rather than on screen.
 
 **`tests/stylesheet.rs` is the only test this project has of the frontend.**

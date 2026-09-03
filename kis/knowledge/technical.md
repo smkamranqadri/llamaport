@@ -91,7 +91,17 @@ output.
 
 Everything the app keeps lives in `~/Library/Application Support/llamaport`:
 that config, `downloads.json`, `speeds.json`, the runner pidfile, the last run
-log.
+log, and `avatars/`.
+
+**`avatars/` is one small file per owner, and the shape is the point.** A single
+map would have several threads writing it at once, and `write_atomic` names its
+temporary after the destination — one name per file, not per writer — so they
+would race on it. A file each removes the question. An empty file is a remembered
+miss and is worth as much as a hit: the owners with no picture publish the most
+repositories, so they are asked for the most often. Kept a month, because an
+avatar changing is cosmetic and no row can show that it has. The author's own run
+filled it with 16 owners at 140 KB.
+
 `store::adopt_legacy_config_dir`
 takes over the directory left under the old `llama-cpp-hub` name, once, as the
 first statement in `setup` — before the pidfile is read or the config is loaded,
@@ -274,6 +284,13 @@ shipped hub, which calls it from their frontend.
   Certainty for a model on disk stays `gguf::Metadata::is_moe`, which reads a real
   expert count the index does not carry.
 
+- **An owner's picture is two endpoints, not one.**
+  `/api/organizations/{owner}/overview` carries `avatarUrl`, and answers **404 for a
+  person** — `/api/users/{owner}/overview` is the other half. Fifteen distinct owners
+  appear in a page of twenty-four and the same handful publish most of what trends, so
+  this caches extremely well. Measured 2026-09-03: unsloth 5.0 KB, DavidAU 15.1 KB,
+  served as webp.
+
 - **`num_parameters=min:20B,max:40B` is a real API filter, and its figure is better than
   ours.** `gguf.total` is read off one file, so a repository whose first GGUF is an MTP
   drafter reports **1.86B for a 27B model** — and that same repository still lands
@@ -377,6 +394,12 @@ shipped hub, which calls it from their frontend.
   margin and no bottom, so it sat four pixels off whatever followed it on every
   screen. **Twenty-eight.**
 
+  **Two of the thirty-five below were the app's own guards being wrong rather than
+  the screen**, and both were caught by a test written the same hour: an avatar cache
+  whose containment check used `Path::starts_with`, and a size cap that had no test
+  until it was pulled out of the fetch. Neither reached the author. That is what the
+  method is for, and it is still the only way anything gets caught before he looks.
+
   **Four more from the second look, same day**: the app froze on opening Discover,
   because a synchronous Tauri command holds the main thread; the download confirmation
   named a quantisation and no model, on a screen the reader had just been thrown back
@@ -421,6 +444,13 @@ shipped hub, which calls it from their frontend.
   faithfully would have shipped a false sentence in the app's voice. Every claim
   a mockup makes about behaviour is checked against the code or the phase file
   that proved it, and corrected in place when it is wrong.
+
+- **Every request this app makes goes through Rust, and that is worth keeping.** The
+  webview loads nothing remote — an `<img src>` at a CDN would have been the first
+  exception, in an app whose `csp` is `null` and would not stop it. Avatars are fetched
+  in Rust and handed over as `data:` URIs instead, which at 5–15 KB costs almost
+  nothing. **`bundle.security.csp` is `null` and should not stay that way**; nothing
+  depends on it being loose today, which is the moment to tighten it.
 
 - **A synchronous Tauri command runs on the main thread, and the window cannot paint
   while it does.** `discover_browse` spends two and a half seconds on the network and held
@@ -596,6 +626,11 @@ shipped hub, which calls it from their frontend.
   rebuilt as `models_dir.join(file_name)`, and `join("../evil")` lands outside
   the directory the rebuild was meant to confine it to. Rebuilding a path from an
   untrusted name is not a check.
+- **And neither is `Path::starts_with`.** It compares components without resolving
+  them, so `avatars/..` starts with `avatars` and a containment test written to stop
+  exactly that returns true. The avatar cache shipped with that guard for an hour and
+  its own test caught it. **Validate the name, never inspect the joined path** —
+  `hub::valid_segment` is the one rule, shared with repository ids.
 - One transfer at a time is enforced by **queueing**, not by refusing. The
   invariant is one line — nothing `Active` and something `Queued` means the head
   of the queue starts — and every path a transfer can settle on runs it, on the
