@@ -10,7 +10,8 @@ purpose.
 
 **Closed items keep their entry, marked.** What another tool does is worth
 remembering after we have done it too, and the reason it was worth doing is in
-the entry. Four closed in v0.4.0 and are marked `CLOSED` below.
+the entry. Four closed in v0.4.0, one in v0.5.0, and LlamaForge's 6, 7 and 8
+closed together on 2026-09-03 when Discover was built.
 
 ---
 
@@ -49,26 +50,44 @@ below is the part that is not.
    not a stats screen: a record keyed on the settings a run used, so the app can
    say what a model got and what a change to its settings did.
 
-## The three that reopen Discover
+## The three that reopened Discover — all CLOSED 2026-09-03
 
-6, 7 and 8 are in-app Hugging Face search, its result badges, and a fit rating —
-which is [the roadmap's "Decided against"](roadmap.md#decided-against) item,
-dropped 2026-08-02 after being planned in full. That entry asks not to be
-planned a third time, so this is a record of what a shipped version looks like,
-not an argument to build one.
+6, 7 and 8 are in-app Hugging Face search, its result badges, and a fit rating.
+They were written as a record of what a shipped version looks like rather than
+an argument to build one, because [the roadmap's "Decided
+against"](roadmap.md#decided-against) asked that Discover not be planned a third
+time. **It was planned a third time and built** ([discover.md](discover.md)),
+and this section is the closest thing to a design document it had. Item 8 is the
+one that mattered most and it was read as a warning rather than a recipe — see
+below.
 
-6. **Search.** `hub.py` is two unauthenticated calls:
+6. **CLOSED 2026-09-03.** *Search.* Both calls are what this app now makes, with
+   `trendingScore` added and `lastModified` deliberately not offered — it sorts,
+   and it returns repositories nobody has downloaded.
+   `hub.py` is two unauthenticated calls:
    `GET /api/models?filter=gguf&search=…&sort=downloads|likes|lastModified` then
    `/api/models/{repo}/tree/main` for files and sizes. Note this does not answer
    the objection that killed Discover here — `?search=` is still the substring
    match over repo ids that made it a worse browser tab.
 
-7. **What the tree call gives for free**: shard sets collapsed
+7. **CLOSED 2026-09-03.** Everything here is now done, and none of it was free:
+   collapsing a shard set needs the five-digit suffix stripped and the parts
+   summed, and the sidecars are not only `mmproj` — an `mtp/` drafter and an
+   imatrix live in the same listing, and `mtp` in a *name* usually means a model
+   built with MTP rather than a drafter.
+   *What the tree call gives for free*: shard sets collapsed
    (`-00001-of-00005` into one row with a summed size), `mmproj` sidecars listed
    separately, a `gated` flag from the list API, and INSTALLED from the local
    catalog. A multi-file fetch would be a queue of jobs this app already has.
 
-8. **A fit rating before the download.** Cheap version is `size * 1.15 <= VRAM`
+8. **CLOSED 2026-09-03 by refusing it.** This entry called the vendored physics
+   core "the forecast rule verbatim" and said the only compatible version is
+   arithmetic shown with no verdict attached. That is exactly what shipped: the
+   row prints its size against the ceiling and says something only when the
+   weights alone are over. Reading Unsloth's own source later put numbers on the
+   warning — their badge disagreed with their memory bar on 8 of 19 sizes
+   ([knowledge/technical.md](../knowledge/technical.md)).
+   *A fit rating before the download.* Cheap version is `size * 1.15 <= VRAM`
    → FITS / TIGHT / CPU OFFLOAD. Theirs is now a vendored physics core
    (`vramwise`) using bits-per-weight, MoE active-vs-total params and memory
    bandwidth to predict a regime and a tok/s figure. **This is the forecast rule

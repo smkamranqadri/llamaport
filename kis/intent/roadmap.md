@@ -171,7 +171,8 @@ user, reversing two standing decisions ([direction.md](direction.md)).
    author listed as not matching are signed off. Phase 4 finished with
    Downloads, Activity Monitor — the last disabled sidebar entry — and Settings;
    the first run had left it early on the author's ask. What the redesign did
-   not touch is Discover, which ships disabled by design.
+   not touch was Discover, which shipped disabled — **built as step 17 on
+   2026-09-03**, so no sidebar entry is disabled any more.
 
 15. **Appearance** — asked for and shipped 2026-09-03, in
    [appearance.md](appearance.md). A Mode control and five palettes, four of
@@ -189,6 +190,22 @@ user, reversing two standing decisions ([direction.md](direction.md)).
    a ladder timing `-ncmoe` against the smaller quant the author runs today.
    Found by the author asking why a MoE cannot fit when its active parameters
    are few — the same route as steps 3, 5, 6, 11 and 14.
+
+17. **Discover** — planned and built 2026-09-03, in
+   [discover.md](discover.md). A live screen over the Hugging Face API: four
+   named lists, a search that goes through the same quantisation pick and fit
+   treatment as a browse row, and a Download that hands a shard set to the queue
+   this app already had. **The third time it was planned, and the entry below
+   asked that there not be one.** What made it different is that the objection
+   was answered rather than argued past: a bare search over repo ids is still a
+   worse browser tab, and what ships is a pick against this machine's real
+   ceiling, which a tab cannot do.
+
+   Prompted like steps 3, 5, 6, 11, 14 and 16 — by the author, with a drawing
+   this time. Its research is the first in this project that changed the plan
+   twice: once against the live API, which killed two of the five chips drawn on
+   measurement rather than taste, and once against Unsloth's shipped hub, which
+   corrected four facts and supplied the fit badge this project then refused.
 
 ## Gaps
 
@@ -209,12 +226,12 @@ full-context cache, and `formatBytes` divided by 1024³ while printing GB.
 
 ## Decided against
 
-**Discover was dropped twice and is back in scope from 2026-08-31**
-([direction.md](direction.md)), because the author asked for it as the app's
-user. The entry below stays as written: its reason was never wrong, and it now
-sets the bar. A search box over repo ids is still a worse browser tab. What is
-in scope is finding the *best model for this machine*, which is a different
-problem.
+**Discover was dropped twice, came back into scope 2026-08-31, and shipped
+2026-09-03** ([discover.md](discover.md)). The entry below stays as written: its
+reason was never wrong, and it is what the built version had to answer. A search
+box over repo ids is still a worse browser tab — so the shipped search is not
+one. Every result carries the quantisation this machine should take and its size
+against the real Metal ceiling, which is the part a browser tab cannot do.
 
 **Benchmarks — removed 2026-08-01, after being built.** Recorded here on
 2026-08-31, having never been written down at the time.
@@ -231,11 +248,14 @@ from that day keyed on model, context, both cache types, `ngl`, `parallel` and
 the author as the app's user, and it should read the deleted implementation before
 writing a new one.
 
-**Discover — dropped 2026-08-02, after being planned.** An in-app Hugging Face
+**Discover — dropped 2026-08-02, after being planned.** ~~An in-app Hugging Face
 browser: search, repo file listing, quant selection. Planned in full, then cut
-before any code was written.
+before any code was written.~~ **Built 2026-09-03 as step 17.**
 
-Two reasons, and they should stop this being planned a third time. Hugging Face's
+Two reasons, and they were meant to stop this being planned a third time. It was
+planned a third time and they were answered rather than overruled — the first by
+what a result carries, the second by the fact that a link still goes to
+Downloads and Discover hands it there. Hugging Face's
 `?search=` is a substring match over repo ids ranked by download count, so an
 in-app search would have been a worse version of the browser tab that is already
 open. And pasting a URL into Downloads already closes the loop the project set

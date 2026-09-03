@@ -159,6 +159,12 @@ reversed deliberately, not overlooked.
   and speed to be part of the answer. If it cannot be better than the browser
   tab, it should not ship.
 
+  **Shipped 2026-09-03** ([discover.md](discover.md)), with fit and
+  quantisation in and speed out — speed cannot be known for a file that is not
+  on disk, which is what Tune exists to measure once it is. A search box did
+  ship, and it is not the one the note refused: every result carries the
+  quantisation this machine should take and its size against the real ceiling.
+
 ## The approved mockup
 
 https://claude.ai/code/artifact/8d38ec5a-18fe-49ed-bf46-cdc7bf58620c — approved
@@ -231,8 +237,11 @@ revisit next.
 
 ## Not settled
 
-- What "best model" means, which item 7 cannot be built without. Tune answers
-  half of it for a model already on disk — what this machine gets out of it — and
-  none of it for a model that is not.
+- What "best model" means. **Item 7 was built without settling it**
+  ([discover.md](discover.md)): Discover answers the smaller question — the best
+  *file* in a repository for this machine — by fit and quantisation alone, and
+  leaves the choice of repository to the reader and the three rankings Hugging
+  Face already keeps. Tune answers what this machine gets out of a model on
+  disk, and neither answers it for a model that is not.
 - Whether hunting and working are two screens or one.
 - What the named choices are called, and how many there are.

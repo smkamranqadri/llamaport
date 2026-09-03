@@ -16,6 +16,9 @@ The artboard is titled "Discover — build later". The author chose to build it
 now, so the README screenshots and the release wait a second time
 ([release.md](release.md)).
 
+**Built 2026-09-03 in two commits, `7c9369f` and `ba4a8f6`.** What shipped and
+what moved is at the end of this file; the plan above is left as written.
+
 ## What ships
 
 A live screen over the Hugging Face API. Four single-select named lists; a
@@ -164,3 +167,52 @@ shard exclusions and watch the tests fail. The client against a stand-in with no
 network. Then the artboard rendered against the app's own DOM in headless Chrome
 before the hand-over — and then the author looking at it, which is where 24 of
 this project's 24 defects have come from.
+
+
+## What shipped, 2026-09-03
+
+All five parcels. Every sidebar entry now leads somewhere, which had not been
+true since the redesign closed.
+
+**Four decisions moved between the plan and the build**, each recorded here
+rather than folded silently into the text above.
+
+- **With no ceiling the picker returns `Q4_K_M`**, or the smallest K-quant when
+  that is absent, and reports the fit as unknown rather than false. The plan did
+  not say what to do without a ceiling. Returning nothing would make Discover a
+  dead screen in exactly the first-run case it matters most, and falling back to
+  installed memory is the measurement error this project started from
+  ([knowledge/technical.md](../knowledge/technical.md)).
+- **The picker charges 1,024 MiB below the working set.** The approved wording
+  said "with headroom" and the first cut had none — it picked 26.3 GB against a
+  26.8 GB ceiling, leaving nothing for a cache. The margin is llama.cpp's own
+  `--fit-target` default rather than a number invented here. **The row still
+  prints the raw working set**, so that 1 GB is not visible anywhere; whether
+  that reads as a gap is the author's call.
+- **Two chips filter and two sort.** Fits this Mac filters on the pick; Small &
+  fast orders the same trending list smallest first, which is an ordering rather
+  than a claim about what "small" is; the other two change `sort=`.
+- **The search box hands a pasted link straight to Downloads** rather than
+  growing a second way to do what that screen already does.
+
+**Proof.** The four commands green, each status on its own line. **291 tests**,
+from 261. Seven of them are `real_hub.rs` against the live API, `--ignored` like
+the other `real_*` suites, and they hold the assumptions the parsers rest on: the
+four cheap `expand` fields are served, the listing stays under 20 KB, a tree
+carries LFS sizes from subdirectories, and a gated repository appears in 100
+trending rows.
+
+**Eleven mutations applied and eleven caught**, the load-bearing one being the
+sidecar rule: excluding drafters on the `mtp` substring passes a naive reading
+and would have discarded 124 real quantisations out of the 132 paths that
+match.
+
+Rendered in both appearances against `App.css` in headless Chrome before
+anything was handed over. **The app itself was never launched** — that ruling
+holds ([knowledge/technical.md](../knowledge/technical.md) Verify), and the
+author's look is still owed.
+
+**One thing built here belongs to no phase.** `tests/stylesheet.rs` exists
+because this change painted the chips with `--muted`, a token `App.css` has
+never defined and the fourth time this project has done it. The rule is in
+Knowledge; the test is the only one this project has of the frontend.

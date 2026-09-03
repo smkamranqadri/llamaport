@@ -22,6 +22,9 @@ src-tauri/src/
   runner.rs    spawn, supervise, telemetry, orphan detection
   health.rs    the ordered model test
   download.rs  the transfer engine: resolve, segments, resume, verify
+  hub.rs       the Hugging Face index behind a Transport trait
+  quant.rs     which file in a repository to fetch
+  discover.rs  a page of rows: one listing, then a tree per row over six lanes
   downloads.rs the job manager the commands drive; admission and settling
   store.rs     the single JSON config under Application Support
   speeds.rs    what a model did, and the settings it did it under
@@ -33,12 +36,13 @@ src/
   Library.tsx    the model list; FirstRun.tsx is what it shows when empty
   ModelDetail.tsx  one model, stopped or running; Presets.tsx picks how it runs
   ProfileForm.tsx  ProfileFields and AdvancedFields, shared with Settings
-  SettingsScreen.tsx, Downloads.tsx, HealthPanel.tsx, Memory.tsx
+  SettingsScreen.tsx, Downloads.tsx, Discover.tsx, HealthPanel.tsx, Memory.tsx
   TunePanel.tsx  the measurement ladder; PiPanel.tsx writes pi's two files
   icons.tsx      every SVG the UI draws
   api.ts, types.ts, format.ts, diff.ts
 src-tauri/tests/   integration tests; real_* need a model, a binary or the network
                    common/ isolates the config directory; call it before any runner
+                   stylesheet.rs reads ../src/App.css; the only test of the frontend
 ```
 
 Both long-running subsystems report through a trait they own rather than calling
@@ -256,6 +260,14 @@ shipped hub, which calls it from their frontend.
   Embeddings, Image generation — and offers neither Coding nor Chat.
 - **No rate-limit headers come back unauthenticated.** The budget is unadvertised,
   not absent.
+- **A tree per row is the cost of a size, so it is fanned out.** Twenty-four trees take
+  **13.7 seconds in a queue and 2.3 seconds across six lanes**, measured 2026-09-03. `ureq`
+  is blocking and there is no async runtime, so that is six threads.
+- **`catalog::quant_from_name` is the one spelling of a quantisation.** It handles the `UD-`
+  prefix and `TQ` quants, and `catalog::parse_shard` splits `-00001-of-00002` — all 461 real
+  shard files sampled use five digits. `quant.rs` was first written with private copies of
+  both and they were worse, which would have had the Library and Discover print one
+  quantisation two ways.
 - **A fit badge computed from file size over-claims, and there are numbers on
   it.** Unsloth's `classifyGgufFit` scores `size × 1.15 + 1 GB` against 97% of the
   card in five classes — `fits | marginal | partial | ram | oom`. Their own
@@ -319,8 +331,15 @@ shipped hub, which calls it from their frontend.
   exposed ([intent/release.md](../intent/release.md)). A phase is not done when
   the suite is green; it is done when somebody has looked.
 
-  The sidebar one, the dead CSS tokens and the unreadable accent buttons are the
-  only entries the *method* caught rather than the author: one fell out of
+  **A twenty-fifth was caught before it could be one, on 2026-09-03**: Discover
+  painted its chips with `--muted`, and rendering the screen's own DOM against
+  `App.css` before the hand-over is what surfaced it. It is written here because
+  it is the same token as the redesign's, four months on, and because it is now
+  the one defect in this list that cannot recur silently — a test guards it.
+
+  The sidebar one, the dead CSS tokens, the unreadable accent buttons and
+  Discover's chips are the only entries the *method* caught rather than the
+  author: one fell out of
   rendering the artboard and putting it beside the app before anything was
   changed, one out of reading the artboard's stylesheet against `App.css`, and
   one out of rendering every palette before handing any of them over. That is the argument for doing the comparison first
@@ -334,6 +353,16 @@ shipped hub, which calls it from their frontend.
   faithfully would have shipped a false sentence in the app's voice. Every claim
   a mockup makes about behaviour is checked against the code or the phase file
   that proved it, and corrected in place when it is wrong.
+
+- **A `var(--x)` with nothing behind it is invisible, and this project writes one about
+  once a quarter.** The redesign shipped three greys painted with `--muted` and a highlight
+  with `--surface-raised`, neither of which `App.css` has ever defined; Discover wrote
+  `--muted` a fourth time. CSS does not error, the property simply inherits, and the result
+  looks nearly right. `src-tauri/tests/stylesheet.rs` now fails on any bare `var(--x)` the
+  stylesheet does not define — it is the only test this project has of the frontend, since
+  there is no framework for one. A `var(--x, fallback)` is deliberately not a defect: CSS
+  paints the fallback, which is how the three fixed ambers and greens
+  ([intent/appearance.md](../intent/appearance.md)) are written.
 
 - **A palette is seven anchors; the surfaces are mixed from them.** `App.css`
   holds ground, text, muted text, line, accent, running and danger per theme,

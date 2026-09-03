@@ -17,9 +17,10 @@ Live status is in [state/current.md](../state/current.md), not here.
 - **Layout is sidebar plus one content pane**, not OrbStack's three zones. The
   author chose it over the three-zone option seeing both drawn.
 - **Sidebar**: Library, Discover, Downloads, Activity Monitor; Settings at the
-  bottom. **Discover ships disabled** — the author chose a grayed "coming soon"
-  entry over leaving it out, so the layout is final from day one. Its screen is
-  designed (artboard "Discover — build later") and not built here.
+  bottom. **Discover shipped disabled** — the author chose a grayed "coming soon"
+  entry over leaving it out, so the layout was final from day one. Its screen was
+  designed (artboard "Discover — build later") and not built here; it was built
+  on 2026-09-03 and the entry is live ([discover.md](discover.md)).
 - **pi is a button on the running model, not a nav entry.**
 - **The launch form shrinks behind three named presets** — Default / Best speed
   / Model suggested — with context and port still visible and everything else

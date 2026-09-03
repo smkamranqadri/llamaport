@@ -45,6 +45,21 @@ macOS said it could not verify the developer, and Open Anyway let it through.
 **The check owed since v0.1.0 is met** — it took two runs on one day, the first
 to find that five releases were broken and the second to prove the fix.
 
+## The next release
+
+**Nothing is tagged for Discover yet.** The next release is the first that would
+carry the redesign, the appearance work, `tauri-plugin-dialog` and now Discover —
+a new capability and this app's first read-only network client, so a minor rather
+than a patch. Two things it owes beyond the usual closing conditions:
+
+- **A security review of the network surface**, as v0.2.0 had and for the same
+  reason: Discover parses third-party JSON into paths and URLs. That review
+  changed what v0.2.0 shipped and this one has more surface to look at.
+- **The README screenshots, which have now waited behind two phases.** They were
+  Next before the redesign and Next again after it, and Discover took the slot on
+  2026-09-03 by the author's choice ([discover.md](discover.md)). The UI is
+  finished again, and Discover is a fourth screen worth showing.
+
 ## Unverified against v0.6.1
 
 Moved out of [state/current.md](../state/current.md) on 2026-09-02, where it had
@@ -377,4 +392,6 @@ the app directly to record `docs/launch.gif` and `docs/launch.mp4`. That grant i
 not the current arrangement — see
 [knowledge/technical.md](../knowledge/technical.md) under Verify, which now rules
 the app off limits to the session entirely. The README's images are due a retake
-against the finished redesign, which is phase 3's standing instruction.
+against the finished UI, which is phase 3's standing instruction. All three date
+from 2026-08-08 and predate the entire redesign, so every one is owed rather than
+some of them.
