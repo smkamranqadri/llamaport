@@ -45,30 +45,56 @@ macOS said it could not verify the developer, and Open Anyway let it through.
 **The check owed since v0.1.0 is met** — it took two runs on one day, the first
 to find that five releases were broken and the second to prove the fix.
 
-## The next release
+## v0.7.0 — tagged 2026-09-04 at `12de686`
 
-**Nothing is tagged for Discover yet.** The next release is the first that would
-carry the redesign, the appearance work, `tauri-plugin-dialog`, Discover — a new
-capability and this app's first read-only network client — and a **private API**.
-A minor rather than a patch.
+The first release to carry the redesign, Appearance, `tauri-plugin-dialog`,
+Activity Monitor, Discover — a new capability and this app's first read-only
+network client — the owner avatars, the translucent sidebar, a CSP, the
+2026-09-04 code review's 22 fixes, and a **private API**. A minor rather than a
+patch. Asked for 2026-09-04 with "ok release it".
 
 **The private API is the one that changes what this project can do later.**
 `macOSPrivateApi` is required for the translucent sidebar and bars the App Store
 permanently ([appearance.md](appearance.md)). That was never a route this app was
-taking, but it stops being one. Two things it owes beyond the usual closing conditions:
+taking, but it stops being one.
 
-- **A security review of the network surface**, as v0.2.0 had and for the same
-  reason: Discover parses third-party JSON into paths and URLs, and now renders a
-  stranger's image. That review changed what v0.2.0 shipped and this one has more
-  surface to look at. Two things for it to start on: `bundle.security.csp` is
-  `null`, and nothing depends on it staying loose now that avatars are fetched in
-  Rust rather than by the window; and the guards on an owner's name and an
-  image's size were both written in this phase and one of them was wrong on the
-  first try ([knowledge/technical.md](../knowledge/technical.md)).
-- **The README screenshots, which have now waited behind two phases.** They were
-  Next before the redesign and Next again after it, and Discover took the slot on
-  2026-09-03 by the author's choice ([discover.md](discover.md)). The UI is
-  finished again, and Discover is a fourth screen worth showing.
+**The security review ran before the tag and changed what ships, as v0.2.0's
+did.** A general-purpose reviewer over `v0.6.1..HEAD`, not the `/security-review`
+skill. Two Medium, three Low, four Informational; areas checked clean were
+traversal, host confusion on downloads, injection into the webview, the
+planted-file cases and the async locks. Every finding but one was fixed in
+`12de686`:
+
+- **The allowlist stopped at `file_name_for`.** A browse cursor was fetched
+  verbatim — a `Link` header or the webview could name `http://169.254.169.254/`
+  and have it fetched and parsed as page two — and an `avatarUrl` was checked for
+  `https://` and nothing else, with ureq following it and five redirects to any
+  host. One rule now, `hub::on_hugging_face`: https, on `HOSTS` or a
+  `.huggingface.co` subdomain; and the agent is `https_only`. A redirect can
+  still reach another https host after the first check, for a GET with no
+  credentials that becomes at most a 512 KB image; accepted.
+- **The transfer engine followed a redirect to any scheme.** It may now change
+  host — Hugging Face hands off to a CDN — and never scheme. The engine's own
+  tests run against a local http server, which is why the rule is "same scheme"
+  rather than "https", and why the check has a unit test and no engine test.
+- **A file planted in `avatars/` went into an `<img src>` unread.** Only an
+  empty file or a `data:image/` URI is served from the cache.
+- **The Discover commands blocked the async workers.** `async fn` with a
+  blocking body parks a worker; a cold page fires a dozen avatar fetches with
+  20 s timeouts, and a network answering nothing would have parked every worker
+  and with them every command, runner control included. The three run under
+  `spawn_blocking`, with `Trees` behind an `Arc`.
+- `opener:default` was granted and unused — dropped. The CSP gains `base-uri
+  'none'; form-action 'none'`, which `default-src` does not cover.
+- **Not fixed**: `image/svg+xml` passes the avatar's `image/` check. Inert inside
+  an `<img>`, so left.
+
+**The README screenshots came first this time**, by the author's choice: seven
+of them, taken 2026-09-04 from the running app, in a new `assets/` folder rather
+than `docs/`, which is documents. The three stills and the launch recording
+from 2026-08-08 went with the move; they predated the redesign entirely.
+
+Artefact proof below once the bundles are built, published and downloaded back.
 
 ## Unverified against v0.6.1
 
@@ -392,13 +418,14 @@ Two large lists were skipped as dead rather than missed: `Hannibal046/Awesome-LL
   out, so an unsigned build would install and then refuse to open.
 
 **The repository's description, topics and social preview** were empty six days
-after it went public and are now set; `docs/social-preview.png` is the committed
+after it went public and are now set; `assets/social-preview.png` is the committed
 source, and the upload is browser-only, so `usesCustomOpenGraphImage` is the only
 way to verify it.
 
 **Screenshots and recordings are the author's**, with one exception: on
 2026-08-08 screen recording and accessibility were granted and the agent drove
-the app directly to record `docs/launch.gif` and `docs/launch.mp4`. That grant is
+the app directly to record a launch recording, since deleted with the 0.7.0
+screenshots. That grant is
 not the current arrangement — see
 [knowledge/technical.md](../knowledge/technical.md) under Verify, which now rules
 the app off limits to the session entirely. The README's images are due a retake
