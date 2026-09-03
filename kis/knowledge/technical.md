@@ -260,6 +260,15 @@ shipped hub, which calls it from their frontend.
   Embeddings, Image generation — and offers neither Coding nor Chat.
 - **No rate-limit headers come back unauthenticated.** The budget is unadvertised,
   not absent.
+- **The listing paginates by opaque cursor, in a `Link: <…>; rel="next"` header**, not by
+  offset. The cursor already encodes the sort, the filter, the expands and the search it
+  was issued for, so it is followed verbatim; rebuilding any of it is how page two comes
+  back sorted unlike page one.
+- **One call gives a repository everything a detail page needs**:
+  `?expand=downloads&likes&lastModified&gated&gguf&cardData` returns the counts, the
+  licence, the parameter count, the architecture and the trained context. `expand=gguf` is
+  affordable for one repository and not for twenty-four — its `chat_template` is what made
+  a listing 271 KB.
 - **A tree per row is the cost of a size, so it is fanned out.** Twenty-four trees take
   **13.7 seconds in a queue and 2.3 seconds across six lanes**, measured 2026-09-03. `ureq`
   is blocking and there is no async runtime, so that is six threads.
@@ -330,6 +339,15 @@ shipped hub, which calls it from their frontend.
   vanished into it, which is what `--on-accent` exists for. **A twenty-fourth was worse and took five releases**: a bundle macOS refuses to open, which only a browser download
   exposed ([intent/release.md](../intent/release.md)). A phase is not done when
   the suite is green; it is done when somebody has looked.
+
+  **Three more on 2026-09-03, from the author's first look at Discover, and one of
+  them is this list's own subject repeating.** The row printed "25.1 GB of 25.0 GB"
+  *while claiming to fit* — a decimal-GB file size beside a binary-GiB ceiling, both
+  labelled GB, which is the unit disagreement this file already carries a rule about
+  one section down. "Small & fast" listed a 229 GB model, because it ordered the
+  trending page by size and filtered nothing. And the stray-server banner had a top
+  margin and no bottom, so it sat four pixels off whatever followed it on every
+  screen. **Twenty-eight now, and the suite has still found none of them.**
 
   **A twenty-fifth was caught before it could be one, on 2026-09-03**: Discover
   painted its chips with `--muted`, and rendering the screen's own DOM against

@@ -216,3 +216,46 @@ author's look is still owed.
 because this change painted the chips with `--muted`, a token `App.css` has
 never defined and the fourth time this project has done it. The rule is in
 Knowledge; the test is the only one this project has of the frontend.
+
+
+## The author's first look, 2026-09-03
+
+Five things, from the running app. Three were defects and two were asks, and all
+five are built (`d9ed796`).
+
+**The number was the worst of them and was not what it looked like.** A row read
+`25.1 GB of 25.0 GB` *while claiming to fit*. The size counts in decimal GB —
+what Finder and Hugging Face show for the same file — and the ceiling counted in
+binary GiB, which is what Activity Monitor shows for the same machine, and both
+printed "GB". The two figures could not be compared by eye, so the ceiling is
+gone from the row rather than converted. This is the unit rule
+[knowledge/technical.md](../knowledge/technical.md) already carried, broken by
+putting two correct figures side by side.
+
+**"Small & fast" listed a 229 GB model.** It ordered the trending page by size
+and filtered nothing, so the tail was everything that did not fit. It is now the
+same filter as Fits this Mac ordered smallest first: two chips, two questions,
+one set. A chip that says small can no longer show something over the ceiling.
+
+**The stray-server banner sat four pixels off whatever followed it.** A top
+margin and no bottom. Fixed on `.banner`, so on every screen rather than this
+one.
+
+**A detail page**, deliberately far smaller than Unsloth's, which renders the
+whole model card, its charts and its citation. Ours states what one call
+returns — downloads, likes, parameters, architecture, trained context, licence —
+and then every quantisation, largest first, each marked against this machine.
+The app's own pick is marked rather than moved, so the ordering stays by size.
+
+**Quantisation choice**, which was offered while planning and declined, and
+asked for after seeing the screen. `quant::fits` is now the single place that
+question is answered, so a row and the list behind it cannot reach different
+verdicts about one file.
+
+**Load more** follows the cursor rather than an offset, proved against the live
+API: a second page of 24 repeating none of the first.
+
+One thing fixed that nobody reported: a quantisation label falls back to the
+file's own stem when a repository names none, and
+`Qwen3.8-Flash-Next-ROCmFP4-FAST-v2-ple16` is a real one. Uncapped, a single
+row's badge pushed the size and the button out of line with every other row.

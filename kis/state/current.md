@@ -23,12 +23,16 @@ Task:     **Discover is built**, in two commits on 2026-09-03 (`7c9369f`,
           corrected four facts and supplied the fit badge this project then
           refused.
 
-          **Nobody has looked at it in the running app.** It was rendered
-          against `App.css` in headless Chrome in both appearances before being
-          handed over, which is the check that goes *before* the ask and never
-          instead of it. **The app is the author's: never launch, capture or
-          drive it** ([knowledge/technical.md](../knowledge/technical.md)
-          Verify).
+          **The author looked, and found five things — three defects and two
+          asks — all of which are built** (`d9ed796`). The worst was a row
+          reading "25.1 GB of 25.0 GB" *while claiming to fit*: a decimal-GB size
+          beside a binary-GiB ceiling, both labelled GB. Discover now has a
+          detail page and real quantisation choice.
+
+          **The app is the author's: never launch, capture or drive it** —
+          everything here was rendered in headless Chrome, which goes before the
+          ask and never instead of it
+          ([knowledge/technical.md](../knowledge/technical.md) Verify).
 
 Mode:     Standard. Nothing is part-finished.
 
@@ -41,12 +45,10 @@ Blocker:  none.
           own task; and **the checks nobody has run**, in
           [intent/release.md](../intent/release.md).
 
-Next:     **The author's look at Discover**, which is where 24 of this project's
-          24 defects have come from. Two decisions were made during the build
-          rather than in the plan and are the most worth overturning:
-          the picker returns `Q4_K_M` when there is no ceiling, and it charges
-          llama.cpp's 1,024 MiB `--fit-target` margin **which no row displays**,
-          so a row reading "25.3 GB of 26.8 GB" was picked against 25.8.
+Next:     **A second look at Discover**, at the detail page and the quantisation
+          list, neither of which anyone has seen running. The 1,024 MiB margin is
+          no longer visible anywhere now the ceiling has left the row, which is
+          simpler and still unremarked on.
 
           Then the **README's screenshots**, which have now waited behind two
           phases and are owed for all three images — every one predates the
@@ -76,11 +78,11 @@ What the app is for: [intent/direction.md](../intent/direction.md).
 ## Proof
 
 The four commands green, each status captured on its own line and never after a
-pipe. **291 tests**, from 261 before Discover.
+pipe. **297 tests**, from 261 before Discover.
 
 Two suites need something this machine has and CI would not: `real_launch` and
 `real_tune` need the binary and a real model, and **`real_hub` needs the
-network** — seven tests holding the assumptions the Hugging Face parsers rest
+network** — nine tests holding the assumptions the Hugging Face parsers rest
 on, so a change at the API's end fails here rather than on screen.
 
 **`tests/stylesheet.rs` is the only test this project has of the frontend.**
