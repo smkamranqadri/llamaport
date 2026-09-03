@@ -153,9 +153,14 @@ takes their window, so ask before doing it while they are at the machine:
   `CGWindowListCopyWindowInfo` until the size repeats, then take the shot. And
   **never resize the window through System Events** — `set size of window 1`
   collapses it rather than resizing it ([intent/roadmap.md](../intent/roadmap.md)).
-- **The app is the author's. Never drive it.** Ruled 2026-09-02: do not launch
-  it, capture it, restore it from the tray or touch it with `osascript` — ask
-  the author for the screenshot and wait. Everything above steals focus or the
+- **The app is the author's. Never drive it unasked.** Ruled 2026-09-02: do not
+  launch it, capture it, restore it from the tray or touch it with `osascript` —
+  ask the author for the screenshot and wait. When the author asks for a launch,
+  as on 2026-09-04 for the screenshots, `bun run tauri dev` in the background
+  is the route, stopped once they say the captures are in — a Rust edit
+  restarts it under them. And the collapsed-window sightings in
+  [intent/roadmap.md](../intent/roadmap.md) follow the session's launches only;
+  the author has never seen one. Everything above steals focus or the
   window from a person who is using the machine, one stray click has already
   landed in their browser, and their eye is the acceptance test regardless. The
   window half of the method stays written down because it is how the app half

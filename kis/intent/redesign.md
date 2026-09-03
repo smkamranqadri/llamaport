@@ -414,4 +414,4 @@ directory, which is why Rescan exists and why item 2 kept it.
 author on the running app, 2026-09-03**: "download, activity table and pick all
 good, reviwed". Every earlier unit was signed off as it landed. **The notarised
 bundle is a separate question** for the picker, and is in
-[release.md](release.md) under "Unverified against v0.6.1".
+[release.md](release.md) under "Unverified against v0.7.0".

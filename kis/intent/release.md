@@ -377,7 +377,7 @@ lapse.
 ### After the tag — these need a published asset or a human at the machine
 
 Owed against the *next* release if they go unmet, and recorded as owed rather
-than quietly carried. The live list is "Unverified against v0.6.1" above.
+than quietly carried. The live list is "Unverified against v0.7.0" above.
 
 - Launching the installed `.app` five times from Finder shows a usable window
   every time. **Never with anything fullscreen.**
