@@ -417,17 +417,23 @@ shipped hub, which calls it from their frontend.
   `expand=gguf`, which had been true one decision earlier. **A stale assertion is worse
   than no assertion: it reports success for the thing it was written to forbid.**
 
-  **Four more from the sidebar vibrancy, and they are a different kind again.** The
+  **Three more from the sidebar vibrancy, and they are a different kind again.** The
   effect shipped defaulted off, which is the option the author had *not* chosen and
   meant a transparent window painting over every pixel of itself; then at a 72% tint
   that hid what was left; then flattening on every app switch, because the material
-  followed the window's focus. A launch flash is still open. **Thirty-nine.**
+  followed the window's focus. **Thirty-eight.**
 
-  **None of those four could have been caught by the usual render** — see the note on
+  A fourth was chased and **turned out not to be ours**: the vibrancy settles rather
+  than appearing when the window opens. The author found ChatGPT's app does the same,
+  which makes it what a transparent window on this platform does rather than a defect
+  to fix. **Compare a window effect against another app before treating its behaviour
+  as a bug** — there was no way to tell from inside this one.
+
+  **None of the three could have been caught by the usual render** — see the note on
   window effects above. They are the first defects here where the author's look was the
   only check available rather than the last one.
 
-  **The suite has caught two of the thirty-nine, both after the fact.**
+  **The suite has caught two of the thirty-eight, both after the fact.**
   `real_models.rs` went red on a speech model Discover had offered and the author had
   downloaded; and a live test caught the dead MoE mark, but only once the author's own
   find prompted someone to write it.
@@ -478,8 +484,9 @@ shipped hub, which calls it from their frontend.
   Chrome will not draw an `NSVisualEffectView`, so the render proves the CSS stops
   painting and nothing about the blur. This is the one kind of change where the author's
   look is the *first* check rather than the last, and it showed: the effect shipped
-  defaulted off, then with a tint that hid it, then flattening on every app switch, and
-  a launch flash is still open.
+  defaulted off, then with a tint that hid it, then flattening on every app switch. A
+  fourth suspected defect was closed by looking at ChatGPT's app instead, which flashes
+  on open exactly the same way.
 
 - **Every request this app makes goes through Rust, and that is worth keeping.** The
   webview loads nothing remote — an `<img src>` at a CDN would have been the first

@@ -123,12 +123,12 @@ unsigned through GitHub — and recorded in
 [knowledge/technical.md](../knowledge/technical.md) with the rest of the
 mechanics.
 
-**A flash on launch is unresolved.** Pinning the material to `active` stopped it
-swapping on focus change, so what remains is something else — most likely the
-webview compositing a frame before `theme.ts` sets `data-translucent`, which it
-does from cache before first render but after the window is already on screen.
-That predicts a flash on launch and reload rather than on app switch, which is
-how it would be told apart. Dropped by the author rather than fixed.
+**The launch flash is not ours.** The vibrancy settles rather than appearing when
+the window opens, and pinning the material to `active` did not stop it. Before
+anything was changed for it the author checked ChatGPT's app and found the same
+flash, which settles it: this is what a transparent window on this platform does,
+not a defect in this app. **Closed, not deferred** — and the way it was closed is
+the point, because there was no way to tell from inside this app alone.
 
 **Two numbers are untuned**: the 40% tint and the `underWindowBackground`
 material were set against each other and then only one of them moved.

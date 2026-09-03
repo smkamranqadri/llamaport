@@ -53,10 +53,7 @@ Mode:     Standard. Nothing is part-finished.
 
 Blocker:  none.
 
-          Four things are open and none blocks: **a flash when the window opens**
-          — the vibrancy settles rather than appearing, dropped by the author
-          rather than fixed, with the suspect and the way to tell it apart in
-          [intent/appearance.md](../intent/appearance.md); **the two picker calls the
+          Three things are open and none blocks: **the two picker calls the
           author has not ruled on** (below); **the unusable-window bug**, whose
           sightings, sizes, falsified hypotheses, scripted recovery and two traps
           are in [intent/roadmap.md](../intent/roadmap.md) risks — it wants its
@@ -82,10 +79,6 @@ Next:     **A seventh look.** Six rounds, nineteen things, and the rate is not
           Discover, the avatars, the vibrancy and a private API
           ([release.md](../intent/release.md)). The README screenshots are still
           owed and still predate everything.
-
-          **`parakeet-tdt-0.6b-v3.q8_0.gguf` is still in the models directory**
-          and Llamaport cannot run it. Nothing deletes it — that is the author's
-          disk — but the Library still lists it as a model.
 
           Then the **README's screenshots**, which have now waited behind two
           phases and are owed for all three images — every one predates the
