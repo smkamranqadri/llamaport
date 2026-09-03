@@ -2495,8 +2495,29 @@ input[type="range"] {
 .chip-row {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 8px;
   margin: 4px 0 18px;
+}
+
+/* Not Downloads' `.limit-select`, which is borderless because it sits inside a sentence.
+   Beside pill-shaped filters a borderless select reads as a label rather than a control.
+   `select` is width:100% globally, for the forms this app is mostly made of, so this opts
+   out and leaves room on the right for the chevron the shared rule paints. */
+.sort-select {
+  width: auto;
+  padding: 6px 30px 6px 12px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text);
+  background-color: var(--bg-card2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.sort-select:hover {
+  background-color: var(--bg-hover);
 }
 
 .chip {
@@ -2520,6 +2541,30 @@ input[type="range"] {
   color: var(--accent);
   background: color-mix(in srgb, var(--accent) 12%, transparent);
   border-color: var(--accent);
+}
+
+/* A hairline between what orders the list and what removes from it. They stopped being the
+   same widget once one of each was on screen at the same time. */
+.chip-divider {
+  width: 1px;
+  height: 18px;
+  margin: 0 4px;
+  background: var(--border);
+}
+
+.search-clear {
+  display: flex;
+  flex: none;
+  align-items: center;
+  padding: 0;
+  color: var(--faint);
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+.search-clear:hover {
+  color: var(--text);
 }
 
 .discover-list {

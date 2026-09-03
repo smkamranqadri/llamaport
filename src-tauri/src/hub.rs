@@ -128,6 +128,21 @@ pub struct Repo {
     /// granted, and this app has no token either way.
     pub gated: bool,
     pub pipeline_tag: Option<String>,
+    /// Read off one file in the repository. That file is sometimes a sidecar — the same
+    /// trap that makes `gguf.total` report 1.86B for a 27B model — but a drafter shares
+    /// its base architecture, so this survives where the parameter count does not.
+    pub architecture: Option<String>,
+    pub context_length: Option<u64>,
+    /// **Only where the architecture says so.** `qwen3moe` and `qwen35moe` do; `qwen4exp`
+    /// is a 131B-A6B mixture of experts and does not, so it comes back `false` here. The
+    /// API carries no expert count — only a downloaded file does, through
+    /// [`crate::gguf::Metadata::is_moe`] — so this under-reports rather than guessing.
+    /// Six of sixty trending repositories qualify, measured 2026-09-03.
+    pub moe: bool,
+}
+
+fn says_moe(architecture: Option<&str>) -> bool {
+    architecture.is_some_and(|arch| arch.to_ascii_lowercase().contains("moe"))
 }
 
 /// Whether `llama-server` could serve this at all.
@@ -342,6 +357,8 @@ struct RawRepo {
     gated: Option<RawGated>,
     #[serde(default)]
     pipeline_tag: Option<String>,
+    #[serde(default)]
+    gguf: Option<RawGguf>,
 }
 
 #[derive(Deserialize)]
@@ -374,6 +391,9 @@ pub fn parse_listing(body: &str) -> Result<Vec<Repo>, String> {
             last_modified: repo.last_modified,
             gated: repo.gated.is_some_and(|gated| gated.is_gated()),
             pipeline_tag: repo.pipeline_tag,
+            moe: says_moe(repo.gguf.as_ref().and_then(|g| g.architecture.as_deref())),
+            architecture: repo.gguf.as_ref().and_then(|g| g.architecture.clone()),
+            context_length: repo.gguf.as_ref().and_then(|g| g.context_length),
         })
         .collect())
 }
@@ -603,6 +623,19 @@ mod tests {
             repos.iter().map(|r| r.gated).collect::<Vec<_>>(),
             [false, true, true, false]
         );
+    }
+
+    #[test]
+    fn a_mixture_of_experts_is_marked_only_where_the_architecture_says_so() {
+        assert!(says_moe(Some("qwen3moe")));
+        assert!(says_moe(Some("qwen35moe")));
+        assert!(says_moe(Some("QWEN3MOE")));
+        assert!(!says_moe(Some("qwen35")));
+        assert!(!says_moe(None));
+        // Deliberately unmarked. Qwen3.8-Flash-Next is a 131B-A6B mixture of experts and
+        // its architecture does not say so, and the index carries no expert count. Marking
+        // it would mean guessing from the repository's name, and this app does not.
+        assert!(!says_moe(Some("qwen4exp")));
     }
 
     #[test]

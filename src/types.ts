@@ -422,6 +422,11 @@ export interface DiscoverRow {
   likes: number;
   lastModified: string | null;
   gated: boolean;
+  architecture: string | null;
+  /// True only where the architecture names it. The index carries no expert count, so this
+  /// under-reports rather than guessing — Qwen3.8-Flash-Next is a mixture of experts and
+  /// comes back false.
+  moe: boolean;
   pick: QuantPick | null;
   quants: number;
   /// Why there is nothing to download, when there is nothing to download.

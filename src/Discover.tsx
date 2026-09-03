@@ -2,42 +2,29 @@ import { useCallback, useEffect, useState } from "react";
 import { discoverBrowse, discoverDownload, downloadStart } from "./api";
 import DiscoverDetail from "./DiscoverDetail";
 import { formatFileSize } from "./format";
-import { DownloadIcon, SearchIcon } from "./icons";
+import { CloseIcon, DownloadIcon, SearchIcon } from "./icons";
 import type { DiscoverRow, DiscoverSort } from "./types";
 
-/// Four lists, and every one of them is something the API or this machine can actually
-/// answer. Coding and Chat were drawn and are not here: over the fifty most trending GGUF
-/// repositories the `code` tag appears on none of them and `conversational` on forty-six,
-/// so one filter would have had nothing behind it and the other would have removed four
-/// rows in fifty.
-const LISTS = [
+/// Sorts and filters are different questions and stopped sharing a widget on 2026-09-03,
+/// after the author used the version where they did. A sort says what order; a filter says
+/// what is left. Coding and Chat are still absent and still measured: over the fifty most
+/// trending GGUF repositories the `code` tag appears on none and `conversational` on
+/// forty-six.
+const SORTS = [
+  { id: "trending" as DiscoverSort, label: "Trending", heading: "Trending on Hugging Face" },
   {
-    id: "fits",
-    label: "Fits this Mac",
-    sort: "trending" as DiscoverSort,
-    heading: "Trending on Hugging Face, and small enough for this Mac",
-  },
-  {
-    id: "small",
-    label: "Small & fast",
-    sort: "trending" as DiscoverSort,
-    heading: "What fits this Mac, smallest first",
-  },
-  {
-    id: "downloads",
+    id: "downloads" as DiscoverSort,
     label: "Most downloaded",
-    sort: "downloads" as DiscoverSort,
     heading: "Most downloaded in the last month",
   },
-  {
-    id: "likes",
-    label: "Most liked",
-    sort: "likes" as DiscoverSort,
-    heading: "Most liked on Hugging Face",
-  },
+  { id: "likes" as DiscoverSort, label: "Most liked", heading: "Most liked on Hugging Face" },
 ] as const;
 
-type ListId = (typeof LISTS)[number]["id"];
+/// Smallest first is an ordering, not a claim about what small is, so it belongs here and
+/// not among the filters. It sorts what the page already holds rather than asking the API,
+/// because the API cannot sort by a size it never returns.
+const BY_SIZE = "smallest";
+type SortId = (typeof SORTS)[number]["id"] | typeof BY_SIZE;
 
 function compact(count: number): string {
   if (count >= 1_000_000) return `${(count / 1_000_000).toFixed(1)}M`;
@@ -93,7 +80,9 @@ export default function Discover({
 }: {
   onShowDownloads: () => void;
 }) {
-  const [list, setList] = useState<ListId>("fits");
+  const [sort, setSort] = useState<SortId>("trending");
+  const [onlyFits, setOnlyFits] = useState(true);
+  const [onlyMoe, setOnlyMoe] = useState(false);
   const [rows, setRows] = useState<DiscoverRow[]>([]);
   const [next, setNext] = useState<string | null>(null);
   const [query, setQuery] = useState("");
@@ -104,7 +93,9 @@ export default function Discover({
   const [got, setGot] = useState<string | null>(null);
   const [opened, setOpened] = useState<string | null>(null);
 
-  const chosen = LISTS.find((entry) => entry.id === list) ?? LISTS[0];
+  // Smallest first is not something the API can do, so it browses trending and reorders.
+  const asked: DiscoverSort = sort === BY_SIZE ? "trending" : sort;
+  const chosen = SORTS.find((entry) => entry.id === asked) ?? SORTS[0];
 
   const load = useCallback((sort: DiscoverSort, search: string | null) => {
     setBusy(true);
@@ -123,15 +114,15 @@ export default function Discover({
   }, []);
 
   useEffect(() => {
-    load(chosen.sort, searched);
-  }, [chosen.sort, searched, load]);
+    load(asked, searched);
+  }, [asked, searched, load]);
 
   /// Appends rather than replaces, and only ever follows the cursor the last page gave —
   /// rebuilding the query would come back sorted differently from what is already on screen.
   const loadMore = () => {
     if (!next) return;
     setMore(true);
-    discoverBrowse(chosen.sort, searched, next)
+    discoverBrowse(asked, searched, next)
       .then((page) => {
         setRows((prev) => [...prev, ...page.rows]);
         setNext(page.next);
@@ -170,15 +161,16 @@ export default function Discover({
       .catch((e) => setFailure(String(e)));
   };
 
-  // Both of these filter to what fits and differ only in order, which is what makes them
-  // two questions rather than one: what can this Mac run, and what can it run quickest. A
-  // chip that says small must never list something over the ceiling.
-  const fitting = rows.filter((row) => row.pick !== null && row.pick.fits !== false);
+  // Filters combine; the sort is applied after them. A row with no pick has no size to
+  // judge, so it survives every filter and sorts last.
   let shown = rows;
-  if (list === "fits") shown = fitting;
-  if (list === "small") {
-    shown = [...fitting].sort(
-      (a, b) => (a.pick?.candidate.size ?? 0) - (b.pick?.candidate.size ?? 0),
+  if (onlyFits) shown = shown.filter((row) => row.pick !== null && row.pick.fits !== false);
+  if (onlyMoe) shown = shown.filter((row) => row.moe);
+  if (sort === BY_SIZE) {
+    shown = [...shown].sort(
+      (a, b) =>
+        (a.pick?.candidate.size ?? Number.MAX_SAFE_INTEGER) -
+        (b.pick?.candidate.size ?? Number.MAX_SAFE_INTEGER),
     );
   }
 
@@ -207,20 +199,50 @@ export default function Discover({
               placeholder="Search models, or paste a link"
               onChange={(e) => setQuery(e.currentTarget.value)}
             />
+            {(query !== "" || searched) && (
+              <button
+                className="search-clear"
+                type="button"
+                title="Clear the search"
+                onClick={() => {
+                  setQuery("");
+                  setSearched(null);
+                }}
+              >
+                <CloseIcon />
+              </button>
+            )}
           </span>
         </form>
       </header>
 
       <div className="chip-row">
-        {LISTS.map((entry) => (
-          <button
-            key={entry.id}
-            className={`chip${entry.id === list ? " is-active" : ""}`}
-            onClick={() => setList(entry.id)}
-          >
-            {entry.label}
-          </button>
-        ))}
+        <select
+          className="sort-select"
+          value={sort}
+          onChange={(e) => setSort(e.currentTarget.value as SortId)}
+        >
+          {SORTS.map((entry) => (
+            <option key={entry.id} value={entry.id}>
+              {entry.label}
+            </option>
+          ))}
+          <option value={BY_SIZE}>Smallest first</option>
+        </select>
+        <span className="chip-divider" />
+        <button
+          className={`chip${onlyFits ? " is-active" : ""}`}
+          onClick={() => setOnlyFits((on) => !on)}
+        >
+          Fits this Mac
+        </button>
+        <button
+          className={`chip${onlyMoe ? " is-active" : ""}`}
+          title="Marked only where the file's architecture names it. The index carries no expert count, so some mixtures of experts are not marked and this filter will not show them."
+          onClick={() => setOnlyMoe((on) => !on)}
+        >
+          MoE
+        </button>
       </div>
 
       {failure && <p className="notice notice-error">{failure}</p>}
@@ -239,7 +261,11 @@ export default function Discover({
       )}
 
       <h2 className="group-label">
-        {searched ? `Matching “${searched}”` : chosen.heading}
+        {searched
+          ? `Matching “${searched}”`
+          : sort === BY_SIZE
+            ? "Trending on Hugging Face, smallest first"
+            : chosen.heading}
       </h2>
 
       {busy && (
@@ -265,7 +291,8 @@ export default function Discover({
       )}
 
       <div className="discover-list">
-        {shown.map((row) => {
+        {!busy &&
+          shown.map((row) => {
           const facts = [`${compact(row.downloads)} downloads this month`];
           const when = updated(row.lastModified);
           if (when) facts.push(when);
@@ -283,6 +310,7 @@ export default function Discover({
                 <span className="discover-head">
                   <span className="discover-name">{row.name}</span>
                   <span className="discover-owner">by {row.owner}</span>
+                  {row.moe && <span className="badge badge-moe">MoE</span>}
                   {row.gated && <span className="badge badge-warn">Gated</span>}
                 </span>
                 <span className="card-sub">{facts.join(" · ")}</span>
@@ -299,7 +327,7 @@ export default function Discover({
               </button>
             </div>
           );
-        })}
+          })}
       </div>
 
       {next && !busy && (

@@ -29,6 +29,9 @@ pub struct Row {
     pub likes: u64,
     pub last_modified: Option<String>,
     pub gated: bool,
+    pub architecture: Option<String>,
+    /// True only where the architecture names it; see [`crate::hub::Repo::moe`].
+    pub moe: bool,
     /// Absent for a gated repository, one holding no quantisation this app can take, and
     /// one whose tree could not be read. `note` says which.
     pub pick: Option<Pick>,
@@ -265,6 +268,8 @@ fn row(trees: &Trees, repo: hub::Repo, ceiling: Option<u64>) -> Row {
         likes: repo.likes,
         last_modified: repo.last_modified,
         gated: repo.gated,
+        architecture: repo.architecture,
+        moe: repo.moe,
         pick,
         quants,
         note,
@@ -291,6 +296,9 @@ mod tests {
             last_modified: None,
             gated,
             pipeline_tag: None,
+            architecture: Some("qwen3moe".into()),
+            context_length: None,
+            moe: true,
         }
     }
 
@@ -331,6 +339,8 @@ mod tests {
         assert_eq!(row.owner, "owner");
         assert_eq!(row.name, "model");
         assert_eq!(row.quants, 2, "the projector is not a quantisation");
+        assert!(row.moe, "the architecture said moe and the row dropped it");
+        assert_eq!(row.architecture.as_deref(), Some("qwen3moe"));
         let pick = row.pick.expect("a pick");
         assert_eq!(pick.candidate.label, "Q8_0");
         assert_eq!(pick.fits, Some(true));
