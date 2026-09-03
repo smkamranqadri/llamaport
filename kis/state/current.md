@@ -34,6 +34,9 @@ Blocker:  none. Open and not blocking:
           - **An Intel Mac** for the universal build, open since v0.3.0. Every
             other check v0.7.0 owed was met by the author on 2026-09-04
             ([intent/release.md](../intent/release.md)).
+          - **pi answering a prompt through the entry the app wrote**, the pi
+            button's sixth acceptance check, the author's to run
+            ([intent/pi.md](../intent/pi.md)).
 
 Next:     **Nothing chosen.** The author's call. The one standing candidate is
           the Show HN that has sat drafted since August
@@ -49,8 +52,8 @@ What the app is for: [intent/direction.md](../intent/direction.md).
 
 ## Proof
 
-The four commands green, each status captured on its own line. **310 tests**,
-from 261 before Discover.
+The four commands green, each status captured on its own line. **319 tests
+pass and 19 are ignored** on 2026-09-04, from 261 before Discover.
 
 Three suites need something this machine has and CI would not: `real_launch` and
 `real_tune` need the binary and a real model, and **`real_hub` needs the

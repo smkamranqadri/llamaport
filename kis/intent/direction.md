@@ -191,10 +191,11 @@ context.
 
 ## The shape this implies
 
-Not a plan. The pieces, so the plan has something to cut up. **Five of the seven
+Not a plan. The pieces, so the plan has something to cut up. **Six of the seven
 are now built** — everything below marked shipped landed in v0.4.0 or v0.5.0,
-except the pi button, which shipped in v0.6.0. What is left is the launch
-form shrinking behind named choices, and per-field override.
+the pi button in v0.6.0, and the launch form shrinking behind three named
+choices in the redesign, v0.7.0 ([redesign.md](redesign.md)). What is left is
+per-field override.
 
 - **The launch form shrinks** to what the author actually varies — a name, a
   port, and a context — plus one named choice that owns the rest.
@@ -244,4 +245,5 @@ revisit next.
   Face already keeps. Tune answers what this machine gets out of a model on
   disk, and neither answers it for a model that is not.
 - Whether hunting and working are two screens or one.
-- What the named choices are called, and how many there are.
+- ~~What the named choices are called, and how many there are.~~ Settled by the
+  redesign: three, Default, Best speed and Model suggested.

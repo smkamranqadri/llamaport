@@ -132,3 +132,9 @@ the point, because there was no way to tell from inside this app alone.
 
 **Two numbers are untuned**: the 40% tint and the `underWindowBackground`
 material were set against each other and then only one of them moved.
+
+**Proof, recorded late.** The vibrancy commits shipped on the author's look
+alone, which is the only check a window effect has, and no gate run was written
+down for them at the time. The four commands were first captured green over
+this code on 2026-09-04, in [review.md](review.md)'s parcel 1, and it shipped in
+v0.7.0 ([release.md](release.md)).

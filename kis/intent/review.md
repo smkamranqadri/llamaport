@@ -98,7 +98,7 @@ changes go last so the author looks once.
    `formatRelative`. Presets derives `speedFields` from `SPEED_KEYS`. `pi.rs`'s
    two readers share `parsed`. Three ternaries became if-chains. ModelDetail is
    723 lines from 1,010.
-4. **Visible — done, `e36dd86`; the look is owed.** "Web UI" on the button.
+4. **Visible — done, `e36dd86`, seen 2026-09-04.** "Web UI" on the button.
    `csp` is `default-src 'self'; connect-src ipc: http://ipc.localhost; img-src
    'self' data:; style-src 'self' 'unsafe-inline'` — no `script-src`, because
    Tauri adds `'self'` and a hash per bundled script itself, and no `devCsp`,
@@ -108,8 +108,11 @@ changes go last so the author looks once.
    corrected; redesign.md's recorded deviation marked reversed.
 
 Out of scope: shortening `inspect_port`'s timeouts; the rest of the release's
-security review; the two open quant-picker calls in [discover.md](discover.md);
-the unusable-window bug; the README screenshots.
+security review; the two open quant-picker calls; the unusable-window bug; the
+README screenshots. All but the first closed the same day on their own:
+the review ran for v0.7.0 ([release.md](release.md)), the picker calls were
+ruled kept ([discover.md](discover.md)), the window bug turned out to follow the
+session's launches ([roadmap.md](roadmap.md)), and the screenshots were taken.
 
 ## Acceptance
 

@@ -17,7 +17,7 @@ generation — the number the author had been typing by hand for 17 of 21 launch
 **Every run already measures itself and the reading is thrown away.**
 `llama-server` returns `prompt_per_second` and `predicted_per_second` with each
 completion, and the telemetry loop diffs the same counters off `/metrics` on
-every poll for the live view (`runner.rs:512`). Nothing survives the process it
+every poll for the live view (`runner.rs`). Nothing survives the process it
 was measured from. Nineteen models have been launched and nothing on disk says
 what any of them did.
 

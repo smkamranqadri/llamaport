@@ -83,10 +83,10 @@ and "fits" is not available.
 
 The evidence is Unsloth's, not this project's argument. Their `classifyGgufFit`
 is the artboard's badge shipped: `size × 1.15 + 1 GB` against 97% of the card,
-in five classes rather than two. Its own comments record that the badge and the
-memory bar **on the same row** disagreed on **11 of 19 sizes**, that sharing a
-constant took it to **8 of 19**, and that the residual eight are the estimator
-itself — "a 18 to 19 GiB quant was badged `fits` beside a bar reporting an
+in five classes rather than two. Its own comments record the badge and the
+memory bar disagreeing on the same row — the counts are in
+[knowledge/technical.md](../knowledge/technical.md) — with the residual being
+the estimator itself: "a 18 to 19 GiB quant was badged `fits` beside a bar reporting an
 overage", "a 20 GiB file on a full 24 GiB card at 1.0 read `fits` while
 `_select_gpus` fell back to `--fit`". Their context allowance is a flat 1 GB "at
 a typical 4K window"; this app runs 65,536 with an f16 cache, where the cache is
@@ -146,14 +146,14 @@ It stays the only choke point.
 ## Risks
 
 - **The ceiling is missing exactly when Discover matters most.** It comes from
-  `probe`'s `--list-devices`, and `lib.rs:342` already notes a first run may not
+  `probe`'s `--list-devices`, and `lib.rs` already notes a first run may not
   have found the binary. Somebody with no binary and no models is the ideal
   Discover user and the one case the app cannot size. Needs a stated state, not
   a blank.
-- **`expand=gguf` lies on repos carrying sidecars.**
-  `HauhauCS/…-27B-…-MTP-GGUF` reports 1.86B parameters for a 27B model, because
-  the field is read off one file and that repo's is the drafter. The same trap as
-  the picker's, one layer earlier.
+- **`expand=gguf` lies on repos carrying sidecars**, because the field is read
+  off one file and that file can be the drafter — the example is in
+  [knowledge/technical.md](../knowledge/technical.md). The same trap as the
+  picker's, one layer earlier.
 - **The API budget is unadvertised.** No rate-limit headers come back
   unauthenticated. A browse that fires a call per row on every chip press is how
   it would be found.
@@ -168,8 +168,9 @@ It stays the only choke point.
 The four commands green. A mutation check on the picker: gut the sidecar and
 shard exclusions and watch the tests fail. The client against a stand-in with no
 network. Then the artboard rendered against the app's own DOM in headless Chrome
-before the hand-over — and then the author looking at it, which is where 24 of
-this project's 24 defects have come from.
+before the hand-over — and then the author looking at it, which is where every
+defect this project had counted by then had come from
+([defects.md](defects.md)).
 
 
 ## What shipped, 2026-09-03
@@ -213,8 +214,8 @@ match.
 
 Rendered in both appearances against `App.css` in headless Chrome before
 anything was handed over. **The app itself was never launched** — that ruling
-holds ([knowledge/technical.md](../knowledge/technical.md) Verify), and the
-author's look is still owed.
+holds ([knowledge/technical.md](../knowledge/technical.md) Verify). The author's
+looks followed, four of them, recorded below.
 
 **One thing built here belongs to no phase.** `tests/stylesheet.rs` exists
 because this change painted the chips with `--muted`, a token `App.css` has
@@ -285,7 +286,8 @@ carries what is still owed, which the artboard drew and the first build left out
 `parakeet-tdt-0.6b-v3` — a speech-recognition GGUF, a valid file, not a language
 model, sitting in the models directory because Discover had offered it and the
 author had downloaded it. **One GGUF repository in six is something
-`llama-server` cannot serve.**
+`llama-server` cannot serve** — the sample is in
+[knowledge/technical.md](../knowledge/technical.md).
 
 `hub::serves_text` is a denylist, and the direction is the point: 48 of 300
 sampled repositories carry no pipeline tag at all, so an allowlist would hide
@@ -312,9 +314,8 @@ state, and the box could not be cleared.
 
 **Then the author found the mechanism I had ruled out.** Hugging Face has an
 `?other=moe` tag — `filter=gguf,moe` on the API — and it catches models whose
-architecture says nothing. It does not replace the architecture: over 300
-repositories the tag covers 35, the architecture 34, only 13 both, and the union
-56. The counts and the reasoning are in
+architecture says nothing. It does not replace the architecture — each alone
+misses about two in five. The counts and the reasoning are in
 [knowledge/technical.md](../knowledge/technical.md).
 
 **A parameter band** came with it, and the API applies it better than this app

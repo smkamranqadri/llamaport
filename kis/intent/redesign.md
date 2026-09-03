@@ -37,9 +37,9 @@ Live status is in [state/current.md](../state/current.md), not here.
 - **Activity Monitor ships with a CPU% column and no GPU column.** The author's
   choice, made knowing the telemetry had neither: per-process GPU has no public
   macOS API, so that column is dropped for good rather than deferred.
-- **The README screenshots stay deferred behind this work.** Every phase would
-  invalidate them again; they are done once, against the finished redesign
-  ([release.md](release.md) phase 3).
+- **The README screenshots stayed deferred behind this work**, and were taken
+  once, against the finished UI, on 2026-09-04 for v0.7.0
+  ([release.md](release.md)).
 
 ## Phases — all four done
 
@@ -412,6 +412,6 @@ directory, which is why Rescan exists and why item 2 kept it.
 
 **Downloads, the Activity table and the folder picker were reviewed by the
 author on the running app, 2026-09-03**: "download, activity table and pick all
-good, reviwed". Every earlier unit was signed off as it landed. **The notarised
-bundle is a separate question** for the picker, and is in
-[release.md](release.md) under "Unverified against v0.7.0".
+good, reviwed". Every earlier unit was signed off as it landed. The picker on
+the signed bundle was a separate question, **met 2026-09-04** on v0.7.0
+([release.md](release.md)).

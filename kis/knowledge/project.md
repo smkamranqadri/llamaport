@@ -4,9 +4,9 @@
 and downloading them from Hugging Face with working resume. Named 2026-08-02,
 before packaging: models arrive at a port, and `llama-server` binds one.
 
-**For:** the author first, other local-LLM users on macOS second. Stage is MVP
-heading for release, so packaging and other people's machines are real scope, not
-hypothetical.
+**For:** the author first, other local-LLM users on macOS second. Stage is a
+public beta, eleven releases in, so packaging and other people's machines are
+real scope, not hypothetical.
 
 **Problem:** the `llama-server` launch command is stable except for three values
 yet gets retyped or hunted out of shell history every time; nothing records what
@@ -19,7 +19,8 @@ so downloads currently go through an external download manager.
 below where they disagree: list models with real GGUF metadata, launch one,
 report what it costs, stop it, say whether it works; download with resume; have
 an opinion about the settings rather than offering knobs; point pi at what is
-running; and, later, help find a model worth downloading.
+running; and help find a model worth downloading, which Discover does since
+2026-09-03.
 
 **Out of scope:** a chat UI of our own — `llama-server` ships one, enabled by
 default, and a ready model opens it in a second app window labelled Web UI. That

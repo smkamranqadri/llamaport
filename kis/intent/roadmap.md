@@ -81,13 +81,11 @@ user, reversing two standing decisions ([direction.md](direction.md)).
    Anyway" steps met a real Gatekeeper prompt for the first time, and the prompt
    was "is damaged and can't be opened" — a message those steps cannot answer.
    Five releases had shipped an unsealed bundle. Fixed in v0.6.1
-   ([release.md](release.md)). The other two stand: a queued row with nothing on
-   disk behind it has never been seen coming back from a restart, and no Intel
-   Mac has run the universal build.
+   ([release.md](release.md)). The queued-row restart was seen on 2026-09-04
+   against v0.7.0. One stands: no Intel Mac has run the universal build.
 
-   Two of this release's after-tag checks came off the list on 2026-09-01: the
-   installed build is v0.5.0, and the Dock click was made by hand on it. Neither
-   was one of the three above, which are older and stand.
+   The after-tag checks were all made by the author on the installed v0.7.0 on
+   2026-09-04 ([release.md](release.md) "Unverified against v0.7.0").
 
 9. ~~**Figures**~~ — done 2026-08-31, shipped in v0.4.0.
    [figures.md](figures.md). Two numbers the app printed were wrong: the KV term
@@ -213,16 +211,12 @@ What two comparable tools do and this one does not, read off their source on
 2026-08-30 and recorded in [gaps.md](gaps.md). A list, not a plan; nothing there
 is scheduled, and each item that reopens a decision says so where it stands.
 
-From **LlamaForge**: no Library search, no keyboard map, a failed launch that
-shows the log instead of the reason, live telemetry that is never written down —
-and in-app Hugging Face search with its trimmings, which is the item below.
-
-From **Unsloth**, which ships a Tauri app on our stack doing our job: no
-auto-update, a launch that always names `-c` and `-ngl all` where llama.cpp can
-now size the context itself, no warning before a load that cannot fit, and a
-handful of UI settlements around bounded figures. Two are ours rather than
-theirs, and both were fixed by step 9: the KV estimate charged every layer a
-full-context cache, and `formatBytes` divided by 1024³ while printing GB.
+From **LlamaForge** and **Unsloth**, which ships a Tauri app on our stack doing
+our job. Most of what was listed on 2026-08-30 has since closed — Library search,
+live telemetry written down, in-app Hugging Face search with its badges and fit
+rating, a launch that can leave `-c` and `-ngl` to llama.cpp, the no-fit
+warning — and [gaps.md](gaps.md) marks each. What still stands there: a keyboard
+map, a failed launch that shows the log instead of the reason, and auto-update.
 
 ## Decided against
 
@@ -274,62 +268,16 @@ unplanned.
 - `rawArgs` is passed to `llama-server` verbatim, so `--host 0.0.0.0` typed there
   exposes an unauthenticated server to the network. Acceptable for a personal
   tool; a release blocker. Decided: `rawArgs` may not set what the app owns.
-- The app can start with an unusable window — **and only when the session
-  launches it.** Ruled 2026-09-04 by the author: every sighting below is a
-  `tauri dev` started from this session's shell, and it has never happened on a
-  launch of the author's own, dev or bundled — five Finder launches of v0.7.0
-  and five of v0.5.0 all came up usable. So it is a property of how a
-  non-interactive shell launches an unbundled binary, not of the app, and it is
-  no longer a release blocker or a task. The record stays because the numbers
-  are real. Observed twice in one session: once
-  with no window at all and the Window menu empty, once at 60x60.
-  `show_main_window` asserts a usable frame and does not reliably achieve it.
-  Predates the downloader. **Third
-  observation 2026-09-02, and the first with hard numbers**: a dev build at
-  `c6ac59f` came up 107×114 at (15, 673) — the configured 880×480 minimums
-  ignored — with the whole UI rendered scaled inside it, captured by window
-  id. One of three dev launches that session; the other two were 1060×720.
-  **Three more times the same day, and there is now a suspect.** Two of them
-  did not start that way: a window that had been 1060×720 for minutes was
-  found at 166×164, then another at 145×171, both at the screen's
-  bottom-left corner, with nobody touching either. Each of those two followed
-  a Vite hot reload within seconds, which looked like the first suspect ever
-  seen — **and that hypothesis is wrong.** It was written down on 2026-09-02
-  and falsified the same day by the next launch: a **fresh** `tauri dev` with
-  no reload of any kind came up at **91×112 at (16, 906)**, the same corner.
-  So reload is not the trigger; what the four collapses share is only the
-  corner and a frame far under the configured 880×480 minimums.
-
-  **Six observations now, and the pattern to chase is the corner**: every
-  collapse puts the window at the bottom-left of a display, which is where a
-  frame of (0,0)-ish origin with a collapsed size would land.
-
-  **Four more on 2026-09-02, and two of the claims above are now wrong.** The
-  sizes were 142×187, 118×129, 142×165 and 142×165, the last three on
-  consecutive launches. So it is no longer *roughly one launch in three* and
-  restarting no longer *clears it every time* — it went from occasional to
-  reproducing on nearly every dev launch within a single session, which is the
-  strongest lead anyone has had and is why this needs its own task rather than
-  another tally mark.
-
-  **Four more on 2026-09-02, and the recovery claim was wrong.** Sizes 142×165,
-  177×197 and 130×136 twice, one of them appearing with nobody touching the
-  window. The tray's Show window is still the only recovery — but it does *not*
-  need a human at the machine: an `osascript` that clicks the tray menu item
-  restored the window three times from the session, and the script is kept at
-  `show.applescript` in the scratchpad. Two things learned with it, both of
-  which cost time before they were understood:
-
-  - **Never resize the window through System Events.** `set size of window 1`
-    collapses it to 130×136 outright rather than resizing it. That is the one
-    reproducible trigger anyone has found, and it may be the same code path the
-    spontaneous collapses take.
-  - **A capture taken straight after the tray recovery is sheared**, because the
-    window animates open from the menu-bar icon and `screencapture` reads it
-    mid-zoom. It returns a plausible-looking image whose horizontal lines slope
-    a few pixels across the width — which sent one session chasing a stagger in
-    the preset cards that the CSS cannot produce. Poll the window's bounds until
-    they stop changing before capturing.
+- ~~The app can start with an unusable window.~~ **Closed 2026-09-04 by the
+  author's ruling, not by a fix.** Sixteen sightings on 2026-09-02, every one a
+  `tauri dev` started from this session's shell, sizes from 91×112 to 177×197,
+  always at a display's bottom-left corner, once reproducible on purpose by
+  resizing through System Events. Never once on a launch of the author's own,
+  dev or bundled — ten Finder launches of v0.5.0 and v0.7.0 all came up usable.
+  So it belongs to how a non-interactive shell launches an unbundled binary, and
+  it is neither a blocker nor a task. What the chase taught about capturing —
+  never resize through System Events, wait for the bounds to settle — lives in
+  [knowledge/technical.md](../knowledge/technical.md) under Verify.
 - ~~The Dock icon does not reopen the main window once it has been closed.~~
   Fixed 2026-08-08, issue 1: the run loop matched only `ExitRequested` and `Exit`,
   so the hide-on-close decision ([knowledge/project.md](../knowledge/project.md))

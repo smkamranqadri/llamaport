@@ -1,49 +1,9 @@
 # Releases
 
-Nine releases, all unsigned by Apple. Each entry below carries what shipped, the
-artefact proof, and only the lessons that still bind. **Every release here was
-downloaded back from GitHub and compared byte for byte with what was built**, so
-that check is stated once rather than nine times.
-
-## v0.6.1 — shipped 2026-09-02
-
-https://github.com/smkamranqadri/llamaport/releases/tag/v0.6.1 — **packaging
-only**, no functional change from v0.6.0, and the release that made the app
-openable at all.
-
-**The Gatekeeper check finally ran, and it failed.** Owed since v0.1.0 and never
-performed, it was run for real on 2026-09-02: the author downloaded v0.6.0
-through a browser, installed it, clicked it, and got **"Llamaport.app is damaged
-and can't be opened."** Not the unidentified-developer prompt the README had
-described for five releases, and there is no **Open Anyway** button for that
-message — so the documented steps could never have worked on any release this
-project had published.
-
-Diagnosed rather than guessed: the shipped bundle carried only the ad-hoc
-signature the linker puts on the arm64 executable — `flags=0x20002(adhoc,
-linker-signed)`, `Info.plist=not bound`, `Sealed Resources=none` — because Tauri
-runs `codesign` only when an identity is configured. macOS could not check the
-app at all, so it refused instead of asking. `"signingIdentity": "-"` makes the
-build sign ad-hoc properly; the shipped bundles verify at
-`flags=0x10002(adhoc,runtime)`. The rule is in
-[knowledge/technical.md](../knowledge/technical.md).
-
-`Llamaport_0.6.1_aarch64.dmg`, 4,252,086 bytes, sha256
-`6b7b8ae3f9ceaaed388c2aa6563575c678d1a9aa6ec5cb8db84d0fb5fb839749`.
-`Llamaport_0.6.1_universal.dmg`, 8,714,320 bytes, sha256
-`34baad55cd5e6bc08c31e88c46d4e10289859663aa1f9cf8961b9692afde384c`. The
-universal one carries `x86_64 arm64`, and the aarch64 `.dmg` was mounted from
-the *downloaded* file and the app inside verified — the artefact check this
-release exists for.
-
-**Every release from v0.1.0 to v0.6.0 carries a warning block** added the same
-day — nine of them — naming the dialog, saying the app is not damaged, and
-giving the `xattr` line, because each told readers to use Open Anyway.
-
-**Confirmed end to end**: v0.6.1 was downloaded through a browser and opened,
-macOS said it could not verify the developer, and Open Anyway let it through.
-**The check owed since v0.1.0 is met** — it took two runs on one day, the first
-to find that five releases were broken and the second to prove the fix.
+Eleven releases, all unsigned by Apple, newest first. Each entry carries what
+shipped, the artefact proof, and only the lessons that still bind. **Every
+release here was downloaded back from GitHub and compared byte for byte with
+what was built**, so that check is stated once rather than eleven times.
 
 ## v0.7.0 — shipped 2026-09-04
 
@@ -113,6 +73,46 @@ the Dock click, a queued row with nothing on disk surviving a restart, the
 folder picker on the signed bundle, the Discussions post brought up to date,
 and Discover's avatars under the tightened rule. **Only the Intel Mac remains**,
 as it has since v0.3.0, because nobody here has one.
+
+## v0.6.1 — shipped 2026-09-02
+
+https://github.com/smkamranqadri/llamaport/releases/tag/v0.6.1 — **packaging
+only**, no functional change from v0.6.0, and the release that made the app
+openable at all.
+
+**The Gatekeeper check finally ran, and it failed.** Owed since v0.1.0 and never
+performed, it was run for real on 2026-09-02: the author downloaded v0.6.0
+through a browser, installed it, clicked it, and got **"Llamaport.app is damaged
+and can't be opened."** Not the unidentified-developer prompt the README had
+described for five releases, and there is no **Open Anyway** button for that
+message — so the documented steps could never have worked on any release this
+project had published.
+
+Diagnosed rather than guessed: the shipped bundle carried only the ad-hoc
+signature the linker puts on the arm64 executable — `flags=0x20002(adhoc,
+linker-signed)`, `Info.plist=not bound`, `Sealed Resources=none` — because Tauri
+runs `codesign` only when an identity is configured. macOS could not check the
+app at all, so it refused instead of asking. `"signingIdentity": "-"` makes the
+build sign ad-hoc properly; the shipped bundles verify at
+`flags=0x10002(adhoc,runtime)`. The rule is in
+[knowledge/technical.md](../knowledge/technical.md).
+
+`Llamaport_0.6.1_aarch64.dmg`, 4,252,086 bytes, sha256
+`6b7b8ae3f9ceaaed388c2aa6563575c678d1a9aa6ec5cb8db84d0fb5fb839749`.
+`Llamaport_0.6.1_universal.dmg`, 8,714,320 bytes, sha256
+`34baad55cd5e6bc08c31e88c46d4e10289859663aa1f9cf8961b9692afde384c`. The
+universal one carries `x86_64 arm64`, and the aarch64 `.dmg` was mounted from
+the *downloaded* file and the app inside verified — the artefact check this
+release exists for.
+
+**Every release from v0.1.0 to v0.6.0 carries a warning block** added the same
+day — nine of them — naming the dialog, saying the app is not damaged, and
+giving the `xattr` line, because each told readers to use Open Anyway.
+
+**Confirmed end to end**: v0.6.1 was downloaded through a browser and opened,
+macOS said it could not verify the developer, and Open Anyway let it through.
+**The check owed since v0.1.0 is met** — it took two runs on one day, the first
+to find that five releases were broken and the second to prove the fix.
 
 ## Unverified against v0.7.0
 
@@ -439,7 +439,6 @@ the app directly to record a launch recording, since deleted with the 0.7.0
 screenshots. That grant is
 not the current arrangement — see
 [knowledge/technical.md](../knowledge/technical.md) under Verify, which now rules
-the app off limits to the session entirely. The README's images are due a retake
-against the finished UI, which is phase 3's standing instruction. All three date
-from 2026-08-08 and predate the entire redesign, so every one is owed rather than
-some of them.
+the app off limits to the session unless asked. The README's images were
+retaken by the author on 2026-09-04 for v0.7.0, seven of them in `assets/`; the
+2026-08-08 set went with the move.

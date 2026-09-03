@@ -86,7 +86,7 @@ below.
    arithmetic shown with no verdict attached. That is exactly what shipped: the
    row prints its size against the ceiling and says something only when the
    weights alone are over. Reading Unsloth's own source later put numbers on the
-   warning — their badge disagreed with their memory bar on 8 of 19 sizes
+   warning — their badge disagreed with their own memory bar
    ([knowledge/technical.md](../knowledge/technical.md)).
    *A fit rating before the download.* Cheap version is `size * 1.15 <= VRAM`
    → FITS / TIGHT / CPU OFFLOAD. Theirs is now a vendored physics core

@@ -30,8 +30,8 @@ times what the model will allocate, printed as an exact figure.
 build b10360 by reading the strings in `libllama.dylib` and the header of the
 file itself.
 
-**The unit label disagrees with the arithmetic.** `format.ts:5` divides by
-1024³ and prints GB. Every figure in the app is therefore 7.4% larger than its
+**The unit label disagrees with the arithmetic.** `format.ts` divided by
+1024³ and printed GB. Every figure in the app is therefore 7.4% larger than its
 own label claims: a 16.45 GiB file reads "16.5 GB" where Finder, which is
 decimal, says 17.66 GB for the same bytes. One formatter currently serves file
 sizes, disk free space, memory and transfer rates, which is the underlying
@@ -102,8 +102,8 @@ decimal with the three rate-limit constants moving with it.
 
 ## Out of scope
 
-Any release. Everything in [gaps.md](gaps.md) — fifteen items are sitting in
-that file and none of them belong to this phase. The recurrent-state
+Any release. Everything in [gaps.md](gaps.md) — none of its items belong to
+this phase. The recurrent-state
 arithmetic. The sampling defaults, which are already correct precisely because
 the app passes nothing ([knowledge/technical.md](../knowledge/technical.md)).
 

@@ -38,7 +38,7 @@ not of this word, and nothing follows from it today.
 
 - `package.json` name; `Cargo.toml` package name and lib name (`llamaport_lib`)
 - `tauri.conf.json` productName, identifier, window title
-- `main.rs` call site; the 12 test-file imports; `App.tsx:162` sidebar title
+- `main.rs` call site; the 12 test-file imports; the `App.tsx` sidebar title
 - `index.html:7`, still the Tauri scaffold's `Tauri + React + Typescript`
 - `README.md:1`
 - `store.rs` config dir, plus the migration below
