@@ -142,6 +142,11 @@ body,
 }
 
 /* Vibrancy.
+   The material is `underWindowBackground`, not `sidebar`. `sidebar` is the semantically
+   correct one for this and it is also one of the more opaque, which is most of why the
+   first attempt looked like nothing had happened. This one lets considerably more
+   through, so the 40% tint below is doing more of the work than it was.
+
    The material is pinned active in `tauri.conf.json` rather than following the window's
    focus. macOS swaps to a flatter, greyer variant when an app goes to the back, which is
    native behaviour and reads here as the sidebar going dark and coming back every time
