@@ -84,26 +84,6 @@ const LIMITS_MB = [0.5, 1, 1.5, 2];
 /// than a second and is raised to this on the way in. Only a typed limit can be under it.
 const FLOOR = 64 * 1024;
 
-function isQuantToken(token: string): boolean {
-  if (["F16", "BF16", "F32", "F64"].includes(token)) return true;
-  const rest = token.replace(/^(IQ|TQ|Q)/, "");
-  return rest !== token && /^\d/.test(rest);
-}
-
-/// The same rule `catalog.rs` uses on a file that has landed, applied to one that has
-/// not: a row in flight has no GGUF to read, and the badge beside its name has to come
-/// from somewhere.
-function quantOf(fileName: string): string | null {
-  const tokens = fileName.replace(/\.gguf$/i, "").split(/[-.]/);
-  for (let i = 0; i < tokens.length; i += 1) {
-    const upper = tokens[i].toUpperCase();
-    if (!isQuantToken(upper)) continue;
-    if (i > 0 && tokens[i - 1].toUpperCase() === "UD") return `UD-${upper}`;
-    return upper;
-  }
-  return null;
-}
-
 function stem(fileName: string) {
   return fileName.replace(/\.gguf$/i, "");
 }
@@ -229,7 +209,6 @@ function Downloading({
   onResume: (id: string) => void;
   onDiscard: (id: string) => void;
 }) {
-  const quant = quantOf(job.fileName);
   const done = percent(job);
   const bar =
     job.state === "active" &&
@@ -245,7 +224,7 @@ function Downloading({
       <div className="download-head">
         <OwnerAvatar owner={job.owner} small />
         <span className="download-name">{name}</span>
-        {quant && <span className="badge">{quant}</span>}
+        {job.quant && <span className="badge">{job.quant}</span>}
         <span className="actions">
           {job.state === "active" && (
             <button className="button button-plain" onClick={() => onPause(job.id)}>

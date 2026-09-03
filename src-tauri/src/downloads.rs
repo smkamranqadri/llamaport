@@ -99,17 +99,23 @@ pub struct DownloadJob {
     /// place knows the shape of a download URL — the window would have to parse it a
     /// second way, and the two would drift.
     pub owner: Option<String>,
+    /// The quantisation as the Library would spell it, read off the file name by the
+    /// catalog's own rule. A row in flight has no GGUF to read, and a second parser in the
+    /// window printed one quantisation two ways.
+    pub quant: Option<String>,
 }
 
 impl DownloadJob {
     pub fn begin(id: &str, url: &str, dest: &Path) -> Self {
+        let file_name = dest
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_default();
+        let quant = crate::catalog::quant_from_name(&file_name);
         Self {
             id: id.to_string(),
             url: url.to_string(),
-            file_name: dest
-                .file_name()
-                .map(|n| n.to_string_lossy().into_owned())
-                .unwrap_or_default(),
+            file_name,
             path: dest.to_string_lossy().into_owned(),
             state: DownloadState::Active,
             phase: None,
@@ -121,6 +127,7 @@ impl DownloadJob {
             finished_secs: None,
             resumable: true,
             owner: crate::hub::owner_of(url),
+            quant,
         }
     }
 
@@ -480,6 +487,8 @@ impl Downloads {
                 .join(&view.file_name)
                 .to_string_lossy()
                 .into_owned();
+            view.quant = crate::catalog::quant_from_name(&view.file_name);
+
             jobs.push(Tracked {
                 view,
                 control: Arc::new(Control::default()),
@@ -899,5 +908,57 @@ impl ProgressSink for Sink {
         }) {
             self.events.emit("download:progress", payload);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    struct Silent;
+
+    impl crate::runner::EventSink for Silent {
+        fn emit(&self, _: &str, _: serde_json::Value) {}
+    }
+
+    #[test]
+    fn a_job_carries_its_quantisation_as_the_catalog_spells_it() {
+        let job = DownloadJob::begin(
+            "dl-1",
+            "https://huggingface.co/unsloth/Model-GGUF/resolve/main/Model-UD-Q4_K_XL.gguf",
+            Path::new("/models/Model-UD-Q4_K_XL.gguf"),
+        );
+        assert_eq!(job.quant.as_deref(), Some("UD-Q4_K_XL"));
+        assert_eq!(
+            job.quant,
+            crate::catalog::quant_from_name("Model-UD-Q4_K_XL")
+        );
+
+        let plain = DownloadJob::begin(
+            "dl-2",
+            "https://huggingface.co/owner/name/resolve/main/spark-x2.5-4b.gguf",
+            Path::new("/models/spark-x2.5-4b.gguf"),
+        );
+        assert_eq!(plain.quant, None);
+    }
+
+    /// A row written by a build before the field existed comes back with a badge too.
+    #[test]
+    fn a_restored_row_is_given_its_quantisation() {
+        let downloads = Downloads::with_engine(
+            Arc::new(Silent),
+            Arc::new(|| {}),
+            Arc::new(|_, _, _| Ok(())),
+        );
+        let mut old = DownloadJob::begin(
+            "dl-7",
+            "https://huggingface.co/owner/name/resolve/main/Model-Q8_0.gguf",
+            Path::new("/elsewhere/Model-Q8_0.gguf"),
+        );
+        old.state = DownloadState::Complete;
+        old.quant = None;
+        downloads.restore(vec![old], Path::new("/models"));
+        let restored = downloads.snapshot();
+        assert_eq!(restored[0].quant.as_deref(), Some("Q8_0"));
     }
 }

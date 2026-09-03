@@ -205,6 +205,8 @@ export interface DownloadJob {
   resumable: boolean;
   /// Who published it, read off the URL in Rust. Null for a URL this app did not recognise.
   owner: string | null;
+  /// The quantisation as the Library spells it, read off the file name in Rust.
+  quant: string | null;
 }
 
 export interface DownloadProgress {
