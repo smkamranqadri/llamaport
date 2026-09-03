@@ -15,6 +15,7 @@ import {
   setDownloadOptions,
 } from "./api";
 import { formatDuration, formatFileSize, formatRate, MB } from "./format";
+import OwnerAvatar from "./OwnerAvatar";
 import { CheckIcon, CloseIcon, DownloadIcon, SearchIcon } from "./icons";
 import type {
   DirInfo,
@@ -242,6 +243,7 @@ function Downloading({
   return (
     <div className="download-card">
       <div className="download-head">
+        <OwnerAvatar owner={job.owner} small />
         <span className="download-name">{name}</span>
         {quant && <span className="badge">{quant}</span>}
         <span className="actions">
@@ -302,6 +304,7 @@ function Failed({
     <div className="download-card">
       <div className="download-head">
         <span className="dot tone-bad" />
+        <OwnerAvatar owner={job.owner} small />
         <span className="download-name">{name}</span>
         <span className="actions">
           {mode !== "none" && (
@@ -351,6 +354,7 @@ function Finished({
 
   return (
     <div className="finished-row">
+      <OwnerAvatar owner={job.owner} small />
       <span className="finished-tick">
         <CheckIcon />
       </span>

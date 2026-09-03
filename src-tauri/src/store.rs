@@ -137,6 +137,17 @@ fn pi_dir() -> PathBuf {
 /// A transfer settles often and the config holds the models directory, the llama-server
 /// path and every remembered launch. Keeping the churn out of it means a history that
 /// cannot be read costs the user nothing but their history.
+/// One small file per owner, rather than one map every writer has to rewrite. Avatars are
+/// fetched from several threads at once, and `write_atomic` names its temporary after the
+/// destination — one name per file, not per writer — so a shared file would have those
+/// threads racing on it. A file each removes the question.
+///
+/// A miss is stored as an empty file and is as worth keeping as a hit: the owners with no
+/// picture are the ones publishing the most repositories, so they are asked for most often.
+pub fn avatar_path(owner: &str) -> PathBuf {
+    config_dir().join("avatars").join(owner)
+}
+
 pub fn history_path() -> PathBuf {
     config_dir().join("downloads.json")
 }

@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
-import { discoverAvatar, discoverBrowse, discoverDownload, downloadStart } from "./api";
+import { discoverBrowse, discoverDownload, downloadStart } from "./api";
 import DiscoverDetail from "./DiscoverDetail";
 import { formatFileSize } from "./format";
-import { CloseIcon, DownloadIcon, OwnerIcon, SearchIcon } from "./icons";
+import { CloseIcon, DownloadIcon, SearchIcon } from "./icons";
+import OwnerAvatar from "./OwnerAvatar";
 import type { DiscoverRow, DiscoverSort, ParamBand } from "./types";
 
 /// Sorts and filters are different questions and stopped sharing a widget on 2026-09-03,
@@ -104,7 +105,6 @@ export default function Discover({
   const [failure, setFailure] = useState<string | null>(null);
   const [got, setGot] = useState<string | null>(null);
   const [opened, setOpened] = useState<string | null>(null);
-  const [avatars, setAvatars] = useState<Record<string, string | null>>({});
 
   // Smallest first is not something the API can do, so it browses trending and reorders.
   const asked: DiscoverSort = sort === BY_SIZE ? "trending" : sort;
@@ -112,28 +112,6 @@ export default function Discover({
 
   const band = (BANDS.find((entry) => entry.id === bandId) ?? BANDS[0]).band;
 
-  // One request per owner ever, asked for after the rows are on screen so a picture never
-  // delays a figure. `null` is recorded as firmly as a hit, or an owner with no avatar
-  // would be asked for again on every page they appear on.
-  useEffect(() => {
-    const wanted = [...new Set(rows.map((row) => row.owner))].filter(
-      (owner) => owner !== "" && !(owner in avatars),
-    );
-    if (wanted.length === 0) return;
-    let live = true;
-    Promise.all(
-      wanted.map((owner) =>
-        discoverAvatar(owner)
-          .then((found) => [owner, found] as const)
-          .catch(() => [owner, null] as const),
-      ),
-    ).then((found) => {
-      if (live) setAvatars((prev) => ({ ...prev, ...Object.fromEntries(found) }));
-    });
-    return () => {
-      live = false;
-    };
-  }, [rows, avatars]);
 
   const load = useCallback(
     (sort: DiscoverSort, search: string | null, band: ParamBand, moe: boolean) => {
@@ -355,13 +333,7 @@ export default function Discover({
 
           return (
             <div className="discover-row" key={row.id}>
-              <span className="owner-avatar" title={row.owner}>
-                {avatars[row.owner] ? (
-                  <img src={avatars[row.owner] ?? undefined} alt="" />
-                ) : (
-                  <OwnerIcon />
-                )}
-              </span>
+              <OwnerAvatar owner={row.owner} />
               <button
                 className="discover-body discover-open"
                 title="Every quantisation, and what each one costs"

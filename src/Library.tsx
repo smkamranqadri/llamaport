@@ -9,6 +9,7 @@ import {
 import { formatFileSize, formatMemory, formatRelative } from "./format";
 import FirstRun from "./FirstRun";
 import { PiIcon, PlayIcon, SearchIcon, StopIcon } from "./icons";
+import OwnerAvatar from "./OwnerAvatar";
 import PiPanel from "./PiPanel";
 import type { DirInfo, ModelEntry, RunnerSnapshot, Telemetry } from "./types";
 
@@ -238,6 +239,7 @@ function ModelRow({
         onClick={() => onSelect(model)}
       >
         <span className={`dot ${isRunning ? `state-${runner.state}` : "is-idle"}`} />
+        <OwnerAvatar owner={model.owner} small />
         <span className="model-name">{model.displayName}</span>
         <Badges model={model} />
         {isRunning && <span className="model-stat">{stat}</span>}

@@ -22,7 +22,9 @@ const RETRY_BACKOFF: Duration = Duration::from_secs(1);
 /// limit parks a segment for longer than a second at a stretch with a cancel behind it.
 const MIN_RATE_LIMIT: u64 = 64 * 1024;
 
-const HOSTS: [&str; 2] = ["huggingface.co", "hf.co"];
+/// The only hosts anything in this app will fetch from. One list, because a second
+/// would drift from it: `hub::owner_of` reads the same URLs this validates.
+pub(crate) const HOSTS: [&str; 2] = ["huggingface.co", "hf.co"];
 const NOT_A_FILE_URL: &str = "this does not look like a Hugging Face file URL — expected \
      https://huggingface.co/{repo}/resolve/{ref}/{file}.gguf";
 
@@ -93,6 +95,10 @@ pub struct DownloadJob {
     /// Whether the bytes this row points at can be continued. Only ever false on a paused
     /// transfer adopted from a `.part` that no longer holds what its sidecar claims.
     pub resumable: bool,
+    /// Who published it, read off the URL. Derived here rather than in the window so one
+    /// place knows the shape of a download URL — the window would have to parse it a
+    /// second way, and the two would drift.
+    pub owner: Option<String>,
 }
 
 impl DownloadJob {
@@ -114,6 +120,7 @@ impl DownloadJob {
             started_secs: now_secs(),
             finished_secs: None,
             resumable: true,
+            owner: crate::hub::owner_of(url),
         }
     }
 

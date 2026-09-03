@@ -6,6 +6,7 @@
 //! this fans out rather than looping.
 
 use std::collections::HashMap;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Mutex;
 use std::time::Duration;
@@ -14,6 +15,7 @@ use serde::Serialize;
 
 use crate::hub::{self, Entry, Facts, Http, Query, Sort};
 use crate::quant::{self, Candidate, Pick};
+use crate::store;
 
 const LANES: usize = 6;
 const TIMEOUT: Duration = Duration::from_secs(20);
@@ -65,13 +67,31 @@ impl Trees {
             .insert(repo.to_string(), entries);
     }
 
-    /// One lookup per owner for the life of the session. Fifteen distinct owners appear in
-    /// a page of twenty-four, and the same handful publish most of what trends.
+    /// One lookup per owner, ever. Fifteen distinct owners appear in a page of twenty-four
+    /// and the same handful publish most of what trends, so this is nearly always a hit —
+    /// in memory within a session, and on disk across them.
+    ///
+    /// **A picture is worth keeping and never worth waiting for.** Anything that goes wrong
+    /// reading or writing the cache is ignored: the answer is still correct, it just costs
+    /// a request.
     pub fn avatar(&self, owner: &str) -> Option<String> {
         if let Some(known) = self.avatars.lock().expect("avatars lock").get(owner) {
             return known.clone();
         }
+        let path = cache_path(owner);
+        if let Some(stored) = path.as_deref().and_then(cached) {
+            let found = (!stored.is_empty()).then_some(stored);
+            self.avatars
+                .lock()
+                .expect("avatars lock")
+                .insert(owner.to_string(), found.clone());
+            return found;
+        }
+
         let found = hub::avatar(&Http::new(TIMEOUT), owner);
+        if let Some(path) = path {
+            store_cached(&path, found.as_deref().unwrap_or(""));
+        }
         self.avatars
             .lock()
             .expect("avatars lock")
@@ -220,6 +240,46 @@ pub fn detail(trees: &Trees, repo: &str, ceiling: Option<u64>) -> Result<Detail,
     })
 }
 
+/// How long a picture is kept before it is asked for again. Long, because an avatar
+/// changing is cosmetic and nobody can tell from the row that it has.
+const AVATAR_TTL: Duration = Duration::from_secs(30 * 24 * 60 * 60);
+
+/// Whether a cached picture of this age is still worth using. Its own function so the rule
+/// can be checked without waiting a month or reaching for a crate to forge a timestamp.
+fn fresh(age: Duration) -> bool {
+    age <= AVATAR_TTL
+}
+
+/// An owner's cached picture, `Some("")` for a remembered miss, `None` for absent or aged
+/// out. The caller cannot tell the last two apart and does not need to: both mean ask.
+fn cached(path: &Path) -> Option<String> {
+    let age = path.metadata().ok()?.modified().ok()?.elapsed().ok()?;
+    if !fresh(age) {
+        return None;
+    }
+    std::fs::read_to_string(path).ok()
+}
+
+fn store_cached(path: &Path, uri: &str) {
+    if let Some(parent) = path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    let _ = std::fs::write(path, uri);
+}
+
+/// Where an owner's picture is kept, or `None` if the name is not one file name.
+///
+/// **Checked on the name, never on the joined path.** `Path::starts_with` is lexical, so
+/// `avatars/..` starts with `avatars` and a containment test passes for a name that climbs
+/// straight out of the directory. This project has shipped that mistake once already, in
+/// `restore` rebuilding a destination from an untrusted file name.
+///
+/// `hub` refuses such an owner before the lookup too, but the write is what would act on
+/// it, so it is checked where it is used rather than trusted from two calls away.
+fn cache_path(owner: &str) -> Option<PathBuf> {
+    hub::valid_segment(owner).then(|| store::avatar_path(owner))
+}
+
 /// Every quantisation with its own verdict, largest first — which is how a repository's
 /// own file list reads and how a reader scans for the best they can take. The one the app
 /// would have taken on its own is marked rather than moved, so the ordering stays by size.
@@ -332,6 +392,41 @@ mod tests {
             architecture: Some("qwen3moe".into()),
             context_length: None,
             moe: true,
+        }
+    }
+
+    #[test]
+    fn a_cached_picture_round_trips_and_a_miss_is_kept_as_firmly_as_a_hit() {
+        let dir = std::env::temp_dir().join(format!("llamaport-avatar-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let hit = dir.join("unsloth");
+        let miss = dir.join("nobody");
+
+        assert_eq!(cached(&hit), None, "nothing is cached yet");
+        store_cached(&hit, "data:image/webp;base64,AAAA");
+        store_cached(&miss, "");
+
+        assert_eq!(cached(&hit).as_deref(), Some("data:image/webp;base64,AAAA"));
+        assert_eq!(
+            cached(&miss).as_deref(),
+            Some(""),
+            "a remembered miss must be distinguishable from never having asked"
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_picture_is_kept_for_a_month_and_no_longer() {
+        assert!(fresh(Duration::from_secs(0)));
+        assert!(fresh(AVATAR_TTL));
+        assert!(!fresh(AVATAR_TTL + Duration::from_secs(1)));
+    }
+
+    #[test]
+    fn an_owner_cannot_write_outside_the_directory_the_app_owns() {
+        assert!(cache_path("unsloth").is_some());
+        for hostile in ["..", "../../evil", "a/b"] {
+            assert!(cache_path(hostile).is_none(), "{hostile} was accepted");
         }
     }
 

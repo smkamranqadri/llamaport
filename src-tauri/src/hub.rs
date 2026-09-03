@@ -305,6 +305,23 @@ pub fn tree(transport: &dyn Transport, repo: &str) -> Result<Vec<Entry>, String>
     parse_tree(&transport.get(&tree_url(repo)?)?.body)
 }
 
+/// The owner out of a download URL, so a row that only knows where a file came from can
+/// still show a picture. Deliberately strict about the shape rather than taking the first
+/// path segment of anything: `downloads::file_name_for` decides what may be downloaded and
+/// this decides nothing, so it refuses whatever it does not recognise.
+pub fn owner_of(url: &str) -> Option<String> {
+    let rest = url.trim().strip_prefix("https://")?;
+    let (host, path) = rest.split_once('/')?;
+    if !crate::downloads::HOSTS.contains(&host.to_ascii_lowercase().as_str()) {
+        return None;
+    }
+    let (owner, tail) = path.split_once('/')?;
+    if !tail.contains("/resolve/") || !valid_segment(owner) {
+        return None;
+    }
+    Some(owner.to_string())
+}
+
 /// The owner's picture as a `data:` URI, or `None` where they have none.
 ///
 /// **Fetched here rather than by the window.** Every request this app makes goes through
@@ -421,7 +438,10 @@ fn valid_repo_id(repo: &str) -> bool {
     }
 }
 
-fn valid_segment(segment: &str) -> bool {
+/// One path or URL component, and nothing that could climb out of wherever it is put.
+/// Shared rather than restated: the avatar cache names a file after an owner, and a
+/// second rule for the same string is how the two drift apart.
+pub(crate) fn valid_segment(segment: &str) -> bool {
     !segment.is_empty()
         && segment != "."
         && segment != ".."
@@ -803,6 +823,30 @@ mod tests {
         assert_eq!(base64(b"fooba"), "Zm9vYmE=");
         assert_eq!(base64(b"foobar"), "Zm9vYmFy");
         assert_eq!(base64(&[0xff, 0xfe, 0xfd]), "//79");
+    }
+
+    #[test]
+    fn an_owner_is_read_off_a_download_url_or_not_at_all() {
+        assert_eq!(
+            owner_of("https://huggingface.co/unsloth/Qwen3.8-27B-GGUF/resolve/main/a.gguf")
+                .as_deref(),
+            Some("unsloth")
+        );
+        assert_eq!(
+            owner_of("https://hf.co/DavidAU/Model/resolve/main/BF16/a-00001-of-00002.gguf")
+                .as_deref(),
+            Some("DavidAU")
+        );
+        for other in [
+            "https://example.com/owner/repo/resolve/main/a.gguf",
+            "http://huggingface.co/owner/repo/resolve/main/a.gguf",
+            "https://huggingface.co/owner/repo/blob/main/a.gguf",
+            "https://huggingface.co/onlyone",
+            "https://huggingface.co/../evil/resolve/main/a.gguf",
+            "not a url",
+        ] {
+            assert_eq!(owner_of(other), None, "{other} yielded an owner");
+        }
     }
 
     #[test]

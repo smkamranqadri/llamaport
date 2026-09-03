@@ -38,6 +38,9 @@ export interface ModelEntry {
   metadata: GgufMetadata | null;
   error: string | null;
   favourite: boolean;
+  /// Who published it, where the app has a record of downloading it. Null for a file copied
+  /// into the models directory by hand, which no amount of looking at a .gguf can answer.
+  owner: string | null;
   /// Null until the model has been launched to Ready at least once.
   lastLaunchedSecs: number | null;
 }
@@ -200,6 +203,8 @@ export interface DownloadJob {
   finishedSecs: number | null;
   /// False only on a paused transfer whose bytes no longer back its sidecar.
   resumable: boolean;
+  /// Who published it, read off the URL in Rust. Null for a URL this app did not recognise.
+  owner: string | null;
 }
 
 export interface DownloadProgress {

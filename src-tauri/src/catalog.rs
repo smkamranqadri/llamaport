@@ -40,6 +40,11 @@ pub struct ModelEntry {
     /// Also set by `arrange`. `None` for a model that has never been launched, which is
     /// what sends the row back to `modified_secs` for something to show.
     pub last_launched_secs: Option<u64>,
+    /// Who published it on Hugging Face, where the app has a record of downloading it.
+    /// **`None` for a file copied into the models directory by hand**, which is a real and
+    /// permanent case: a `.gguf` on disk carries no publisher, so the row shows the generic
+    /// mark rather than inventing one from the file name.
+    pub owner: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -198,6 +203,9 @@ fn build_entry(
         error,
         favourite: false,
         last_launched_secs: None,
+        // Set by `arranged` in lib.rs, which is the only thing that can see the download
+        // history. A raw scan of the directory cannot know who published a file.
+        owner: None,
     }
 }
 
@@ -451,6 +459,7 @@ mod tests {
             error: None,
             favourite: false,
             last_launched_secs: None,
+            owner: None,
         }
     }
 

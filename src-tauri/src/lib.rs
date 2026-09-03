@@ -17,6 +17,7 @@ pub mod store;
 pub mod sysmem;
 pub mod tune;
 
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
@@ -300,8 +301,21 @@ async fn catalog_list(state: State<'_, AppState>) -> Result<Vec<ModelEntry>, Str
 /// stored order is what `model()` resolves against, and starring a model is not a reason
 /// to renumber it.
 fn arranged(state: &AppState, entries: Vec<ModelEntry>) -> Vec<ModelEntry> {
-    let config = state.config.lock().expect("config lock");
-    catalog::arrange(entries, &config.favourites, &config.last_launched)
+    let owners: HashMap<String, String> = state
+        .downloads
+        .snapshot()
+        .into_iter()
+        .filter_map(|job| Some((job.path, hub::owner_of(&job.url)?)))
+        .collect();
+
+    let mut entries = {
+        let config = state.config.lock().expect("config lock");
+        catalog::arrange(entries, &config.favourites, &config.last_launched)
+    };
+    for entry in &mut entries {
+        entry.owner = owners.get(&entry.path).cloned();
+    }
+    entries
 }
 
 #[tauri::command]
