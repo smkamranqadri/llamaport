@@ -259,3 +259,35 @@ One thing fixed that nobody reported: a quantisation label falls back to the
 file's own stem when a repository names none, and
 `Qwen3.8-Flash-Next-ROCmFP4-FAST-v2-ple16` is a real one. Uncapped, a single
 row's badge pushed the size and the button out of line with every other row.
+
+
+## The second look, 2026-09-03
+
+Six things, and a seventh the look turned up sideways. All built (`ca5d7af`).
+
+**The freeze was Tauri doing what it documents.** A synchronous command runs on
+the main thread, so a browse spending two and a half seconds on the network held
+that thread for all of it and the window could not paint the loading state React
+had already been told to show. The rule is in
+[knowledge/technical.md](../knowledge/technical.md); the commands are `async`.
+
+**The confirmation was the worst of the interaction defects.** It named a
+quantisation and no model, as unbacked text, on a screen the reader had just been
+thrown back to — which reads as something having gone wrong. Downloading from the
+detail page now stays there, marks the row, and offers View progress. The sidebar
+carries what is still owed, which the artboard drew and the first build left out.
+
+**The sideways one is the interesting one.** `real_models.rs` went red on
+`parakeet-tdt-0.6b-v3` — a speech-recognition GGUF, a valid file, not a language
+model, sitting in the models directory because Discover had offered it and the
+author had downloaded it. **One GGUF repository in six is something
+`llama-server` cannot serve.**
+
+`hub::serves_text` is a denylist, and the direction is the point: 48 of 300
+sampled repositories carry no pipeline tag at all, so an allowlist would hide
+some of the best models on the site. An unknown tag is kept; a known-not-text tag
+is refused. The counts are in Knowledge.
+
+`real_models.rs` stops asserting that a speech model is a language model, says
+which files it set aside, and refuses to pass on a directory holding none — so
+it cannot go quiet by having nothing left to check.

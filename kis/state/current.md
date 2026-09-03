@@ -23,11 +23,17 @@ Task:     **Discover is built**, in two commits on 2026-09-03 (`7c9369f`,
           corrected four facts and supplied the fit badge this project then
           refused.
 
-          **The author looked, and found five things — three defects and two
-          asks — all of which are built** (`d9ed796`). The worst was a row
-          reading "25.1 GB of 25.0 GB" *while claiming to fit*: a decimal-GB size
-          beside a binary-GiB ceiling, both labelled GB. Discover now has a
-          detail page and real quantisation choice.
+          **The author has looked twice and found eleven things; all are
+          built** (`d9ed796`, `ca5d7af`). The worst of the first round was a row
+          reading "25.1 GB of 25.0 GB" *while claiming to fit*. The worst of the
+          second was not reported at all: the app **froze** on opening Discover,
+          because a synchronous Tauri command holds the main thread.
+
+          **And Discover was offering models `llama-server` cannot run** — one
+          GGUF repository in six. Found because the author downloaded a
+          speech-recognition model and `real_models.rs` went red on it, which is
+          the only time this project's suite has caught anything a look found
+          first.
 
           **The app is the author's: never launch, capture or drive it** —
           everything here was rendered in headless Chrome, which goes before the
@@ -45,10 +51,14 @@ Blocker:  none.
           own task; and **the checks nobody has run**, in
           [intent/release.md](../intent/release.md).
 
-Next:     **A second look at Discover**, at the detail page and the quantisation
-          list, neither of which anyone has seen running. The 1,024 MiB margin is
-          no longer visible anywhere now the ceiling has left the row, which is
-          simpler and still unremarked on.
+Next:     **A third look at Discover.** Two rounds have each found five or six
+          things and the rate is not obviously falling. Unseen so far: the
+          loading state, the download confirmation, the sidebar count, and
+          whether the non-text filter leaves the lists looking right.
+
+          **`parakeet-tdt-0.6b-v3.q8_0.gguf` is still in the models directory**
+          and Llamaport cannot run it. Nothing deletes it — that is the author's
+          disk — but the Library still lists it as a model.
 
           Then the **README's screenshots**, which have now waited behind two
           phases and are owed for all three images — every one predates the
@@ -78,11 +88,11 @@ What the app is for: [intent/direction.md](../intent/direction.md).
 ## Proof
 
 The four commands green, each status captured on its own line and never after a
-pipe. **297 tests**, from 261 before Discover.
+pipe. **298 tests**, from 261 before Discover.
 
 Two suites need something this machine has and CI would not: `real_launch` and
 `real_tune` need the binary and a real model, and **`real_hub` needs the
-network** — nine tests holding the assumptions the Hugging Face parsers rest
+network** — ten tests holding the assumptions the Hugging Face parsers rest
 on, so a change at the API's end fails here rather than on screen.
 
 **`tests/stylesheet.rs` is the only test this project has of the frontend.**

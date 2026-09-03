@@ -260,6 +260,14 @@ shipped hub, which calls it from their frontend.
   Embeddings, Image generation — and offers neither Coding nor Chat.
 - **No rate-limit headers come back unauthenticated.** The budget is unadvertised,
   not absent.
+- **One GGUF repository in six is not a language model.** Over 300 sampled 2026-09-03
+  across all three sorts: 104 `image-text-to-text`, 97 `text-generation`, **48 with no
+  `pipeline_tag` at all** — `unsloth/Qwen3.8-27B-GGUF` among them — and 51 that
+  `llama-server` cannot serve, led by `automatic-speech-recognition` at 13.
+  **So the filter has to be a denylist.** Keeping only the known-good tags would hide the
+  48 untagged, which include some of the best models on the site; refusing the known-bad
+  tags costs only a media model that slips through under a tag nobody has seen yet.
+  `image-text-to-text` is kept — those are vision language models and the server runs them.
 - **The listing paginates by opaque cursor, in a `Link: <…>; rel="next"` header**, not by
   offset. The cursor already encodes the sort, the filter, the expands and the search it
   was issued for, so it is followed verbatim; rebuilding any of it is how page two comes
@@ -371,6 +379,13 @@ shipped hub, which calls it from their frontend.
   faithfully would have shipped a false sentence in the app's voice. Every claim
   a mockup makes about behaviour is checked against the code or the phase file
   that proved it, and corrected in place when it is wrong.
+
+- **A synchronous Tauri command runs on the main thread, and the window cannot paint
+  while it does.** `discover_browse` spends two and a half seconds on the network and held
+  that thread for all of it, so the loading state React had already been told to render
+  never appeared and the app read as frozen. `async fn` moves a command to the async
+  runtime. Anything here that touches the network is `async` for this reason and not for
+  tidiness.
 
 - **A `var(--x)` with nothing behind it is invisible, and this project writes one about
   once a quarter.** The redesign shipped three greys painted with `--muted` and a highlight
