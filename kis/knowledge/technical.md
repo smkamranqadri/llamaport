@@ -217,6 +217,56 @@ default. Sibling `.bak`, `.save` and `.backup` files already accumulate beside i
   override** that `store::use_config_dir` gives Application Support, and a test
   that cannot run without it. The file at risk here belongs to another tool.
 
+## The Hugging Face API
+
+Measured against the live API on 2026-09-03 while planning
+[intent/discover.md](../intent/discover.md), and cross-read against Unsloth's
+shipped hub, which calls it from their frontend.
+
+- **The sorts that exist** are `downloads` (30-day), `likes`, `trendingScore`,
+  `lastModified` and `createdAt`. `downloadsAllTime` is **rejected as a sort**
+  and accepted as an `expand`. `lastModified` and `createdAt` work and return
+  sludge — the top three of each were repos with zero downloads — so neither is
+  usable without a popularity floor. `trendingScore` is **descending only**:
+  `direction=1` is refused with "only descending sort is supported".
+- **`expand=gguf` on the listing call** returns `total` (parameter count),
+  `architecture` and `context_length` per repo, so a browse row can carry a
+  parameter count and the trained context with no per-repo call. It also drags in
+  the whole `chat_template`, which is kilobytes a row. **It is read off one file
+  in the repo and is wrong when that file is a sidecar**:
+  `HauhauCS/…-27B-…-MTP-GGUF` reports 1.86B parameters for a 27B model because
+  the repo's first GGUF is the MTP drafter.
+- **`full=true` carries `siblings` — filenames with no sizes.** Sizes come only
+  from `/api/models/{repo}/tree/main?recursive=true`, so a size on screen costs a
+  call per repo. `recursive=true` is required: quants live in subdirectories
+  (`BF16/`, `MTP/`) as often as at the root.
+- **A tree holds traps beside the quants.** `MTP/mtp-*.gguf` drafters, `mmproj-*`
+  projectors, and `BF16/…-00001-of-00002.gguf` shard halves sit in the same
+  listing as real quants. A rule that takes the largest file that fits picks a
+  drafter or one shard of a set. `lfs` on an entry is what says the size headers
+  will exist ([intent/downloader.md](../intent/downloader.md)).
+- **`gated` is `false`, `"auto"` or `"manual"`**, and only `full=true` returns
+  it. Four of the top 50 trending GGUF repos are gated. **The tree call returns
+  200 for a gated repo and `resolve` returns 401**, so a screen that does not
+  read the flag will show a size, pass a fit filter, offer a download and fail.
+- **Tags do not carry task domain on GGUF repos.** Over the top 50 trending, the
+  `code` tag appears **0 times** and `conversational` appears **46**. So a Coding
+  filter has no backing at all and a Chat filter removes four rows in fifty.
+  Unsloth files models by modality instead — Reasoning, Vision, Audio,
+  Embeddings, Image generation — and offers neither Coding nor Chat.
+- **No rate-limit headers come back unauthenticated.** The budget is unadvertised,
+  not absent.
+- **A fit badge computed from file size over-claims, and there are numbers on
+  it.** Unsloth's `classifyGgufFit` scores `size × 1.15 + 1 GB` against 97% of the
+  card in five classes — `fits | marginal | partial | ram | oom`. Their own
+  comments record that badge and memory bar **on the same row** disagreed on
+  **11 of 19 sizes**, that sharing one constant took it to **8 of 19**, and that
+  the residual eight are the estimator itself. Their context term is a flat 1 GB
+  "at a typical 4K window", where this app runs 65,536 with an f16 cache. This is
+  the same finding as "fit does not mean it works", arrived at from outside, and
+  it is why nothing in this app prints "fits" beside a file size it has not
+  opened.
+
 ## Constraints
 
 - **Installed memory is the wrong ceiling, and "fits" is not "works".** On this

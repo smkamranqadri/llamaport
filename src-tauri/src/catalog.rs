@@ -71,7 +71,7 @@ fn identity(path: &Path, size_bytes: u64) -> Option<String> {
     Some(format!("{size_bytes:x}-{hex}"))
 }
 
-fn is_quant_token(token: &str) -> bool {
+pub(crate) fn is_quant_token(token: &str) -> bool {
     if matches!(token, "F16" | "BF16" | "F32" | "F64") {
         return true;
     }
@@ -83,7 +83,7 @@ fn is_quant_token(token: &str) -> bool {
         .is_some_and(|c| c.is_ascii_digit())
 }
 
-fn quant_from_name(name: &str) -> Option<String> {
+pub(crate) fn quant_from_name(name: &str) -> Option<String> {
     let tokens: Vec<&str> = name.split(['-', '.']).collect();
     for (i, token) in tokens.iter().enumerate() {
         let upper = token.to_ascii_uppercase();
@@ -99,7 +99,7 @@ fn quant_from_name(name: &str) -> Option<String> {
 }
 
 /// Splits `name-00001-of-00003` into its base name, index, and total.
-fn parse_shard(stem: &str) -> Option<(&str, u32, u32)> {
+pub(crate) fn parse_shard(stem: &str) -> Option<(&str, u32, u32)> {
     if stem.len() <= SHARD_SUFFIX_LEN {
         return None;
     }
