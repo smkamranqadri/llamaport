@@ -107,7 +107,14 @@ pub fn browse(
             cursor,
         },
     )?;
-    let repos = page.repos;
+    // An ASR model, an embedding model and an image generator are all GGUF files this app
+    // can download and `llama-server` cannot serve. One of them was downloaded before this
+    // existed and it had no context length.
+    let repos: Vec<hub::Repo> = page
+        .repos
+        .into_iter()
+        .filter(|repo| hub::serves_text(repo.pipeline_tag.as_deref()))
+        .collect();
 
     // A gated repository is skipped rather than fetched. Its tree answers 200 and its
     // files answer 401, so a size read here would sit above a Download that cannot work.
@@ -283,6 +290,7 @@ mod tests {
             likes: 2,
             last_modified: None,
             gated,
+            pipeline_tag: None,
         }
     }
 

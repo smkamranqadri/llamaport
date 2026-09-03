@@ -25,9 +25,36 @@ fn scan_local() -> Option<Vec<ModelEntry>> {
     Some(entries)
 }
 
+/// A GGUF with no context length is not a language model. `parakeet-tdt-0.6b-v3` is a real
+/// one — speech recognition, 714 MB, downloaded through Discover on 2026-09-03 before
+/// Discover learned to leave those alone. The file is a valid GGUF and llama-server cannot
+/// serve it, so asserting it parses as a language model asserts something false.
+fn is_language_model(entry: &ModelEntry) -> bool {
+    entry
+        .metadata
+        .as_ref()
+        .is_some_and(|md| md.context_length.is_some())
+}
+
 #[test]
 fn every_local_model_parses() {
-    let Some(entries) = scan_local() else { return };
+    let Some(all) = scan_local() else { return };
+
+    let (entries, other): (Vec<ModelEntry>, Vec<ModelEntry>) =
+        all.into_iter().partition(is_language_model);
+    for skipped in &other {
+        eprintln!(
+            "not a language model, so not asserted against: {}",
+            skipped.file_name
+        );
+    }
+    // Otherwise a directory of nothing but speech models would pass this by proving
+    // nothing at all.
+    assert!(
+        !entries.is_empty(),
+        "the models directory holds {} GGUF files and not one of them is a language model",
+        other.len()
+    );
 
     for entry in &entries {
         assert!(

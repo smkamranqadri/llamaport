@@ -14,7 +14,13 @@ const HOST: &str = "https://huggingface.co";
 /// Never `full=true`, and never `expand=gguf`. Measured 2026-09-03 over 24 rows: this set
 /// costs 4,582 bytes, `full=true` costs 78,022, and adding `expand=gguf` costs 271,439 —
 /// fifty-nine times, almost all of it `chat_template`, which nothing here reads.
-const EXPAND: [&str; 4] = ["downloads", "likes", "lastModified", "gated"];
+const EXPAND: [&str; 5] = [
+    "downloads",
+    "likes",
+    "lastModified",
+    "gated",
+    "pipeline_tag",
+];
 
 /// Only descending is ever asked for, which is as well: the API refuses `direction=1` on
 /// `trendingScore` outright.
@@ -121,6 +127,38 @@ pub struct Repo {
     /// True for `"auto"` and `"manual"` alike. The distinction is about how access is
     /// granted, and this app has no token either way.
     pub gated: bool,
+    pub pipeline_tag: Option<String>,
+}
+
+/// Whether `llama-server` could serve this at all.
+///
+/// **A denylist, and the direction matters.** Over 300 GGUF repositories sampled 2026-09-03
+/// across all three sorts, 48 carry *no* pipeline tag at all — `unsloth/Qwen3.8-27B-GGUF`
+/// among them — so keeping only the known-good tags would hide some of the best models on
+/// the site. What is listed below is what is definitely not a language model: 51 of those
+/// 300, one in six, and Discover offered every one of them until an ASR model was
+/// downloaded and turned out to have no context length.
+///
+/// `image-text-to-text` stays: those are vision language models and the server runs them.
+pub fn serves_text(pipeline_tag: Option<&str>) -> bool {
+    !matches!(
+        pipeline_tag,
+        Some(
+            "automatic-speech-recognition"
+                | "audio-classification"
+                | "feature-extraction"
+                | "sentence-similarity"
+                | "token-classification"
+                | "reinforcement-learning"
+                | "text-to-image"
+                | "text-to-speech"
+                | "text-to-video"
+                | "image-to-image"
+                | "image-to-video"
+                | "image-text-to-video"
+                | "any-to-any"
+        )
+    )
 }
 
 /// What the detail page states, and nothing it cannot back. Every field is optional
@@ -302,6 +340,8 @@ struct RawRepo {
     last_modified: Option<String>,
     #[serde(default)]
     gated: Option<RawGated>,
+    #[serde(default)]
+    pipeline_tag: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -333,6 +373,7 @@ pub fn parse_listing(body: &str) -> Result<Vec<Repo>, String> {
             likes: repo.likes,
             last_modified: repo.last_modified,
             gated: repo.gated.is_some_and(|gated| gated.is_gated()),
+            pipeline_tag: repo.pipeline_tag,
         })
         .collect())
 }
@@ -562,6 +603,21 @@ mod tests {
             repos.iter().map(|r| r.gated).collect::<Vec<_>>(),
             [false, true, true, false]
         );
+    }
+
+    #[test]
+    fn what_llama_server_cannot_serve_is_named_rather_than_guessed() {
+        // The direction is the point: an unknown or missing tag is kept, because 48 of 300
+        // sampled repositories carry none and some of those are the best models listed.
+        assert!(serves_text(None));
+        assert!(serves_text(Some("text-generation")));
+        assert!(serves_text(Some("image-text-to-text")));
+        assert!(serves_text(Some("something-invented-next-year")));
+
+        assert!(!serves_text(Some("automatic-speech-recognition")));
+        assert!(!serves_text(Some("feature-extraction")));
+        assert!(!serves_text(Some("text-to-image")));
+        assert!(!serves_text(Some("any-to-any")));
     }
 
     #[test]

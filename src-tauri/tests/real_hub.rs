@@ -269,3 +269,44 @@ fn the_facts_call_carries_what_the_detail_page_states() {
     assert!(facts.context_length.is_some(), "no trained context");
     assert!(facts.license.is_some(), "no licence");
 }
+
+#[test]
+#[ignore = "reads the live Hugging Face index"]
+fn the_index_really_does_serve_models_llama_server_cannot_run() {
+    // The reason Discover filters at all. If this ever comes back empty, either Hugging
+    // Face stopped tagging these or the denylist has drifted from what it names.
+    let repos = hub::list(
+        &http(),
+        &Query {
+            limit: 100,
+            ..query(Sort::Downloads)
+        },
+    )
+    .expect("a listing")
+    .repos;
+
+    let refused: Vec<&str> = repos
+        .iter()
+        .filter(|repo| !hub::serves_text(repo.pipeline_tag.as_deref()))
+        .map(|repo| repo.id.as_str())
+        .collect();
+    assert!(
+        !refused.is_empty(),
+        "100 of the most downloaded GGUF repositories and not one is a non-text model"
+    );
+
+    // And the direction: a repository with no tag is kept, because many of the best carry
+    // none. Nothing here may depend on the tag being present.
+    let untagged = repos
+        .iter()
+        .filter(|repo| repo.pipeline_tag.is_none())
+        .count();
+    assert!(
+        untagged > 0,
+        "no untagged repository in 100, so the keep-what-is-unknown rule is untested here"
+    );
+    println!(
+        "refused {} of 100, {untagged} carry no tag at all",
+        refused.len()
+    );
+}

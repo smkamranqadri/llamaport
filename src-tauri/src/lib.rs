@@ -840,8 +840,13 @@ fn download_start(url: String, state: State<'_, AppState>) -> Result<Vec<Downloa
 
 /// One listing call and a file tree for each row that needs one. Slow by the standards of
 /// this app's other commands — a couple of seconds — because the sizes exist nowhere else.
+///
+/// **`async` is load-bearing and not decoration.** Tauri runs a synchronous command on the
+/// main thread, so this one held it for the whole round trip and the window could not paint
+/// the loading state it had already been told to show. Every command that touches the
+/// network belongs off that thread.
 #[tauri::command]
-fn discover_browse(
+async fn discover_browse(
     sort: hub::Sort,
     search: Option<String>,
     cursor: Option<String>,
@@ -851,9 +856,13 @@ fn discover_browse(
 }
 
 /// One repository: the facts it states, and every quantisation with its own verdict. The
-/// tree is nearly always the one the browsed row already fetched.
+/// tree is nearly always the one the browsed row already fetched, but the facts call is
+/// always made, so this goes off the main thread for the same reason as the browse.
 #[tauri::command]
-fn discover_repo(repo: String, state: State<'_, AppState>) -> Result<discover::Detail, String> {
+async fn discover_repo(
+    repo: String,
+    state: State<'_, AppState>,
+) -> Result<discover::Detail, String> {
     discover::detail(&state.trees, &repo, state.device_budget())
 }
 

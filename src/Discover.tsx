@@ -88,7 +88,11 @@ function Sizing({ row }: { row: DiscoverRow }) {
   );
 }
 
-export default function Discover() {
+export default function Discover({
+  onShowDownloads,
+}: {
+  onShowDownloads: () => void;
+}) {
   const [list, setList] = useState<ListId>("fits");
   const [rows, setRows] = useState<DiscoverRow[]>([]);
   const [next, setNext] = useState<string | null>(null);
@@ -160,8 +164,9 @@ export default function Discover() {
   const get = (row: DiscoverRow) => {
     if (!row.pick) return;
     setFailure(null);
+    const label = row.pick.candidate.label;
     discoverDownload(row.id, row.pick.candidate.paths)
-      .then(() => setGot(`${row.name} — ${row.pick?.candidate.label} added to Downloads`))
+      .then(() => setGot(`${row.name} · ${label}`))
       .catch((e) => setFailure(String(e)));
   };
 
@@ -182,10 +187,7 @@ export default function Discover() {
       <DiscoverDetail
         repo={opened}
         onBack={() => setOpened(null)}
-        onQueued={(message) => {
-          setGot(message);
-          setOpened(null);
-        }}
+        onShowDownloads={onShowDownloads}
       />
     );
   }
@@ -222,13 +224,34 @@ export default function Discover() {
       </div>
 
       {failure && <p className="notice notice-error">{failure}</p>}
-      {got && <p className="notice">{got}</p>}
+      {got && (
+        <div className="notice notice-done">
+          <span>
+            <strong>{got}</strong> is downloading
+          </span>
+          <button className="button button-plain" onClick={onShowDownloads}>
+            View progress
+          </button>
+          <button className="button button-plain" onClick={() => setGot(null)}>
+            Dismiss
+          </button>
+        </div>
+      )}
 
       <h2 className="group-label">
         {searched ? `Matching “${searched}”` : chosen.heading}
       </h2>
 
-      {busy && <p className="field-hint">Reading Hugging Face…</p>}
+      {busy && (
+        <div className="discover-list">
+          {[0, 1, 2, 3, 4].map((slot) => (
+            <div className="discover-row is-waiting" key={slot}>
+              <span className="skeleton skeleton-name" />
+              <span className="skeleton skeleton-size" />
+            </div>
+          ))}
+        </div>
+      )}
 
       {!busy && shown.length === 0 && (
         <div className="empty">

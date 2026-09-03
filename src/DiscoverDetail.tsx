@@ -29,25 +29,30 @@ function Fit({ fits }: { fits: boolean | null }) {
 export default function DiscoverDetail({
   repo,
   onBack,
-  onQueued,
+  onShowDownloads,
 }: {
   repo: string;
   onBack: () => void;
-  onQueued: (message: string) => void;
+  onShowDownloads: () => void;
 }) {
   const [detail, setDetail] = useState<Detail | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
+  const [sent, setSent] = useState<string[]>([]);
 
   useEffect(() => {
     setDetail(null);
     setFailure(null);
+    setSent([]);
     discoverRepo(repo).then(setDetail).catch((e) => setFailure(String(e)));
   }, [repo]);
 
+  /// Stays on the page. Sending a download used to throw the reader back to the list with
+  /// a line of text naming a quantisation and no model, which read as though something had
+  /// gone wrong rather than right.
   const get = (offer: QuantOffer) => {
     setFailure(null);
     discoverDownload(repo, offer.candidate.paths)
-      .then(() => onQueued(`${offer.candidate.label} added to Downloads`))
+      .then(() => setSent((prev) => [...prev, offer.candidate.label]))
       .catch((e) => setFailure(String(e)));
   };
 
@@ -73,14 +78,39 @@ export default function DiscoverDetail({
           </button>
           <div>
             <h1>{detail?.name ?? repo}</h1>
-            <p className="screen-subtitle">by {detail?.owner ?? "…"}</p>
+            {/* The full repository id, because a name alone does not say which of the
+                several repositories publishing this model you are looking at. */}
+            <p className="screen-subtitle">{detail?.facts.id ?? repo}</p>
           </div>
         </div>
       </header>
 
       {failure && <p className="notice notice-error">{failure}</p>}
 
-      {!detail && !failure && <p className="field-hint">Reading Hugging Face…</p>}
+      {sent.length > 0 && (
+        <div className="notice notice-done">
+          <span>
+            <strong>
+              {sent.length === 1 ? sent[0] : `${sent.length} quantisations`}
+            </strong>{" "}
+            {sent.length === 1 ? "is" : "are"} downloading
+          </span>
+          <button className="button button-plain" onClick={onShowDownloads}>
+            View progress
+          </button>
+        </div>
+      )}
+
+      {!detail && !failure && (
+        <div className="quant-list">
+          {[0, 1, 2, 3, 4, 5].map((slot) => (
+            <div className="quant-row is-waiting" key={slot}>
+              <span className="skeleton skeleton-name" />
+              <span className="skeleton skeleton-size" />
+            </div>
+          ))}
+        </div>
+      )}
 
       {detail && (
         <>
@@ -117,9 +147,15 @@ export default function DiscoverDetail({
                     <span className="quant-size">
                       {formatFileSize(offer.candidate.size)}
                     </span>
-                    <button className="button" onClick={() => get(offer)}>
+                    <button
+                      className="button"
+                      disabled={sent.includes(offer.candidate.label)}
+                      onClick={() => get(offer)}
+                    >
                       <DownloadIcon />
-                      Download
+                      {sent.includes(offer.candidate.label)
+                        ? "Downloading"
+                        : "Download"}
                     </button>
                   </div>
                 ))}

@@ -2410,6 +2410,74 @@ input[type="range"] {
   background: var(--badge-bg);
 }
 
+/* What the sidebar owes, beside the entry that owes it. The artboard drew this and the
+   first build left it out, so a queued transfer was invisible from anywhere but Downloads. */
+.side-count {
+  flex-shrink: 0;
+  min-width: 18px;
+  margin-left: auto;
+  padding: 1px 5px;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  color: var(--text-muted);
+  background: var(--badge-bg);
+  border-radius: 9px;
+}
+
+/* Its own class rather than `.notice`, which several screens use bare and one of them
+   deliberately. A confirmation has to look like a surface and carry its way onward: the
+   first version was an unbacked line of text that read as an error. */
+.notice-done {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+  background: var(--bg-card2);
+  border: 1px solid var(--border);
+}
+
+.notice-done .button {
+  margin-left: auto;
+}
+
+.notice-done .button + .button {
+  margin-left: 0;
+}
+
+/* A row that is waiting for the network. It keeps the height of the row it will become, so
+   the list does not jump when the figures arrive. */
+.discover-row.is-waiting,
+.quant-row.is-waiting {
+  pointer-events: none;
+}
+
+.skeleton {
+  height: 11px;
+  background: var(--badge-bg);
+  border-radius: 4px;
+  animation: skeleton-pulse 1.4s ease-in-out infinite;
+}
+
+.skeleton-name {
+  width: 40%;
+}
+
+.skeleton-size {
+  width: 90px;
+  margin-left: auto;
+}
+
+@keyframes skeleton-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
 /* Its own class rather than Downloads' `.load-more`: this one is centred, and redefining
    that would have moved a button on a screen this change is not about. */
 .discover-more {

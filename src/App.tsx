@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   appVersion,
+  downloadStatus,
   getSettings,
   listModels,
+  onDownloadState,
   onCatalogChanged,
   onRunnerLog,
   onRunnerState,
@@ -28,7 +30,7 @@ import Library from "./Library";
 import ModelDetail from "./ModelDetail";
 import SettingsScreen from "./SettingsScreen";
 import { apply as applyAppearance, watchSystem } from "./theme";
-import type { ModelEntry, Orphan, RunnerSnapshot, Telemetry } from "./types";
+import type { DownloadJob, ModelEntry, Orphan, RunnerSnapshot, Telemetry } from "./types";
 import "./App.css";
 
 type Screen = "library" | "discover" | "downloads" | "activity" | "settings";
@@ -131,6 +133,7 @@ export default function App() {
   const [ignoredOrphans, setIgnoredOrphans] = useState<number[]>([]);
   const [catalogVersion, setCatalogVersion] = useState(0);
   const [version, setVersion] = useState("");
+  const [downloads, setDownloads] = useState<DownloadJob[]>([]);
 
   // The config is the truth and the webview's copy is a cache of it, so the two are
   // reconciled once at boot — and while the mode is System, macOS gets the last word.
@@ -147,6 +150,7 @@ export default function App() {
 
   useEffect(() => {
     appVersion().then(setVersion).catch(() => {});
+    downloadStatus().then(setDownloads).catch(() => {});
     runnerStatus().then(setRunner).catch(() => {});
     runnerLogs().then(setLogs).catch(() => {});
     const scan = () => orphanStatus().then(setOrphans).catch(() => {});
@@ -164,6 +168,7 @@ export default function App() {
       onRunnerLog((line) => setLogs((prev) => [...prev.slice(-1999), line])),
       onTelemetry(setTelemetry),
       onCatalogChanged(() => setCatalogVersion((v) => v + 1)),
+      onDownloadState(setDownloads),
     ];
 
     return () => {
@@ -192,6 +197,11 @@ export default function App() {
   };
 
   const running = runner.state === "starting" || runner.state === "ready";
+  // What is still owed rather than what has ever been queued: a finished transfer is
+  // history, and a count that includes it never returns to nothing.
+  const owed = downloads.filter((job) =>
+    ["active", "queued", "paused"].includes(job.state),
+  ).length;
   const visibleOrphans = orphans.filter(
     (orphan) => !ignoredOrphans.includes(orphan.pid),
   );
@@ -209,7 +219,7 @@ export default function App() {
       );
     }
     if (screen === "discover") {
-      return <Discover />;
+      return <Discover onShowDownloads={() => go("downloads")} />;
     }
     if (screen === "downloads") {
       return <Downloads onShowInLibrary={showInLibrary} />;
@@ -257,6 +267,7 @@ export default function App() {
           label="Downloads"
           icon={<DownloadIcon />}
           active={screen === "downloads"}
+          extra={owed > 0 ? <span className="side-count">{owed}</span> : undefined}
           onClick={() => go("downloads")}
         />
         <div className="side-section">General</div>
