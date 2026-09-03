@@ -262,6 +262,8 @@ export interface DownloadOptions {
 export interface Appearance {
   theme: string;
   mode: string;
+  /// Whether the sidebar lets the desktop through.
+  translucent: boolean;
 }
 
 export interface Settings {

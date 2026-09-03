@@ -59,7 +59,11 @@ export const MODES: { id: Mode; label: string }[] = [
   { id: "dark", label: "Dark" },
 ];
 
-export const DEFAULT_APPEARANCE: Appearance = { theme: "llamaport", mode: "system" };
+export const DEFAULT_APPEARANCE: Appearance = {
+  theme: "llamaport",
+  mode: "system",
+  translucent: false,
+};
 
 /// A name this build does not know falls back rather than blanking the window — the
 /// config it came from is untrusted input, and a later build may have written it.
@@ -118,7 +122,10 @@ export function apply(appearance: Appearance | null) {
   const root = document.documentElement;
   root.setAttribute("data-theme", theme.id);
   root.setAttribute("data-mode", resolve(theme, mode));
-  cache({ theme: theme.id, mode });
+  // An attribute rather than a class, like the other two, so one stylesheet decides what
+  // translucency means per palette instead of the components knowing.
+  root.toggleAttribute("data-translucent", appearance?.translucent === true);
+  cache({ theme: theme.id, mode, translucent: appearance?.translucent === true });
 }
 
 /// Applied before the first render, from the cache, so the window never opens in the

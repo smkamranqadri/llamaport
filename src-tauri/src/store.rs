@@ -25,6 +25,11 @@ pub const CURRENT_SCHEMA: u32 = 8;
 pub struct Appearance {
     pub theme: String,
     pub mode: String,
+    /// Whether the sidebar lets the desktop through. Stored rather than derived because
+    /// the window is transparent either way — `transparent` is set at creation and cannot
+    /// be changed after — so this is the only thing that decides whether anything shows.
+    #[serde(default)]
+    pub translucent: bool,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -687,12 +692,28 @@ mod tests {
     }
 
     #[test]
+    fn a_config_from_before_the_sidebar_could_be_translucent_loads_opaque() {
+        // The field is `#[serde(default)]`, so every config already on disk arrives with
+        // the effect off. Nobody's window changes because they updated.
+        let path = scratch("appearance-old");
+        fs::write(
+            &path,
+            r#"{"schemaVersion":8,"appearance":{"theme":"nous","mode":"dark"}}"#,
+        )
+        .expect("write");
+        let loaded = load_from(&path).appearance.expect("remembered");
+        assert_eq!(loaded.theme, "nous");
+        assert!(!loaded.translucent);
+    }
+
+    #[test]
     fn an_appearance_survives_a_round_trip_and_an_unknown_name_is_kept() {
         let path = scratch("appearance");
         let config = Config {
             appearance: Some(Appearance {
                 theme: "nous".into(),
                 mode: "dark".into(),
+                translucent: true,
             }),
             ..Default::default()
         };
@@ -701,6 +722,7 @@ mod tests {
         let loaded = load_from(&path).appearance.expect("remembered");
         assert_eq!(loaded.theme, "nous");
         assert_eq!(loaded.mode, "dark");
+        assert!(loaded.translucent);
 
         // A palette a newer build named. Keeping it is the whole reason these are strings
         // rather than enums: an unreadable name must cost the screen its highlight, not

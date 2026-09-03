@@ -141,6 +141,32 @@ body,
   height: 100%;
 }
 
+/* Vibrancy.
+   The window is transparent at every launch — `transparent` is set at creation and cannot
+   be changed after — so this attribute is the only thing that decides whether any of it
+   shows. Without it the app paints exactly as it always did.
+
+   macOS draws the blur behind the webview through an NSVisualEffectView, so nothing here
+   is a `backdrop-filter`; the job is only to stop painting over it. */
+:root[data-translucent] {
+  background: transparent;
+}
+
+/* The ground was painted on the root, so the moment that goes transparent the whole
+   window does. The content pane takes it over rather than the sidebar's neighbour being
+   see-through too. */
+:root[data-translucent] .content {
+  background: var(--bg);
+}
+
+/* Tinted rather than clear, so a palette still owns the sidebar. Four of the five are
+   ported and their colour is most of what distinguishes them; at full transparency the
+   sidebar would be the desktop on all five and Appearance's swatches would describe
+   something the window no longer shows. */
+:root[data-translucent] .sidebar {
+  background: color-mix(in srgb, var(--bg-sidebar) 72%, transparent);
+}
+
 /* Sidebar */
 
 .sidebar {
@@ -2476,6 +2502,25 @@ input[type="range"] {
   50% {
     opacity: 0.45;
   }
+}
+
+.toggle-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin: 2px 0 16px;
+  cursor: pointer;
+}
+
+.toggle-row input {
+  width: auto;
+  margin-top: 1px;
+  accent-color: var(--accent);
+}
+
+.toggle-row .field-hint {
+  display: block;
+  margin-top: 2px;
 }
 
 /* Its own class rather than Downloads' `.load-more`: this one is centred, and redefining

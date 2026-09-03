@@ -105,8 +105,18 @@ export default function SettingsScreen({
 
   // Applied from what Rust wrote back rather than from what was clicked: the screen then
   // shows the palette that is actually stored, even if the write failed.
-  const saveAppearance = (nextTheme: string, nextMode: Mode) => {
-    setAppearance({ theme: nextTheme, mode: nextMode })
+  const translucent = settings.appearance?.translucent === true;
+
+  const saveAppearance = (
+    nextTheme: string,
+    nextMode: Mode,
+    nextTranslucent: boolean = translucent,
+  ) => {
+    setAppearance({
+      theme: nextTheme,
+      mode: nextMode,
+      translucent: nextTranslucent,
+    })
       .then((next) => {
         setSettings(next);
         applyAppearance(next.appearance);
@@ -226,6 +236,23 @@ export default function SettingsScreen({
             </span>
           )}
         </div>
+
+        <label className="toggle-row">
+          <input
+            type="checkbox"
+            checked={translucent}
+            onChange={(e) =>
+              saveAppearance(theme.id, mode, e.currentTarget.checked)
+            }
+          />
+          <span>
+            Let the desktop through the sidebar
+            <span className="field-hint">
+              The palette still tints it. macOS only, and it costs a little
+              memory to blur what is behind the window.
+            </span>
+          </span>
+        </label>
 
         <div className="themes">
           {THEMES.map((option) => (
