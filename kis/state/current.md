@@ -7,26 +7,19 @@ Branch:   `main`, working tree clean. **`v0.6.1` is tagged at `5d8957d` and HEAD
           written here, because the commit that records it increments it. Why it
           matters is in [knowledge/technical.md](../knowledge/technical.md).
 
-Task:     **Nothing is in progress.** Two things landed on 2026-09-03 and both
-          are built and seen:
-
-          - **Discover**, all five parcels ([intent/discover.md](../intent/discover.md)).
-            A live screen over the Hugging Face API, and no sidebar entry is
-            disabled any more.
-          - **A translucent sidebar** ([intent/appearance.md](../intent/appearance.md)),
-            which is a fifth thing the Appearance section owns.
-
-          Both took several rounds of correction from the author looking at the
-          running app. What each round found is in those two files and the rules
-          that came out of it are in
-          [knowledge/technical.md](../knowledge/technical.md); none of it is
-          repeated here.
+Task:     **The code review's 22 findings, four parcels, one commit each**
+          ([intent/review.md](../intent/review.md)). Parcel 1 (thirteen commands
+          async, the LFS filter, the probe stamp, seven hygiene items) is in.
+          Parcels 2-4: the quant badge to Rust, the frontend refactors, then
+          every visible change last so the author looks once.
 
           **The app is the author's: never launch, capture or drive it.** Render
           what can be rendered and then ask
           ([knowledge/technical.md](../knowledge/technical.md) Verify).
 
-Mode:     Standard. Nothing is part-finished.
+Mode:     Phase. Parcel 1 landed in `dbed3be`, reviewed and proved
+          ([intent/review.md](../intent/review.md) Proof). Parcel 2 next: the
+          quant badge moves to Rust.
 
 Command:  export PATH="$HOME/.cargo/bin:$PATH"   # cargo is not on a non-login PATH
           bun run build
