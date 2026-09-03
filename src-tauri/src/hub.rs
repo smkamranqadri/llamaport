@@ -5,6 +5,7 @@
 //! on to `downloads::file_name_for`, which stays the only thing that decides what may land
 //! in the models directory.
 
+use std::io::Read;
 use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
@@ -81,6 +82,10 @@ pub struct Fetched {
 /// and everything built on them run against canned bodies with no network.
 pub trait Transport: Send + Sync {
     fn get(&self, url: &str) -> Result<Fetched, String>;
+
+    /// Bytes and their type as a `data:` URI, or `None` when the response is not an image
+    /// or is larger than this app will hold.
+    fn get_image(&self, url: &str) -> Result<Option<String>, String>;
 }
 
 /// `<https://…>; rel="next"`, and only that relation — the header also carries others.
@@ -94,6 +99,10 @@ fn next_link(header: &str) -> Option<String> {
         Some(part[start..end].to_string())
     })
 }
+
+/// An avatar this app will render. Capped because the bytes come from a stranger: an
+/// uploader chooses their own picture, and 512 KB is forty times the largest seen.
+const AVATAR_CAP: usize = 512 * 1024;
 
 pub struct Http {
     agent: ureq::Agent,
@@ -128,6 +137,57 @@ impl Transport for Http {
             Err(e) => Err(e.to_string()),
         }
     }
+
+    fn get_image(&self, url: &str) -> Result<Option<String>, String> {
+        let response = self.agent.get(url).call().map_err(|e| e.to_string())?;
+        let kind = response.content_type().to_string();
+        if !kind.starts_with("image/") {
+            return Ok(None);
+        }
+        let mut bytes = Vec::new();
+        // Bounded by one more than the cap, so a body at the limit is kept and anything
+        // past it is over by exactly enough to be refused rather than truncated into a
+        // broken image.
+        response
+            .into_reader()
+            .take(AVATAR_CAP as u64 + 1)
+            .read_to_end(&mut bytes)
+            .map_err(|e| e.to_string())?;
+        Ok(as_data_uri(&kind, &bytes))
+    }
+}
+
+/// What a fetched image becomes, or `None` if it should not become anything. Separate from
+/// the fetch so the two rules it carries — it must be an image, and it must be small enough
+/// to hold — can be checked without a socket.
+fn as_data_uri(kind: &str, bytes: &[u8]) -> Option<String> {
+    if !kind.starts_with("image/") || bytes.is_empty() || bytes.len() > AVATAR_CAP {
+        return None;
+    }
+    Some(format!("data:{kind};base64,{}", base64(bytes)))
+}
+
+/// Standard base64. Written here rather than pulled in: the dependency list is deliberately
+/// short and this is the only thing in the app that needs it.
+fn base64(bytes: &[u8]) -> String {
+    const SET: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut out = String::with_capacity(bytes.len().div_ceil(3) * 4);
+    for chunk in bytes.chunks(3) {
+        let b = [
+            chunk[0],
+            *chunk.get(1).unwrap_or(&0),
+            *chunk.get(2).unwrap_or(&0),
+        ];
+        let packed = u32::from(b[0]) << 16 | u32::from(b[1]) << 8 | u32::from(b[2]);
+        for i in 0..4 {
+            if i <= chunk.len() {
+                out.push(SET[(packed >> (18 - 6 * i) & 0x3f) as usize] as char);
+            } else {
+                out.push('=');
+            }
+        }
+    }
+    out
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
@@ -245,6 +305,39 @@ pub fn tree(transport: &dyn Transport, repo: &str) -> Result<Vec<Entry>, String>
     parse_tree(&transport.get(&tree_url(repo)?)?.body)
 }
 
+/// The owner's picture as a `data:` URI, or `None` where they have none.
+///
+/// **Fetched here rather than by the window.** Every request this app makes goes through
+/// Rust, and an `<img src>` pointing at a CDN would be the first exception — one more host
+/// the webview talks to directly, in an app whose `csp` is `null`. An avatar is 5 to 15 KB,
+/// so the invariant costs almost nothing to keep.
+///
+/// An organisation and a user are different endpoints and the first answers 404 for the
+/// other, so both are tried in that order.
+pub fn avatar(transport: &dyn Transport, owner: &str) -> Option<String> {
+    if !valid_segment(owner) {
+        return None;
+    }
+    let url = [
+        format!("{HOST}/api/organizations/{owner}/overview"),
+        format!("{HOST}/api/users/{owner}/overview"),
+    ]
+    .into_iter()
+    .find_map(|url| transport.get(&url).ok())
+    .and_then(|fetched| {
+        serde_json::from_str::<serde_json::Value>(&fetched.body)
+            .ok()?
+            .get("avatarUrl")?
+            .as_str()
+            .map(str::to_string)
+    })?;
+
+    if !url.starts_with("https://") {
+        return None;
+    }
+    transport.get_image(&url).ok().flatten()
+}
+
 /// Everything the detail page states about a repository, in one call. `expand=gguf` is
 /// affordable here and not in a listing: one repository's chat template is kilobytes, and
 /// twenty-four of them were the 271 KB that kept it out of the browse call.
@@ -322,17 +415,19 @@ pub fn download_url(repo: &str, path: &str) -> Result<String, String> {
 /// Owner and name, and nothing that could steer the URL it is spliced into. A `?` would
 /// append a parameter, a `..` would climb, and either arrives from the network for free.
 fn valid_repo_id(repo: &str) -> bool {
-    let Some((owner, name)) = repo.split_once('/') else {
-        return false;
-    };
-    [owner, name].iter().all(|segment| {
-        !segment.is_empty()
-            && *segment != "."
-            && *segment != ".."
-            && segment
-                .bytes()
-                .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_' | b'.'))
-    })
+    match repo.split_once('/') {
+        Some((owner, name)) => valid_segment(owner) && valid_segment(name),
+        None => false,
+    }
+}
+
+fn valid_segment(segment: &str) -> bool {
+    !segment.is_empty()
+        && segment != "."
+        && segment != ".."
+        && segment
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_' | b'.'))
 }
 
 /// A tree path may carry directories — `BF16/model-00001-of-00002.gguf` — so slashes are
@@ -517,6 +612,10 @@ mod tests {
                 next: None,
             })
         }
+
+        fn get_image(&self, _: &str) -> Result<Option<String>, String> {
+            Ok(Some("data:image/webp;base64,AAAA".into()))
+        }
     }
 
     fn query(sort: Sort) -> Query {
@@ -692,6 +791,52 @@ mod tests {
         assert!(!says_moe(None, &[]));
         // Not from the name: -A3B is a naming habit, not a claim anybody made.
         assert!(!says_moe(Some("llama"), &tags(&["Qwen3-Coder-30B-A3B"])));
+    }
+
+    #[test]
+    fn base64_matches_the_standard_at_every_padding_length() {
+        assert_eq!(base64(b""), "");
+        assert_eq!(base64(b"f"), "Zg==");
+        assert_eq!(base64(b"fo"), "Zm8=");
+        assert_eq!(base64(b"foo"), "Zm9v");
+        assert_eq!(base64(b"foob"), "Zm9vYg==");
+        assert_eq!(base64(b"fooba"), "Zm9vYmE=");
+        assert_eq!(base64(b"foobar"), "Zm9vYmFy");
+        assert_eq!(base64(&[0xff, 0xfe, 0xfd]), "//79");
+    }
+
+    #[test]
+    fn a_strangers_image_is_bounded_and_has_to_be_an_image() {
+        assert!(as_data_uri("image/webp", b"abc").is_some());
+        assert!(as_data_uri("image/png", &vec![0u8; AVATAR_CAP]).is_some());
+        // One byte past. The reader takes cap+1, so an oversized body always lands here
+        // rather than arriving truncated and rendering as a broken picture.
+        assert!(as_data_uri("image/png", &vec![0u8; AVATAR_CAP + 1]).is_none());
+        assert!(as_data_uri("text/html", b"<script>").is_none());
+        assert!(as_data_uri("application/json", b"{}").is_none());
+        assert!(as_data_uri("image/png", b"").is_none());
+        assert_eq!(
+            as_data_uri("image/webp", b"foo").as_deref(),
+            Some("data:image/webp;base64,Zm9v")
+        );
+    }
+
+    #[test]
+    fn an_owner_that_could_steer_a_url_gets_no_avatar() {
+        for hostile in ["../../api", "owner/name", "", ".", "..", "own er"] {
+            assert!(
+                avatar(&Canned(r#"{"avatarUrl":"https://x/a.png"}"#), hostile).is_none(),
+                "{hostile} was accepted"
+            );
+        }
+        assert!(avatar(&Canned(r#"{"avatarUrl":"https://x/a.png"}"#), "unsloth").is_some());
+    }
+
+    #[test]
+    fn an_avatar_url_that_is_not_https_is_refused() {
+        assert!(avatar(&Canned(r#"{"avatarUrl":"http://x/a.png"}"#), "unsloth").is_none());
+        assert!(avatar(&Canned(r#"{"avatarUrl":"javascript:alert(1)"}"#), "unsloth").is_none());
+        assert!(avatar(&Canned(r#"{"name":"unsloth"}"#), "unsloth").is_none());
     }
 
     #[test]

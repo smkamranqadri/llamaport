@@ -47,6 +47,10 @@ pub struct Row {
 #[derive(Default)]
 pub struct Trees {
     seen: Mutex<HashMap<String, Vec<Entry>>>,
+    /// Owner to picture, `None` remembered as firmly as a hit. An owner with no avatar
+    /// would otherwise be asked for again on every page they appear on, and the ones
+    /// without pictures are exactly the ones that publish many repositories.
+    avatars: Mutex<HashMap<String, Option<String>>>,
 }
 
 impl Trees {
@@ -59,6 +63,20 @@ impl Trees {
             .lock()
             .expect("trees lock")
             .insert(repo.to_string(), entries);
+    }
+
+    /// One lookup per owner for the life of the session. Fifteen distinct owners appear in
+    /// a page of twenty-four, and the same handful publish most of what trends.
+    pub fn avatar(&self, owner: &str) -> Option<String> {
+        if let Some(known) = self.avatars.lock().expect("avatars lock").get(owner) {
+            return known.clone();
+        }
+        let found = hub::avatar(&Http::new(TIMEOUT), owner);
+        self.avatars
+            .lock()
+            .expect("avatars lock")
+            .insert(owner.to_string(), found.clone());
+        found
     }
 }
 

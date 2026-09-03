@@ -172,6 +172,12 @@ export function discoverBrowse(
   });
 }
 
+/// The owner's picture as a data: URI, or null where they have none. Fetched through Rust
+/// like everything else, so the window makes no request of its own.
+export function discoverAvatar(owner: string): Promise<string | null> {
+  return invoke<string | null>("discover_avatar", { owner });
+}
+
 /// One repository: its facts and every quantisation, each with its own verdict.
 export function discoverRepo(repo: string): Promise<DiscoverDetail> {
   return invoke<DiscoverDetail>("discover_repo", { repo });

@@ -869,6 +869,17 @@ async fn discover_browse(
     )
 }
 
+/// The owner's picture, as a `data:` URI. Asked for one owner at a time by the window,
+/// rather than being carried on every row: a page of twenty-four has about fifteen distinct
+/// owners and the same ones recur, so this is nearly always a cache hit after the first page.
+#[tauri::command]
+async fn discover_avatar(
+    owner: String,
+    state: State<'_, AppState>,
+) -> Result<Option<String>, String> {
+    Ok(state.trees.avatar(&owner))
+}
+
 /// One repository: the facts it states, and every quantisation with its own verdict. The
 /// tree is nearly always the one the browsed row already fetched, but the facts call is
 /// always made, so this goes off the main thread for the same reason as the browse.
@@ -1179,6 +1190,7 @@ pub fn run() {
             download_start,
             discover_browse,
             discover_repo,
+            discover_avatar,
             discover_download,
             download_pause,
             download_resume,

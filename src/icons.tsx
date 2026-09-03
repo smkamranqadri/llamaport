@@ -96,6 +96,18 @@ export function SearchIcon() {
 /// pi's own mark, from the logo the project publishes (`https://pi.dev/logo-auto.svg`,
 /// linked by its README). Filled rather than stroked, and cropped to the artwork's own
 /// bounds so it sits at the weight of the stroked icons beside it.
+/// Stands in for an owner with no picture. Deliberately one generic mark rather than a
+/// coloured initial: a letter invents a distinction between owners that the app has no
+/// basis for, and every row without an avatar should look the same kind of unknown.
+export function OwnerIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 3 20 7.5v9L12 21 4 16.5v-9z" />
+      <path d="M12 12 20 7.5M12 12v9M12 12 4 7.5" />
+    </svg>
+  );
+}
+
 export function PiIcon() {
   return (
     <svg

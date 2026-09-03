@@ -2583,6 +2583,27 @@ input[type="range"] {
   border-radius: 9px;
 }
 
+/* Square with a soft radius, like the tiles the author pointed at. A picture is a stranger's
+   file, so it is contained rather than trusted to be square or small. */
+.owner-avatar {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  overflow: hidden;
+  color: var(--faint);
+  background: var(--badge-bg);
+  border-radius: 8px;
+}
+
+.owner-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 .discover-body {
   display: flex;
   flex: 1;

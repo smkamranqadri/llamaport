@@ -382,3 +382,27 @@ fn neither_moe_signal_is_close_to_complete_on_its_own() {
     );
     println!("{marked} marked, {by_arch} of them by architecture alone");
 }
+
+#[test]
+#[ignore = "reads the live Hugging Face index"]
+fn an_avatar_comes_back_for_an_organisation_and_for_a_person() {
+    // Two endpoints, and the first answers 404 for the other kind of owner. unsloth is an
+    // organisation; DavidAU is a person who publishes a great many GGUF repositories.
+    for owner in ["unsloth", "DavidAU"] {
+        let found = hub::avatar(&http(), owner).unwrap_or_else(|| panic!("no avatar for {owner}"));
+        assert!(
+            found.starts_with("data:image/"),
+            "{owner} came back as {}",
+            &found[..found.len().min(40)]
+        );
+        assert!(found.len() > 500, "{owner} came back suspiciously small");
+        println!("{owner}: {} bytes of data URI", found.len());
+    }
+}
+
+#[test]
+#[ignore = "reads the live Hugging Face index"]
+fn an_owner_with_no_avatar_is_a_miss_rather_than_an_error() {
+    let missing = format!("llamaport-no-such-owner-{}", std::process::id());
+    assert!(hub::avatar(&http(), &missing).is_none());
+}
