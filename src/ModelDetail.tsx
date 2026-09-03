@@ -19,6 +19,7 @@ import { CloseIcon, CopyIcon, PiIcon, PlayIcon, StopIcon } from "./icons";
 import Disclosure from "./Disclosure";
 import { AdvancedFields, AUTO_CTX, ProfileFields } from "./ProfileForm";
 import HealthPanel from "./HealthPanel";
+import OwnerAvatar from "./OwnerAvatar";
 import PiPanel from "./PiPanel";
 import Presets, {
   presetName,
@@ -383,6 +384,7 @@ export default function ModelDetail({
   return (
     <>
       <header className="screen-header">
+        <OwnerAvatar owner={model.owner} />
         <div>
           <span className="title-row">
             <h1 title={model.fileName}>{model.displayName}</h1>
