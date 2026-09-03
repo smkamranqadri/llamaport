@@ -20,7 +20,7 @@ pub const CURRENT_SCHEMA: u32 = 8;
 /// macOS or is pinned. Both are plain strings and neither is an enum, because a config is
 /// untrusted input — a name written by a newer build must fall back to the default
 /// palette on the screen, not fail the parse and take every other setting with it.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct Appearance {
     pub theme: String,
@@ -28,8 +28,23 @@ pub struct Appearance {
     /// Whether the sidebar lets the desktop through. Stored rather than derived because
     /// the window is transparent either way — `transparent` is set at creation and cannot
     /// be changed after — so this is the only thing that decides whether anything shows.
-    #[serde(default)]
+    ///
+    /// **Defaults to on, including for a config written before it existed.** A window that
+    /// is transparent and paints over every pixel of itself is the effect not existing,
+    /// and the first build shipped that way: the author saw no change and reported the
+    /// feature broken. `#[derive(Default)]` would have made it `false`, so `Default` is
+    /// written out rather than derived.
     pub translucent: bool,
+}
+
+impl Default for Appearance {
+    fn default() -> Self {
+        Self {
+            theme: String::new(),
+            mode: String::new(),
+            translucent: true,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -692,9 +707,11 @@ mod tests {
     }
 
     #[test]
-    fn a_config_from_before_the_sidebar_could_be_translucent_loads_opaque() {
-        // The field is `#[serde(default)]`, so every config already on disk arrives with
-        // the effect off. Nobody's window changes because they updated.
+    fn a_config_from_before_the_sidebar_could_be_translucent_gets_the_effect() {
+        // Deliberately not the other way round. The first build defaulted this off, so a
+        // window that was transparent painted over every pixel of itself and the effect
+        // may as well not have shipped. An absent key means the config predates the
+        // setting, not that anybody turned it off.
         let path = scratch("appearance-old");
         fs::write(
             &path,
@@ -703,7 +720,24 @@ mod tests {
         .expect("write");
         let loaded = load_from(&path).appearance.expect("remembered");
         assert_eq!(loaded.theme, "nous");
-        assert!(!loaded.translucent);
+        assert!(loaded.translucent);
+    }
+
+    #[test]
+    fn turning_it_off_survives_a_round_trip() {
+        // The off state has to be storable, or the default would overwrite the choice on
+        // every load and the toggle would spring back.
+        let path = scratch("appearance-off");
+        let config = Config {
+            appearance: Some(Appearance {
+                theme: "llamaport".into(),
+                mode: "system".into(),
+                translucent: false,
+            }),
+            ..Default::default()
+        };
+        save_to(&path, &config).expect("save");
+        assert!(!load_from(&path).appearance.expect("remembered").translucent);
     }
 
     #[test]

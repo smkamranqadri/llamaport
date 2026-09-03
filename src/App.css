@@ -162,9 +162,16 @@ body,
 /* Tinted rather than clear, so a palette still owns the sidebar. Four of the five are
    ported and their colour is most of what distinguishes them; at full transparency the
    sidebar would be the desktop on all five and Appearance's swatches would describe
-   something the window no longer shows. */
+   something the window no longer shows.
+
+   **This started at 72% and that was far too much.** macOS has already tinted and blurred
+   through its own sidebar material by the time this paints, so the two stack: the author
+   turned the effect on and reported the sidebar as barely changed. At 40% the desktop
+   reads through and the palette still colours it. It is one number, and the only way to
+   judge it is to look — a browser cannot draw what sits behind the window. */
 :root[data-translucent] .sidebar {
-  background: color-mix(in srgb, var(--bg-sidebar) 72%, transparent);
+  background: color-mix(in srgb, var(--bg-sidebar) 40%, transparent);
+  border-right-color: color-mix(in srgb, var(--border) 55%, transparent);
 }
 
 /* Sidebar */

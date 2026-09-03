@@ -62,7 +62,7 @@ export const MODES: { id: Mode; label: string }[] = [
 export const DEFAULT_APPEARANCE: Appearance = {
   theme: "llamaport",
   mode: "system",
-  translucent: false,
+  translucent: true,
 };
 
 /// A name this build does not know falls back rather than blanking the window — the
