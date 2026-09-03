@@ -8,11 +8,9 @@ Hugging Face with resume that survives a kill.
 macOS, Apple Silicon or Intel. This is an unsigned beta — see
 [Install](#install).
 
-![Opening a model from the Library shows its quantisation, parameters, context and
-the launch settings it will use. Run starts llama-server and the page turns into
-a live view of KV cache, memory and token rates. Test model then reports every
-check passing — process, port, health, model list, alias, chat completion and
-streaming — with generation at 285 tokens per second](docs/launch.gif)
+![The Library: one model running with its memory beside it and a Use in pi
+button, three stopped ones with their quantisation, size and when they last ran,
+and the publisher's picture on every row the app downloaded](assets/library.png)
 
 ## Who it is for
 
@@ -30,9 +28,10 @@ opens with whatever it was last launched with successfully. The Library orders
 itself by what you have run most recently, so the models you actually use stay at
 the top.
 
-![A running model, showing live KV cache, generation and prompt-eval rates, system
-memory and swap, the model's own metadata, the launch settings that produced it,
-and the full llama-server command](docs/running.png)
+![A running model: memory against the machine, speed, context in use and health
+on four cards, the address other apps reach it at, and folded details for the
+test results, live figures, the full llama-server command, the model's own
+metadata and the logs](assets/running.png)
 
 **Tells you whether it actually works.** **Test model** runs an ordered set of
 checks against the running server — process, port, health endpoint, model list,
@@ -55,8 +54,7 @@ because an unresumable 20 GB transfer is a trap, not a convenience. A second URL
 queues behind the first rather than being refused.
 
 ![The Downloads screen, with a speed limit applied to the transfer already
-running, several paused transfers each offering Resume or Discard, and a history
-of completed downloads](docs/download.png)
+running and several paused transfers each offering Resume or Cancel](assets/downloads.png)
 
 **Finds a model for this Mac.** Discover browses Hugging Face's GGUF
 repositories live — trending, most downloaded, most liked, a parameter band, a
@@ -68,12 +66,25 @@ serve are left out, a gated repository says so before you click, and Download
 hands the file to the same queue a pasted URL goes to.
 
 ![Discover, listing trending GGUF repositories with the quantisation chosen for
-this Mac and its size against the GPU's limit](docs/discover.png)
+this Mac and its size](assets/discover.png)
+
+![One repository on Discover: its downloads, likes, parameters, architecture,
+context and licence, then every quantisation largest first, each marked whether
+its weights clear the GPU's working set, with the app's pick named](assets/discover-detail.png)
 
 **Shows what it is costing you.** Activity Monitor lists every `llama-server`
 on the Mac — the one the app runs, one it is measuring, or a stray it did not
-start — with memory and CPU beside the machine's own figures. Appearance offers
-four palettes in light or dark.
+start — with memory and CPU beside the machine's own figures.
+
+![Activity Monitor: the running llama-server with its memory and CPU, and the
+Mac's total CPU, memory, GPU memory and swap on four cards](assets/activity.png)
+
+**Looks the way you want.** Settings holds the models folder, which
+`llama-server` the app found, and Appearance: five palettes, the app's own in
+light or dark, and a sidebar that lets the desktop through.
+
+![Settings: the models folder, the llama-server found and its version, and the
+Appearance section with mode, the translucent sidebar and the palettes](assets/settings.png)
 
 ## Requirements
 
