@@ -274,10 +274,17 @@ unplanned.
 - `rawArgs` is passed to `llama-server` verbatim, so `--host 0.0.0.0` typed there
   exposes an unauthenticated server to the network. Acceptable for a personal
   tool; a release blocker. Decided: `rawArgs` may not set what the app owns.
-- The app can start with an unusable window. Observed twice in one session: once
+- The app can start with an unusable window — **and only when the session
+  launches it.** Ruled 2026-09-04 by the author: every sighting below is a
+  `tauri dev` started from this session's shell, and it has never happened on a
+  launch of the author's own, dev or bundled — five Finder launches of v0.7.0
+  and five of v0.5.0 all came up usable. So it is a property of how a
+  non-interactive shell launches an unbundled binary, not of the app, and it is
+  no longer a release blocker or a task. The record stays because the numbers
+  are real. Observed twice in one session: once
   with no window at all and the Window menu empty, once at 60x60.
   `show_main_window` asserts a usable frame and does not reliably achieve it.
-  Predates the downloader, and is a release blocker of its own. **Third
+  Predates the downloader. **Third
   observation 2026-09-02, and the first with hard numbers**: a dev build at
   `c6ac59f` came up 107×114 at (15, 673) — the configured 880×480 minimums
   ignored — with the whole UI rendered scaled inside it, captured by window

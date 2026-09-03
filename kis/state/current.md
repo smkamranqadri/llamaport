@@ -34,16 +34,16 @@ Blocker:  none. Open and not blocking:
           - **Two calls in Discover's quantisation picker the author has never
             ruled on**: `Q4_K_M` with no ceiling, and the withheld 1,024 MiB
             `--fit-target` margin ([intent/discover.md](../intent/discover.md)).
-          - **The unusable-window bug** ([intent/roadmap.md](../intent/roadmap.md)).
           - **An Intel Mac** for the universal build, open since v0.3.0. Every
             other check v0.7.0 owed was met by the author on 2026-09-04
             ([intent/release.md](../intent/release.md)).
 
 Next:     **Nothing chosen.** The author's call. Candidates, none ahead of the
-          others: the two picker rulings, the window bug as its own task, and
-          the Show HN that has sat drafted since August
-          ([intent/release.md](../intent/release.md)). Library search was
-          listed here and had shipped on 2026-09-02.
+          others: the two picker rulings, and the Show HN that has sat drafted
+          since August ([intent/release.md](../intent/release.md)). Library
+          search was listed here and had shipped on 2026-09-02; the window bug
+          was listed here and turned out to follow the session's launches, not
+          the author's ([intent/roadmap.md](../intent/roadmap.md)).
 
 Where the project stands: [intent/roadmap.md](../intent/roadmap.md).
 What the app is for: [intent/direction.md](../intent/direction.md).
