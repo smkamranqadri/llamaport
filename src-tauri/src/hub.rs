@@ -112,6 +112,7 @@ impl Http {
     pub fn new(timeout: Duration) -> Self {
         Self {
             agent: ureq::AgentBuilder::new()
+                .https_only(true)
                 .timeout_read(timeout)
                 .timeout(timeout * 2)
                 .build(),
@@ -293,7 +294,23 @@ pub struct Page {
     pub next: Option<String>,
 }
 
+/// Whether a URL the API handed back may be fetched: `https`, on Hugging Face. A cursor
+/// and an avatar both arrive as whole URLs, and either could name any host at all.
+fn on_hugging_face(url: &str) -> bool {
+    let Some(rest) = url.strip_prefix("https://") else {
+        return false;
+    };
+    let host = rest.split(['/', '?', '#']).next().unwrap_or_default();
+    let host = host.to_ascii_lowercase();
+    crate::downloads::HOSTS.contains(&host.as_str()) || host.ends_with(".huggingface.co")
+}
+
 pub fn list(transport: &dyn Transport, query: &Query) -> Result<Page, String> {
+    if let Some(cursor) = query.cursor.as_deref() {
+        if !on_hugging_face(cursor) {
+            return Err("the next page is not on Hugging Face".into());
+        }
+    }
     let fetched = transport.get(&listing_url(query))?;
     Ok(Page {
         repos: parse_listing(&fetched.body)?,
@@ -349,7 +366,7 @@ pub fn avatar(transport: &dyn Transport, owner: &str) -> Option<String> {
             .map(str::to_string)
     })?;
 
-    if !url.starts_with("https://") {
+    if !on_hugging_face(&url) {
         return None;
     }
     transport.get_image(&url).ok().flatten()
@@ -858,13 +875,14 @@ mod tests {
 
     #[test]
     fn an_owner_that_could_steer_a_url_gets_no_avatar() {
+        let overview = r#"{"avatarUrl":"https://cdn-avatars.huggingface.co/a.png"}"#;
         for hostile in ["../../api", "owner/name", "", ".", "..", "own er"] {
             assert!(
-                avatar(&Canned(r#"{"avatarUrl":"https://x/a.png"}"#), hostile).is_none(),
+                avatar(&Canned(overview), hostile).is_none(),
                 "{hostile} was accepted"
             );
         }
-        assert!(avatar(&Canned(r#"{"avatarUrl":"https://x/a.png"}"#), "unsloth").is_some());
+        assert!(avatar(&Canned(overview), "unsloth").is_some());
     }
 
     #[test]
@@ -963,6 +981,56 @@ mod tests {
         ] {
             assert!(!valid_tree_path(path), "{path} was accepted");
         }
+    }
+
+    #[test]
+    fn a_page_is_only_fetched_from_hugging_face() {
+        for url in [
+            "https://huggingface.co/api/models?filter=gguf&cursor=abc",
+            "https://hf.co/api/models",
+            "https://cdn-avatars.huggingface.co/v1/x.png",
+        ] {
+            assert!(on_hugging_face(url), "{url} was refused");
+        }
+        for url in [
+            "http://huggingface.co/api/models",
+            "https://huggingface.co.example/api/models",
+            "https://attacker.example/?huggingface.co",
+            "https://huggingface.co@attacker.example/",
+            "ftp://huggingface.co/",
+            "",
+        ] {
+            assert!(!on_hugging_face(url), "{url} was accepted");
+        }
+
+        let mut query = query(Sort::Trending);
+        query.cursor = Some("http://169.254.169.254/latest/meta-data/".into());
+        let Err(error) = list(&Canned("[]"), &query) else {
+            panic!("a cursor off the site was fetched");
+        };
+        assert!(error.contains("not on Hugging Face"), "{error}");
+    }
+
+    /// The overview JSON is a stranger's, and the picture it names must not become a
+    /// request to wherever it points.
+    #[test]
+    fn an_avatar_off_hugging_face_is_never_fetched() {
+        struct Elsewhere;
+
+        impl Transport for Elsewhere {
+            fn get(&self, _: &str) -> Result<Fetched, String> {
+                Ok(Fetched {
+                    body: r#"{"avatarUrl":"https://attacker.example/a.png"}"#.into(),
+                    next: None,
+                })
+            }
+
+            fn get_image(&self, url: &str) -> Result<Option<String>, String> {
+                panic!("fetched {url}");
+            }
+        }
+
+        assert_eq!(avatar(&Elsewhere, "unsloth"), None);
     }
 
     #[test]

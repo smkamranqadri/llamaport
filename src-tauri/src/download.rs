@@ -278,6 +278,17 @@ impl From<String> for ResolveError {
     }
 }
 
+/// A redirect may move between hosts — Hugging Face hands off to a CDN — and never between
+/// schemes: a `Location: http://…` in that chain would carry the rest of the transfer in
+/// plaintext without a word.
+fn same_scheme(from: &str, to: &str) -> bool {
+    let scheme = |url: &str| url.split_once("://").map(|(s, _)| s.to_ascii_lowercase());
+    match (scheme(from), scheme(to)) {
+        (Some(a), Some(b)) => a == b,
+        _ => false,
+    }
+}
+
 /// Re-runs resolution when the signature it was handed had already expired. Each attempt
 /// issues a fresh one, so this converges rather than spinning.
 fn resolve_signed(url: &str, stall_after: Duration) -> Result<Resolved, String> {
@@ -320,6 +331,9 @@ fn resolve(url: &str, stall_after: Duration) -> Result<Resolved, ResolveError> {
             let location = response
                 .header("location")
                 .ok_or_else(|| "redirect without a location header".to_string())?;
+            if !same_scheme(&current, location) {
+                return Err(format!("redirect to {location} changes the scheme").into());
+            }
             current = location.to_string();
             redirected = true;
             continue;
@@ -1105,4 +1119,24 @@ pub fn download(spec: &Spec, control: &Control, progress: &dyn ProgressSink) -> 
     std::fs::rename(&part, &spec.dest).map_err(|e| e.to_string())?;
     let _ = std::fs::remove_file(sidecar_path(&spec.dest));
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::same_scheme;
+
+    #[test]
+    fn a_redirect_may_change_host_and_never_scheme() {
+        assert!(same_scheme(
+            "https://huggingface.co/x/resolve/main/a.gguf",
+            "https://cdn-lfs.hf.co/a?sig=1"
+        ));
+        assert!(same_scheme("http://127.0.0.1:1/a", "HTTP://127.0.0.1:2/b"));
+        assert!(!same_scheme(
+            "https://huggingface.co/a",
+            "http://huggingface.co/a"
+        ));
+        assert!(!same_scheme("https://huggingface.co/a", "/relative/a"));
+        assert!(!same_scheme("https://huggingface.co/a", ""));
+    }
 }

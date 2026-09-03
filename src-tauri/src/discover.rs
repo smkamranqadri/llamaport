@@ -257,7 +257,11 @@ fn cached(path: &Path) -> Option<String> {
     if !fresh(age) {
         return None;
     }
-    std::fs::read_to_string(path).ok()
+    // The directory is the app's, and a file in it is still a file anything can write:
+    // what goes into an `<img src>` is only ever what this app itself would have put there.
+    std::fs::read_to_string(path)
+        .ok()
+        .filter(|stored| stored.is_empty() || stored.starts_with("data:image/"))
 }
 
 fn store_cached(path: &Path, uri: &str) {
@@ -412,6 +416,18 @@ mod tests {
             Some(""),
             "a remembered miss must be distinguishable from never having asked"
         );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_planted_cache_file_is_not_handed_to_the_window() {
+        let dir = std::env::temp_dir().join(format!("llamaport-planted-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let planted = dir.join("unsloth");
+        store_cached(&planted, "https://tracker.example/x.gif");
+        assert_eq!(cached(&planted), None, "a URL was served as a picture");
+        store_cached(&planted, "<svg onload=alert(1)>");
+        assert_eq!(cached(&planted), None);
         let _ = std::fs::remove_dir_all(&dir);
     }
 

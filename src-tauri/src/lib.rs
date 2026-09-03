@@ -60,7 +60,7 @@ struct AppState {
     downloads: Downloads,
     tray: Mutex<Option<TrayHandles>>,
     activity: activity::Monitor,
-    trees: discover::Trees,
+    trees: Arc<discover::Trees>,
 }
 
 impl AppState {
@@ -852,7 +852,9 @@ fn download_start(url: String, state: State<'_, AppState>) -> Result<Vec<Downloa
 /// **`async` is load-bearing and not decoration.** Tauri runs a synchronous command on the
 /// main thread, so this one held it for the whole round trip and the window could not paint
 /// the loading state it had already been told to show. Every command that touches the
-/// network belongs off that thread.
+/// network belongs off that thread — and off the async workers too, which is what
+/// `spawn_blocking` buys: a cold page fires a dozen of these at once, and a network that
+/// answers nothing would otherwise park every worker for the whole timeout.
 #[tauri::command]
 async fn discover_browse(
     sort: hub::Sort,
@@ -867,14 +869,20 @@ async fn discover_browse(
         (None, None) => None,
         band => Some(band),
     };
-    discover::browse(
-        &state.trees,
-        sort,
-        search,
-        cursor,
-        &discover::Narrow { params, only_moe },
-        state.device_budget(),
-    )
+    let trees = state.trees.clone();
+    let budget = state.device_budget();
+    tauri::async_runtime::spawn_blocking(move || {
+        discover::browse(
+            &trees,
+            sort,
+            search,
+            cursor,
+            &discover::Narrow { params, only_moe },
+            budget,
+        )
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 /// The owner's picture, as a `data:` URI. Asked for one owner at a time by the window,
@@ -885,7 +893,10 @@ async fn discover_avatar(
     owner: String,
     state: State<'_, AppState>,
 ) -> Result<Option<String>, String> {
-    Ok(state.trees.avatar(&owner))
+    let trees = state.trees.clone();
+    tauri::async_runtime::spawn_blocking(move || trees.avatar(&owner))
+        .await
+        .map_err(|e| e.to_string())
 }
 
 /// One repository: the facts it states, and every quantisation with its own verdict. The
@@ -896,7 +907,11 @@ async fn discover_repo(
     repo: String,
     state: State<'_, AppState>,
 ) -> Result<discover::Detail, String> {
-    discover::detail(&state.trees, &repo, state.device_budget())
+    let trees = state.trees.clone();
+    let budget = state.device_budget();
+    tauri::async_runtime::spawn_blocking(move || discover::detail(&trees, &repo, budget))
+        .await
+        .map_err(|e| e.to_string())?
 }
 
 /// Hands the chosen quantisation to the queue that already exists. A shard set is several
@@ -1094,7 +1109,7 @@ pub fn run() {
                 downloads,
                 tray: Mutex::new(None),
                 activity: activity::Monitor::new(),
-                trees: discover::Trees::default(),
+                trees: Arc::new(discover::Trees::default()),
             });
 
             // What finished came from the history file; what did not is on the disk, in
