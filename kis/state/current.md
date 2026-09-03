@@ -1,25 +1,26 @@
 # Current
 
 ```text
-Branch:   `main`, working tree clean. **`v0.6.1` is tagged at `5d8957d` and HEAD
-          has moved past it. Run `git rev-list --count v0.6.1..HEAD` before
+Branch:   `main`, working tree clean. **`v0.7.0` is tagged at `12de686` and HEAD
+          has moved past it. Run `git rev-list --count v0.7.0..HEAD` before
           building a release artefact** — the distance is deliberately not
           written here, because the commit that records it increments it. Why it
           matters is in [knowledge/technical.md](../knowledge/technical.md).
 
-Task:     **Release v0.7.0** ([intent/release.md](../intent/release.md)), the
-          first to carry the redesign, Appearance, Discover, the owner avatars,
-          the translucent sidebar, a CSP and a private API. Asked for
-          2026-09-04. The bump is committed (`chore: v0.7.0`); the tag waits
-          on two things below. Then: `CI=true bun run tauri build` for aarch64
-          and `--target universal-apple-darwin`, `codesign --verify --deep
-          --strict`, `gh release create`, download back and compare bytes.
+Task:     **Nothing is in progress.** v0.7.0 shipped 2026-09-04
+          ([intent/release.md](../intent/release.md)): the redesign, Appearance,
+          Activity Monitor, Discover, the avatars, the translucent sidebar, a
+          CSP, the code review's 22 fixes and the security review's five, seven
+          new screenshots in `assets/`. Two bundles published, verified,
+          downloaded back and compared.
 
-          **The app is the author's: never launch, capture or drive it.** Render
-          what can be rendered and then ask
-          ([knowledge/technical.md](../knowledge/technical.md) Verify).
+          **The app is the author's: never launch, capture or drive it** unless
+          asked — on 2026-09-04 the author asked, for the screenshots, and it
+          was run in dev mode and stopped when they were in. Render what can be
+          rendered and then ask ([knowledge/technical.md](../knowledge/technical.md)
+          Verify).
 
-Mode:     Phase. Bumped, not tagged.
+Mode:     Standard. Nothing is part-finished.
 
 Command:  export PATH="$HOME/.cargo/bin:$PATH"   # cargo is not on a non-login PATH
           bun run build
@@ -28,39 +29,20 @@ Command:  export PATH="$HOME/.cargo/bin:$PATH"   # cargo is not on a non-login P
           cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
           Each status on its own line, never after a pipe. Running it: `bun run tauri dev`.
 
-Blocker:  **Two things before the tag, in this order.**
+Blocker:  none. Open and not blocking:
 
-          - **The README screenshots, by the author** — chosen 2026-09-04 over
-            shipping without them a third time. `docs/launch.gif`,
-            `docs/running.png` and `docs/download.png` are what the README
-            shows and all predate the redesign; a `docs/discover.png` is new,
-            since the README has no Discover section yet and this release is
-            the first to carry the screen.
-          - **The security review of the network surface**, running as a
-            subagent over `v0.6.1..HEAD`, as v0.2.0's was. Its findings are
-            fixed before the tag or recorded as accepted.
+          - **Two calls in Discover's quantisation picker the author has never
+            ruled on**: `Q4_K_M` with no ceiling, and the withheld 1,024 MiB
+            `--fit-target` margin ([intent/discover.md](../intent/discover.md)).
+          - **The unusable-window bug** ([intent/roadmap.md](../intent/roadmap.md)).
+          - **What v0.7.0 owes the author**: the five checks, the Discussions
+            post, a look at Discover's avatars under the new rule
+            ([intent/release.md](../intent/release.md)).
 
-          Still open and not blocking: the two quant-picker calls, the
-          unusable-window bug, the five checks in release.md.
-
-Next:     **A release.** It is the first to carry Discover, the owner avatars, the
-          translucent sidebar, a CSP and a **private API**, so a minor
-          ([intent/release.md](../intent/release.md), which lists what it owes —
-          including a security review of the network surface).
-
-          **The README's screenshots come first and are owed for all three**;
-          every one predates the redesign, and they now trail four phases. They
-          need the author at the machine, like every capture.
-
-          Two vibrancy numbers are untuned — the 40% tint and the
-          `underWindowBackground` material were set against each other and only
-          one of them moved. Neither is worth touching without a look.
-
-          Unplanned: per-field override, and **MoE launches**
-          ([intent/moe.md](../intent/moe.md)), still blocked on timing `-ncmoe`.
-          Library search is open ([intent/gaps.md](../intent/gaps.md)) and is now
-          the only search this app lacks.
-```
+Next:     **Nothing chosen.** The author's call. Candidates, none ahead of the
+          others: the two picker rulings, the window bug as its own task,
+          Library search ([intent/gaps.md](../intent/gaps.md)), and the Show HN
+          that has sat drafted since August ([intent/release.md](../intent/release.md)).
 
 Where the project stands: [intent/roadmap.md](../intent/roadmap.md).
 What the app is for: [intent/direction.md](../intent/direction.md).

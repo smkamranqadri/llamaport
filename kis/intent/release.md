@@ -45,7 +45,10 @@ macOS said it could not verify the developer, and Open Anyway let it through.
 **The check owed since v0.1.0 is met** — it took two runs on one day, the first
 to find that five releases were broken and the second to prove the fix.
 
-## v0.7.0 — tagged 2026-09-04 at `12de686`
+## v0.7.0 — shipped 2026-09-04
+
+https://github.com/smkamranqadri/llamaport/releases/tag/v0.7.0 — tagged at
+`12de686`, published as a full release.
 
 The first release to carry the redesign, Appearance, `tauri-plugin-dialog`,
 Activity Monitor, Discover — a new capability and this app's first read-only
@@ -94,13 +97,29 @@ of them, taken 2026-09-04 from the running app, in a new `assets/` folder rather
 than `docs/`, which is documents. The three stills and the launch recording
 from 2026-08-08 went with the move; they predated the redesign entirely.
 
-Artefact proof below once the bundles are built, published and downloaded back.
+`Llamaport_0.7.0_aarch64.dmg`, 4,570,488 bytes, sha256
+`1b1cdd7991ce1bc1b06531e27b4fd956ce08b39645b3a341ab3e65526fb82caa`.
+`Llamaport_0.7.0_universal.dmg`, 9,376,315 bytes, sha256
+`1a779349dc167140771321957987110defa7b46d03b0a76aba9313cd640c4b02`, carrying
+`x86_64 arm64`. Both `.app`s verify with `codesign --verify --deep --strict` at
+`flags=0x10002(adhoc,runtime)`, `Sealed Resources version=2`. Proved on both
+layers: `index-BluDBz9J.js` is embedded, once in the aarch64 build and once per
+slice of the universal, and "the next page is not on Hugging Face" — a string
+only `12de686` introduces — is in both and zero times in the installed 0.6.1.
+Built with `CI=true`, downloaded back from GitHub and compared byte for byte.
 
-## Unverified against v0.6.1
+**Owed against it, needing the author**: the five checks under "Unverified"
+below, unchanged; the Show and tell post in llama.cpp's Discussions, which now
+claims less than the app does, since Discover is a network client and the post
+says nothing of it; and a look at the built bundle's Discover under the
+tightened avatar rule, where an owner whose picture is hosted off
+`huggingface.co` now shows the generic mark.
+
+## Unverified against v0.7.0
 
 Moved out of [state/current.md](../state/current.md) on 2026-09-02, where it had
 become a ledger. Five checks nobody has run, each needing a human at the
-machine:
+machine, now owed against v0.7.0 as they were against v0.6.1:
 
 - **Five launches from Finder** with nothing fullscreen.
 - **The Dock click.** The 2026-09-01 evidence was against v0.5.0 and does not
