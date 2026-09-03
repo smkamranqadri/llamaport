@@ -58,6 +58,23 @@ queues behind the first rather than being refused.
 running, several paused transfers each offering Resume or Discard, and a history
 of completed downloads](docs/download.png)
 
+**Finds a model for this Mac.** Discover browses Hugging Face's GGUF
+repositories live — trending, most downloaded, most liked, a parameter band, a
+mixture-of-experts filter, and a search that gets the same treatment. For every
+row the app picks the quantisation itself: the largest that fits the GPU's real
+working set, preferring the K-quant family, with the choice and its size printed
+on the row rather than hidden behind the button. Models `llama-server` cannot
+serve are left out, a gated repository says so before you click, and Download
+hands the file to the same queue a pasted URL goes to.
+
+![Discover, listing trending GGUF repositories with the quantisation chosen for
+this Mac and its size against the GPU's limit](docs/discover.png)
+
+**Shows what it is costing you.** Activity Monitor lists every `llama-server`
+on the Mac — the one the app runs, one it is measuring, or a stray it did not
+start — with memory and CPU beside the machine's own figures. Appearance offers
+four palettes in light or dark.
+
 ## Requirements
 
 - macOS on Apple Silicon or Intel
