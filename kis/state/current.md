@@ -7,19 +7,18 @@ Branch:   `main`, working tree clean. **`v0.6.1` is tagged at `5d8957d` and HEAD
           written here, because the commit that records it increments it. Why it
           matters is in [knowledge/technical.md](../knowledge/technical.md).
 
-Task:     **The code review's 22 findings, four parcels, one commit each**
-          ([intent/review.md](../intent/review.md)). Parcel 1 (thirteen commands
-          async, the LFS filter, the probe stamp, seven hygiene items) is in.
-          Parcels 2-4: the quant badge to Rust, the frontend refactors, then
-          every visible change last so the author looks once.
+Task:     **The code review's 22 findings are in, four commits**
+          ([intent/review.md](../intent/review.md)): `dbed3be`, `f105d10`,
+          `3def994`, `e36dd86`. Every parcel proved and reviewed. **What is
+          still owed is the author's look at a built bundle** — the bundle,
+          because only a bundle carries the new CSP; the dev webview gets none.
+          Four things to see, listed in review.md's Proof.
 
           **The app is the author's: never launch, capture or drive it.** Render
           what can be rendered and then ask
           ([knowledge/technical.md](../knowledge/technical.md) Verify).
 
-Mode:     Phase. Parcel 1 landed in `dbed3be`, reviewed and proved
-          ([intent/review.md](../intent/review.md) Proof). Parcel 2 next: the
-          quant badge moves to Rust.
+Mode:     Phase, last step. Nothing part-finished; the look is the close.
 
 Command:  export PATH="$HOME/.cargo/bin:$PATH"   # cargo is not on a non-login PATH
           bun run build
@@ -42,8 +41,8 @@ Blocker:  none. Three things are open and none of them blocks:
           - **Five checks nobody has run**, in
             [intent/release.md](../intent/release.md).
 
-Next:     **A release.** It is the first to carry Discover, the owner avatars,
-          the translucent sidebar and a **private API**, so a minor
+Next:     **The look**, then **a release.** It is the first to carry Discover, the
+          owner avatars, the translucent sidebar, a CSP and a **private API**, so a minor
           ([intent/release.md](../intent/release.md), which lists what it owes —
           including a security review of the network surface).
 

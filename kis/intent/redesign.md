@@ -329,7 +329,9 @@ rows with a tick, a name and Show.
 - **A finished row is named by the catalog**, which reads the GGUF's own name,
   so the Library and this screen cannot call the same file different things. A
   row in flight has no GGUF to read, so its file name stands in and its quant
-  badge is parsed by a TypeScript copy of `catalog.rs`'s rule.
+  badge is parsed by a TypeScript copy of `catalog.rs`'s rule. **Reversed
+  2026-09-04**: the job carries its quant from Rust, by the one rule
+  ([review.md](review.md)).
 - **The URL survives only on a failure** — the one moment somebody needs the
   address they asked for. Elsewhere it is the row's tooltip.
 - **The speed limit is a named choice on the status line**, not a panel: No

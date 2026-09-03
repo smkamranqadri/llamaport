@@ -84,21 +84,28 @@ changes go last so the author looks once.
    and `Downloads` is `Clone` with an `Arc` counter. `Candidate` holds one `cache`
    (`Profile` keeps both — llama-server takes them separately). The comments and
    the empty impl went.
-2. **The quant badge moves to Rust.** `DownloadJob.quant`, derived by
-   `catalog::quant_from_name` where `owner` is derived; `Downloads.tsx` loses
-   `isQuantToken`/`quantOf`. The key on `downloads.json` is additive.
-3. **Frontend refactors.** `Telemetry.tsx` takes `Card`, `Sparkline`, `rate` and
-   `TelemetryPanel`, and Activity imports the first two. `launchCost` and
-   `MemoryBar` move into `Memory.tsx` beside `Stat`. `compact`/`counted` become
-   one `formatCount` in `format.ts`; `updated` uses `formatRelative`. Presets
-   derives `pick` and `suggestionFields` from `SPEED_KEYS`. `pi::document` and
-   `settings_document` share one read-and-parse. The three nested ternaries become
-   if-chains. `Presets`' `Card` is a different shape and stays.
-4. **Visible.** "Web UI" on the button. `csp` set to
-   `default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'`.
-   `.advanced` on `--border`; `.limit-select` opts out of the width; `.pi-new` gets
-   a rule and `.check-name` is dropped. README's two lines rewritten to what the app
-   does. figures.md's hint sentence corrected.
+2. **The quant badge moves to Rust — done, `f105d10`.** `DownloadJob.quant`,
+   derived by `catalog::quant_from_name` where `owner` is derived, and set again
+   on rows restored from `downloads.json` so a history written before the field
+   existed shows a badge too. `Downloads.tsx` lost `isQuantToken`/`quantOf`.
+3. **Frontend refactors — done, `3def994`.** `Telemetry.tsx` takes `Card`,
+   `Sparkline`, `rate` and `TelemetryPanel`, and Activity imports `Card`. The
+   merged Card wraps its figure in `.card-figure` only when a sparkline is
+   drawn, so the model screen's markup is byte-identical; Activity's three cards
+   without one lose a wrapper around a single child, which paints the same.
+   `launchCost` and `MemoryBar` moved into `Memory.tsx` unchanged. `formatCount`
+   in `format.ts` replaced two identical helpers; `updated` calls
+   `formatRelative`. Presets derives `speedFields` from `SPEED_KEYS`. `pi.rs`'s
+   two readers share `parsed`. Three ternaries became if-chains. ModelDetail is
+   723 lines from 1,010.
+4. **Visible — done, `e36dd86`; the look is owed.** "Web UI" on the button.
+   `csp` is `default-src 'self'; connect-src ipc: http://ipc.localhost; img-src
+   'self' data:; style-src 'self' 'unsafe-inline'` — no `script-src`, because
+   Tauri adds `'self'` and a hash per bundled script itself, and no `devCsp`,
+   because it would be inert ([knowledge/technical.md](../knowledge/technical.md)).
+   `.advanced` on `--border`; `.limit-select` opts out of the width; `.pi-new`
+   muted; `.check-name` dropped. README's two lines rewritten; figures.md
+   corrected; redesign.md's recorded deviation marked reversed.
 
 Out of scope: shortening `inspect_port`'s timeouts; the rest of the release's
 security review; the two open quant-picker calls in [discover.md](discover.md);
@@ -142,3 +149,29 @@ pass restored. A reviewer read the diff against this plan and re-ran the gates;
 its two Important findings (three sync settings writers, the stamp taken after
 the probe) are fixed above. Nothing in this parcel is visible, so nothing to look
 at yet.
+
+**Parcel 2, 2026-09-04.** Gates green as above; 210 lib tests. Two new tests in
+`downloads.rs` watched to fail with both derivations gutted. Reviewed clean; one
+redundant clone removed on its say.
+
+**Parcel 3, 2026-09-04.** Gates green; no test covers it, as planned. A reviewer
+diffed every moved block against `HEAD` and found `launchCost`, `MemoryBar`,
+`rate`, `formatCount` and both pi error strings byte-identical, the three
+if-chains equivalent including the tie rule, and one markup change: Activity's
+non-spark cards lose a single-child wrapper, visually inert. Accepted and named
+in the commit.
+
+**Parcel 4, 2026-09-04.** Gates green; `stylesheet.rs` green with `--line` gone.
+The four CSS changes rendered against `App.css` in headless Chrome, llamaport
+light and dark: the Advanced border follows the palette, the limit select sits
+inline, "new file" is muted beside the counts, the check rows keep their grid.
+A reviewer verified the CSP against Tauri 2.11.5's source rather than the docs:
+`ipc:` is the macOS IPC scheme, hashes cover the one bundled script, no `<style>`
+element exists to nonce so `'unsafe-inline'` survives for React's attributes,
+and the webui window is a separate webview the policy does not govern.
+
+**Still owed: the author's look at a built bundle**, because only a bundle
+carries the CSP — the dev webview is served by Vite and gets none. Four things
+to see: the pane paints and avatars show under the policy; the Web UI button;
+the Advanced border on a light palette; the Downloads status line and pi's
+"new file" mark.

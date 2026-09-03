@@ -193,9 +193,10 @@ the thing missing. Both branches now carry it.
   18.0 GB in the Library and 16.8 GB as weights in the memory bar. Each agrees
   with the tool it is meant to be compared against, the seam belongs to the
   domain rather than to this app, and macOS splits in the same place. The memory
-  panel's hint now says which counting it uses and that the Model panel's figure
-  is the same bytes counted the other way, so a reader who notices has the
-  answer in front of them.
+  panel carried a hint naming its counting and the Model panel's figure as the
+  same bytes counted the other way; the redesign dropped it with the three rows
+  it removed, and the author ruled on 2026-09-04 that the screen stays as it is
+  ([review.md](review.md)).
 - `predicted_base` in `lib.rs` became weights-plus-cache-when-known rather than
   failing to compile. It is written to the launch spec and never read; removing
   it belongs to no phase yet.

@@ -36,7 +36,9 @@ src/
   Library.tsx    the model list; FirstRun.tsx is what it shows when empty
   ModelDetail.tsx  one model, stopped or running; Presets.tsx picks how it runs
   ProfileForm.tsx  ProfileFields and AdvancedFields, shared with Settings
-  SettingsScreen.tsx, Downloads.tsx, Discover.tsx, HealthPanel.tsx, Memory.tsx
+  SettingsScreen.tsx, Downloads.tsx, Discover.tsx, HealthPanel.tsx
+  Memory.tsx     Stat, launchCost and MemoryBar: what a launch costs against the ceilings
+  Telemetry.tsx  Card, Sparkline and TelemetryPanel, shared with Activity.tsx
   TunePanel.tsx  the measurement ladder; PiPanel.tsx writes pi's two files
   icons.tsx      every SVG the UI draws
   api.ts, types.ts, format.ts, diff.ts
@@ -490,17 +492,35 @@ shipped hub, which calls it from their frontend.
 
 - **Every request this app makes goes through Rust, and that is worth keeping.** The
   webview loads nothing remote — an `<img src>` at a CDN would have been the first
-  exception, in an app whose `csp` is `null` and would not stop it. Avatars are fetched
-  in Rust and handed over as `data:` URIs instead, which at 5–15 KB costs almost
-  nothing. **`bundle.security.csp` is `null` and should not stay that way**; nothing
-  depends on it being loose today, which is the moment to tighten it.
+  exception, in an app whose `csp` was `null` and would not have stopped it. Avatars are
+  fetched in Rust and handed over as `data:` URIs instead, which at 5–15 KB costs almost
+  nothing. `bundle.security.csp` is set since 2026-09-04 (the CSP note below); `default-src
+  'self'` now refuses the exception before anyone writes it.
 
 - **A synchronous Tauri command runs on the main thread, and the window cannot paint
   while it does.** `discover_browse` spends two and a half seconds on the network and held
   that thread for all of it, so the loading state React had already been told to render
   never appeared and the app read as frozen. `async fn` moves a command to the async
   runtime. Anything here that touches the network is `async` for this reason and not for
-  tidiness.
+  tidiness — and so is anything that reaches `runner::inspect_port` (two HTTP calls with a
+  timeout each on a busy port) or `capabilities()` on a miss (three process spawns).
+  Thirteen commands were still `fn` on 2026-09-04, `launch_plan` among them on a 200 ms
+  debounce. **An `async` command that borrows `State` must return `Result`**; `api.ts`
+  does not notice, since `invoke` already returns a promise.
+
+- **The probe cache is stamped on the binary's mtime and size, taken before the probe
+  runs.** A Homebrew upgrade replaces the file in place; stamped after, a file replaced
+  mid-probe would be remembered under the old flags for good. An `Err` stays cached until
+  the path is set again, as before.
+
+- **Tauri injects the CSP only into assets it serves over `tauri://localhost`.** With
+  `build.devUrl` set, Vite serves the dev webview and Tauri injects nothing, so
+  `devCsp` is inert here and `bun run tauri dev` runs with no policy at all — only a built
+  bundle exercises `bundle.security.csp`. The policy omits `script-src` on purpose:
+  Tauri adds `'self'` and a hash for every bundled script. `'unsafe-inline'` on
+  `style-src` survives because `dist/index.html` has no `<style>` element to nonce; it is
+  what React's inline `style` attributes need. `ipc:` is the macOS IPC scheme. Read off
+  tauri 2.11.5's source on 2026-09-04, not the docs, which do not say.
 
 - **An edit whose anchor does not match changes nothing and says nothing.** Four times
   in one session: `.sort-select` written twice before it existed, `expand=gguf` added to
