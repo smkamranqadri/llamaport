@@ -363,6 +363,14 @@ export interface PiPreview {
 
 /// The four lists Discover offers. `trending` is Hugging Face's own trendingScore, which
 /// only ever sorts descending; `downloads` is its thirty-day figure, not the all-time one.
+/// Billions of parameters, inclusive. Both absent means every size. Applied by the API,
+/// whose figure survives the sidecar trap that makes a 27B repository's own metadata read
+/// 1.86B.
+export interface ParamBand {
+  min: number | null;
+  max: number | null;
+}
+
 export type DiscoverSort = "trending" | "downloads" | "likes";
 
 export interface QuantCandidate {

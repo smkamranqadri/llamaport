@@ -850,9 +850,23 @@ async fn discover_browse(
     sort: hub::Sort,
     search: Option<String>,
     cursor: Option<String>,
+    min_params: Option<u32>,
+    max_params: Option<u32>,
+    only_moe: bool,
     state: State<'_, AppState>,
 ) -> Result<discover::Page, String> {
-    discover::browse(&state.trees, sort, search, cursor, state.device_budget())
+    let params = match (min_params, max_params) {
+        (None, None) => None,
+        band => Some(band),
+    };
+    discover::browse(
+        &state.trees,
+        sort,
+        search,
+        cursor,
+        &discover::Narrow { params, only_moe },
+        state.device_budget(),
+    )
 }
 
 /// One repository: the facts it states, and every quantisation with its own verdict. The

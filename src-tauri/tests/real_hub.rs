@@ -21,6 +21,7 @@ fn query(sort: Sort) -> Query {
         search: None,
         limit: 24,
         cursor: None,
+        params: None,
     }
 }
 
@@ -84,20 +85,21 @@ fn a_search_finds_a_named_model_and_the_term_survives_encoding() {
 
 #[test]
 #[ignore = "reads the live Hugging Face index"]
-fn the_cheap_expand_set_is_what_the_client_was_sized_for() {
+fn the_expand_set_is_what_the_client_was_sized_for() {
     let body = http()
         .get(&hub::listing_url(&query(Sort::Trending)))
         .expect("a listing body")
         .body;
+    // expand=gguf brings the chat templates with it and there is no way to decline them.
+    // The bound is here so the cost stays a decision rather than a drift.
     assert!(
-        body.len() < 20_000,
-        "24 rows came to {} bytes; the set was measured at 4,582 and the reason \
-         expand=gguf is refused is that it costs 271,439",
+        body.len() < 600_000,
+        "24 rows came to {} bytes; expand=gguf was measured at 271,439",
         body.len()
     );
     assert!(
-        !body.contains("chat_template"),
-        "the listing is carrying chat templates, which nothing here reads"
+        body.contains("architecture"),
+        "no architecture in the listing, so every row would come back unmarked for MoE"
     );
 }
 
@@ -309,4 +311,74 @@ fn the_index_really_does_serve_models_llama_server_cannot_run() {
         "refused {} of 100, {untagged} carry no tag at all",
         refused.len()
     );
+}
+
+#[test]
+#[ignore = "reads the live Hugging Face index"]
+fn a_parameter_band_is_honoured_by_the_api_and_survives_the_sidecar_trap() {
+    let band = hub::list(
+        &http(),
+        &Query {
+            params: Some((Some(20), Some(40))),
+            ..query(Sort::Downloads)
+        },
+    )
+    .expect("a listing")
+    .repos;
+    assert!(!band.is_empty(), "the 20-40B band came back empty");
+
+    // Not checked against gguf.total, which is read off one file and reports 1.86B for a
+    // 27B repository. The API's own figure is what the band is applied to and it is the
+    // better one -- that repository still lands in this band.
+    let small = hub::list(
+        &http(),
+        &Query {
+            params: Some((None, Some(4))),
+            ..query(Sort::Downloads)
+        },
+    )
+    .expect("a listing")
+    .repos;
+    let overlap = band
+        .iter()
+        .filter(|repo| small.iter().any(|other| other.id == repo.id))
+        .count();
+    assert_eq!(
+        overlap, 0,
+        "{overlap} repositories are both under 4B and over 20B"
+    );
+}
+
+#[test]
+#[ignore = "reads the live Hugging Face index"]
+fn neither_moe_signal_is_close_to_complete_on_its_own() {
+    let repos = hub::list(
+        &http(),
+        &Query {
+            limit: 100,
+            ..query(Sort::Downloads)
+        },
+    )
+    .expect("a listing")
+    .repos;
+
+    let marked = repos.iter().filter(|repo| repo.moe).count();
+    let by_arch = repos
+        .iter()
+        .filter(|repo| {
+            repo.architecture
+                .as_deref()
+                .is_some_and(|arch| arch.to_ascii_lowercase().contains("moe"))
+        })
+        .count();
+    assert!(
+        marked > 0,
+        "no mixture of experts in 100 of the most downloaded"
+    );
+    assert!(
+        marked > by_arch,
+        "the tag added nothing: {marked} marked, {by_arch} by architecture alone. \
+         Either the tag stopped being served or expand=tags was dropped."
+    );
+    println!("{marked} marked, {by_arch} of them by architecture alone");
 }

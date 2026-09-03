@@ -3,7 +3,7 @@ import { discoverBrowse, discoverDownload, downloadStart } from "./api";
 import DiscoverDetail from "./DiscoverDetail";
 import { formatFileSize } from "./format";
 import { CloseIcon, DownloadIcon, SearchIcon } from "./icons";
-import type { DiscoverRow, DiscoverSort } from "./types";
+import type { DiscoverRow, DiscoverSort, ParamBand } from "./types";
 
 /// Sorts and filters are different questions and stopped sharing a widget on 2026-09-03,
 /// after the author used the version where they did. A sort says what order; a filter says
@@ -24,6 +24,17 @@ const SORTS = [
 /// not among the filters. It sorts what the page already holds rather than asking the API,
 /// because the API cannot sort by a size it never returns.
 const BY_SIZE = "smallest";
+
+/// Asked of the API rather than measured here. Its parameter figure is the better one:
+/// a repository whose own metadata reports 1.86B for a 27B model still lands in the
+/// 20-40B band, because that figure is read off one file and this one is not.
+const BANDS: ReadonlyArray<{ id: string; label: string; band: ParamBand }> = [
+  { id: "any", label: "Any size", band: { min: null, max: null } },
+  { id: "tiny", label: "Up to 4B", band: { min: null, max: 4 } },
+  { id: "small", label: "4B to 14B", band: { min: 4, max: 14 } },
+  { id: "mid", label: "14B to 40B", band: { min: 14, max: 40 } },
+  { id: "large", label: "Over 40B", band: { min: 40, max: null } },
+];
 type SortId = (typeof SORTS)[number]["id"] | typeof BY_SIZE;
 
 function compact(count: number): string {
@@ -83,6 +94,7 @@ export default function Discover({
   const [sort, setSort] = useState<SortId>("trending");
   const [onlyFits, setOnlyFits] = useState(true);
   const [onlyMoe, setOnlyMoe] = useState(false);
+  const [bandId, setBandId] = useState("any");
   const [rows, setRows] = useState<DiscoverRow[]>([]);
   const [next, setNext] = useState<string | null>(null);
   const [query, setQuery] = useState("");
@@ -97,32 +109,39 @@ export default function Discover({
   const asked: DiscoverSort = sort === BY_SIZE ? "trending" : sort;
   const chosen = SORTS.find((entry) => entry.id === asked) ?? SORTS[0];
 
-  const load = useCallback((sort: DiscoverSort, search: string | null) => {
-    setBusy(true);
-    setFailure(null);
-    discoverBrowse(sort, search, null)
-      .then((page) => {
-        setRows(page.rows);
-        setNext(page.next);
-      })
-      .catch((e) => {
-        setRows([]);
-        setNext(null);
-        setFailure(String(e));
-      })
-      .finally(() => setBusy(false));
-  }, []);
+  const band = (BANDS.find((entry) => entry.id === bandId) ?? BANDS[0]).band;
 
+  const load = useCallback(
+    (sort: DiscoverSort, search: string | null, band: ParamBand, moe: boolean) => {
+      setBusy(true);
+      setFailure(null);
+      return discoverBrowse(sort, search, null, band, moe)
+        .then((page) => {
+          setRows(page.rows);
+          setNext(page.next);
+        })
+        .catch((e) => {
+          setRows([]);
+          setNext(null);
+          setFailure(String(e));
+        })
+        .finally(() => setBusy(false));
+    },
+    [],
+  );
+
+  // The band and the MoE filter are applied before a single tree is fetched, so changing
+  // either re-asks rather than re-filtering what is on screen.
   useEffect(() => {
-    load(asked, searched);
-  }, [asked, searched, load]);
+    load(asked, searched, band, onlyMoe);
+  }, [asked, searched, band.min, band.max, onlyMoe, load]);
 
   /// Appends rather than replaces, and only ever follows the cursor the last page gave —
   /// rebuilding the query would come back sorted differently from what is already on screen.
   const loadMore = () => {
     if (!next) return;
     setMore(true);
-    discoverBrowse(asked, searched, next)
+    discoverBrowse(asked, searched, next, band, onlyMoe)
       .then((page) => {
         setRows((prev) => [...prev, ...page.rows]);
         setNext(page.next);
@@ -165,7 +184,6 @@ export default function Discover({
   // judge, so it survives every filter and sorts last.
   let shown = rows;
   if (onlyFits) shown = shown.filter((row) => row.pick !== null && row.pick.fits !== false);
-  if (onlyMoe) shown = shown.filter((row) => row.moe);
   if (sort === BY_SIZE) {
     shown = [...shown].sort(
       (a, b) =>
@@ -219,6 +237,17 @@ export default function Discover({
       <div className="chip-row">
         <select
           className="sort-select"
+          value={bandId}
+          onChange={(e) => setBandId(e.currentTarget.value)}
+        >
+          {BANDS.map((entry) => (
+            <option key={entry.id} value={entry.id}>
+              {entry.label}
+            </option>
+          ))}
+        </select>
+        <select
+          className="sort-select"
           value={sort}
           onChange={(e) => setSort(e.currentTarget.value as SortId)}
         >
@@ -238,7 +267,7 @@ export default function Discover({
         </button>
         <button
           className={`chip${onlyMoe ? " is-active" : ""}`}
-          title="Marked only where the file's architecture names it. The index carries no expert count, so some mixtures of experts are not marked and this filter will not show them."
+          title="Marked where the uploader tagged it or the file's architecture names it. Neither signal is complete on its own — over 300 repositories, 35 carry the tag, 34 the architecture, and only 13 both."
           onClick={() => setOnlyMoe((on) => !on)}
         >
           MoE

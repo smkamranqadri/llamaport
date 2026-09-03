@@ -11,15 +11,23 @@ use serde::{Deserialize, Serialize};
 
 const HOST: &str = "https://huggingface.co";
 
-/// Never `full=true`, and never `expand=gguf`. Measured 2026-09-03 over 24 rows: this set
-/// costs 4,582 bytes, `full=true` costs 78,022, and adding `expand=gguf` costs 271,439 —
-/// fifty-nine times, almost all of it `chat_template`, which nothing here reads.
-const EXPAND: [&str; 5] = [
+/// Never `full=true`. **`expand=gguf` was refused here on a byte count and is now
+/// included**, which is a reversal on purpose: the architecture exists nowhere else, and
+/// without it a row cannot say whether a model is a mixture of experts. The cost was
+/// re-measured rather than argued from the bytes — 0.82s to 1.38s over 24 rows, against a
+/// page already spending 2.3s fetching trees. `expand=tags` comes with it and is small.
+///
+/// The byte figures, for the record: this set without `gguf` is 4,582 over 24 rows,
+/// `full=true` is 78,022, and adding `gguf` is 271,439 — almost all of it `chat_template`,
+/// which nothing here reads and nothing here can decline.
+const EXPAND: [&str; 7] = [
     "downloads",
     "likes",
     "lastModified",
     "gated",
     "pipeline_tag",
+    "gguf",
+    "tags",
 ];
 
 /// Only descending is ever asked for, which is as well: the API refuses `direction=1` on
@@ -54,6 +62,11 @@ pub struct Query {
     pub limit: usize,
     /// A `rel="next"` URL from an earlier page, followed as given.
     pub cursor: Option<String>,
+    /// Billions of parameters, inclusive. Filtered by the API rather than here: its figure
+    /// survives the sidecar trap that makes `gguf.total` report 1.86B for a 27B model,
+    /// checked 2026-09-03 on a repository that reads 1.86B and still lands in the 20–40B
+    /// band.
+    pub params: Option<(Option<u32>, Option<u32>)>,
 }
 
 /// A body, and where the next page is if there is one.
@@ -133,15 +146,24 @@ pub struct Repo {
     /// its base architecture, so this survives where the parameter count does not.
     pub architecture: Option<String>,
     pub context_length: Option<u64>,
-    /// **Only where the architecture says so.** `qwen3moe` and `qwen35moe` do; `qwen4exp`
-    /// is a 131B-A6B mixture of experts and does not, so it comes back `false` here. The
-    /// API carries no expert count — only a downloaded file does, through
-    /// [`crate::gguf::Metadata::is_moe`] — so this under-reports rather than guessing.
-    /// Six of sixty trending repositories qualify, measured 2026-09-03.
+    /// **Two independent signals, and neither is close to complete on its own.** Measured
+    /// over 300 GGUF repositories 2026-09-03: the uploader's `moe` tag is on 35, an
+    /// architecture naming MoE covers 34, **only 13 carry both**, and the union is 56.
+    /// The tag catches `deepseek4`, `laguna` and `qwen4exp`, whose architectures say
+    /// nothing; the architecture catches `unsloth/Qwen3-Coder-30B-A3B-Instruct-GGUF`,
+    /// which nobody tagged. Each alone misses about two in five.
+    ///
+    /// Still never a guess from the repository's name. A tag is a claim its uploader
+    /// made and an architecture is a fact read out of the file; both are evidence, where
+    /// `-A3B` in a title is only a naming habit. Certainty for a model already on disk
+    /// stays [`crate::gguf::Metadata::is_moe`], which reads a real expert count.
     pub moe: bool,
 }
 
-fn says_moe(architecture: Option<&str>) -> bool {
+fn says_moe(architecture: Option<&str>, tags: &[String]) -> bool {
+    if tags.iter().any(|tag| tag.eq_ignore_ascii_case("moe")) {
+        return true;
+    }
     architecture.is_some_and(|arch| arch.to_ascii_lowercase().contains("moe"))
 }
 
@@ -253,6 +275,19 @@ pub fn listing_url(query: &Query) -> String {
         url.push_str("&expand=");
         url.push_str(field);
     }
+    if let Some((min, max)) = query.params {
+        let mut terms = Vec::new();
+        if let Some(min) = min {
+            terms.push(format!("min:{min}B"));
+        }
+        if let Some(max) = max {
+            terms.push(format!("max:{max}B"));
+        }
+        if !terms.is_empty() {
+            url.push_str("&num_parameters=");
+            url.push_str(&encoded(&terms.join(",")));
+        }
+    }
     if let Some(search) = query.search.as_deref().map(str::trim) {
         if !search.is_empty() {
             url.push_str("&search=");
@@ -359,6 +394,8 @@ struct RawRepo {
     pipeline_tag: Option<String>,
     #[serde(default)]
     gguf: Option<RawGguf>,
+    #[serde(default)]
+    tags: Vec<String>,
 }
 
 #[derive(Deserialize)]
@@ -391,7 +428,10 @@ pub fn parse_listing(body: &str) -> Result<Vec<Repo>, String> {
             last_modified: repo.last_modified,
             gated: repo.gated.is_some_and(|gated| gated.is_gated()),
             pipeline_tag: repo.pipeline_tag,
-            moe: says_moe(repo.gguf.as_ref().and_then(|g| g.architecture.as_deref())),
+            moe: says_moe(
+                repo.gguf.as_ref().and_then(|g| g.architecture.as_deref()),
+                &repo.tags,
+            ),
             architecture: repo.gguf.as_ref().and_then(|g| g.architecture.clone()),
             context_length: repo.gguf.as_ref().and_then(|g| g.context_length),
         })
@@ -485,6 +525,7 @@ mod tests {
             search: None,
             limit: 24,
             cursor: None,
+            params: None,
         }
     }
 
@@ -497,7 +538,12 @@ mod tests {
         for field in EXPAND {
             assert!(url.contains(&format!("expand={field}")), "{url}");
         }
-        assert!(!url.contains("expand=gguf"), "{url}");
+        // expand=gguf is required, not refused: the architecture behind the MoE mark
+        // comes from nowhere else. This assertion used to say the opposite, and it went
+        // on passing for a commit in which the field was silently absent and every row
+        // came back unmarked.
+        assert!(url.contains("expand=gguf"), "{url}");
+        assert!(url.contains("expand=tags"), "{url}");
         assert!(!url.contains("full=true"), "{url}");
     }
 
@@ -625,17 +671,42 @@ mod tests {
         );
     }
 
+    fn tags(list: &[&str]) -> Vec<String> {
+        list.iter().map(|tag| tag.to_string()).collect()
+    }
+
     #[test]
-    fn a_mixture_of_experts_is_marked_only_where_the_architecture_says_so() {
-        assert!(says_moe(Some("qwen3moe")));
-        assert!(says_moe(Some("qwen35moe")));
-        assert!(says_moe(Some("QWEN3MOE")));
-        assert!(!says_moe(Some("qwen35")));
-        assert!(!says_moe(None));
-        // Deliberately unmarked. Qwen3.8-Flash-Next is a 131B-A6B mixture of experts and
-        // its architecture does not say so, and the index carries no expert count. Marking
-        // it would mean guessing from the repository's name, and this app does not.
-        assert!(!says_moe(Some("qwen4exp")));
+    fn a_mixture_of_experts_is_read_from_two_signals_because_neither_is_complete() {
+        // Architecture alone. Nobody tagged unsloth/Qwen3-Coder-30B-A3B-Instruct-GGUF.
+        assert!(says_moe(Some("qwen3moe"), &[]));
+        assert!(says_moe(Some("QWEN35MOE"), &[]));
+        // Tag alone. qwen4exp is a 131B-A6B mixture of experts whose architecture is silent.
+        assert!(says_moe(Some("qwen4exp"), &tags(&["gguf", "moe"])));
+        assert!(says_moe(Some("deepseek4"), &tags(&["moe"])));
+        assert!(says_moe(None, &tags(&["MoE"])));
+
+        assert!(!says_moe(
+            Some("qwen35"),
+            &tags(&["gguf", "conversational"])
+        ));
+        assert!(!says_moe(None, &[]));
+        // Not from the name: -A3B is a naming habit, not a claim anybody made.
+        assert!(!says_moe(Some("llama"), &tags(&["Qwen3-Coder-30B-A3B"])));
+    }
+
+    #[test]
+    fn a_parameter_band_is_asked_of_the_api_rather_than_filtered_here() {
+        let banded = |params| {
+            listing_url(&Query {
+                params,
+                ..query(Sort::Downloads)
+            })
+        };
+        assert!(banded(Some((Some(20), Some(40)))).contains("num_parameters=min%3A20B%2Cmax%3A40B"));
+        assert!(banded(Some((Some(40), None))).contains("num_parameters=min%3A40B"));
+        assert!(banded(Some((None, Some(4)))).contains("num_parameters=max%3A4B"));
+        assert!(!banded(None).contains("num_parameters"));
+        assert!(!banded(Some((None, None))).contains("num_parameters"));
     }
 
     #[test]

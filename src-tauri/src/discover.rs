@@ -93,11 +93,24 @@ pub struct Offer {
     pub picked: bool,
 }
 
+/// What the reader has narrowed the listing to. Kept together because both are decided
+/// before a single tree is fetched, which is what makes them cheap: a filtered-out row
+/// never costs a call.
+#[derive(Debug, Clone, Default)]
+pub struct Narrow {
+    /// Billions of parameters, inclusive, asked of the API.
+    pub params: Option<(Option<u32>, Option<u32>)>,
+    /// Applied here rather than by the API. `filter=gguf,moe` would return only the
+    /// tagged ones and drop 21 of the 56 a 300-repository sample found.
+    pub only_moe: bool,
+}
+
 pub fn browse(
     trees: &Trees,
     sort: Sort,
     search: Option<String>,
     cursor: Option<String>,
+    narrow: &Narrow,
     ceiling: Option<u64>,
 ) -> Result<Page, String> {
     let http = Http::new(TIMEOUT);
@@ -108,6 +121,7 @@ pub fn browse(
             search,
             limit: PAGE,
             cursor,
+            params: narrow.params,
         },
     )?;
     // An ASR model, an embedding model and an image generator are all GGUF files this app
@@ -117,6 +131,7 @@ pub fn browse(
         .repos
         .into_iter()
         .filter(|repo| hub::serves_text(repo.pipeline_tag.as_deref()))
+        .filter(|repo| !narrow.only_moe || repo.moe)
         .collect();
 
     // A gated repository is skipped rather than fetched. Its tree answers 200 and its

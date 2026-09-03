@@ -10,6 +10,7 @@ import type {
   DiscoverDetail,
   DiscoverPage,
   DiscoverSort,
+  ParamBand,
   HealthReport,
   LaunchPlan,
   MachineMemory,
@@ -158,8 +159,17 @@ export function discoverBrowse(
   sort: DiscoverSort,
   search: string | null,
   cursor: string | null,
+  band: ParamBand,
+  onlyMoe: boolean,
 ): Promise<DiscoverPage> {
-  return invoke<DiscoverPage>("discover_browse", { sort, search, cursor });
+  return invoke<DiscoverPage>("discover_browse", {
+    sort,
+    search,
+    cursor,
+    minParams: band.min ?? null,
+    maxParams: band.max ?? null,
+    onlyMoe,
+  });
 }
 
 /// One repository: its facts and every quantisation, each with its own verdict.
