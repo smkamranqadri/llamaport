@@ -7,6 +7,8 @@ import type {
   DownloadJob,
   DownloadOptions,
   DownloadProgress,
+  DiscoverRow,
+  DiscoverSort,
   HealthReport,
   LaunchPlan,
   MachineMemory,
@@ -147,6 +149,23 @@ export function tuneCancel(): Promise<TuneReport> {
 
 export function downloadStart(url: string): Promise<DownloadJob[]> {
   return invoke<DownloadJob[]>("download_start", { url });
+}
+
+/// One listing call and a file tree per row, so this takes a couple of seconds rather
+/// than the milliseconds every other command here takes.
+export function discoverBrowse(
+  sort: DiscoverSort,
+  search: string | null,
+): Promise<DiscoverRow[]> {
+  return invoke<DiscoverRow[]>("discover_browse", { sort, search });
+}
+
+/// A shard set is several files and becomes several queued jobs.
+export function discoverDownload(
+  repo: string,
+  paths: string[],
+): Promise<DownloadJob[]> {
+  return invoke<DownloadJob[]>("discover_download", { repo, paths });
 }
 
 export function downloadPause(id: string): Promise<DownloadJob[]> {

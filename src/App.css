@@ -2320,3 +2320,104 @@ input[type="range"] {
   padding: 0;
   font-size: 12px;
 }
+
+/* Discover */
+
+/* Wider than the Downloads field it shares a shape with, because on this screen the box is
+   the primary way in rather than a way to paste one link. The artboard draws it about this
+   wide for the same reason. */
+.discover-field {
+  width: 470px;
+}
+
+.chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 4px 0 18px;
+}
+
+.chip {
+  padding: 6px 14px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text-muted);
+  background: var(--bg-card2);
+  border: 1px solid transparent;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.chip:hover {
+  background: var(--bg-hover);
+}
+
+/* The same selected treatment the Appearance rows use, so a chosen thing looks chosen
+   the same way on every screen. */
+.chip.is-active {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border-color: var(--accent);
+}
+
+.discover-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.discover-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 14px;
+  background: var(--bg-card2);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+}
+
+.discover-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.discover-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.discover-name {
+  overflow: hidden;
+  font-weight: 550;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.discover-owner {
+  flex: none;
+  color: var(--text-muted);
+}
+
+.discover-size {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Over the ceiling is the one thing this screen is willing to assert, because every term
+   it cannot see moves the real requirement up rather than down. */
+.discover-over {
+  color: var(--danger);
+}
+
+.discover-note {
+  color: var(--text-muted);
+  font-size: 12px;
+}

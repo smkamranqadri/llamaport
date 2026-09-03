@@ -1,5 +1,6 @@
 pub mod activity;
 pub mod catalog;
+pub mod discover;
 pub mod download;
 pub mod downloads;
 pub mod estimate;
@@ -59,6 +60,7 @@ struct AppState {
     tray: Mutex<Option<TrayHandles>>,
     orphan: Mutex<Vec<Orphan>>,
     activity: activity::Monitor,
+    trees: discover::Trees,
 }
 
 impl AppState {
@@ -70,6 +72,15 @@ impl AppState {
     fn save_config(&self) -> Result<(), String> {
         let config = self.config.lock().expect("config lock");
         store::save(&config).map_err(|e| e.to_string())
+    }
+
+    /// What a launch must fit inside, off `llama-server --list-devices`. `None` until the
+    /// binary has been found, which is a real state on a first run.
+    fn device_budget(&self) -> Option<u64> {
+        self.capabilities()
+            .ok()
+            .and_then(|caps| caps.device_budget_mib())
+            .map(|mib| mib * 1024 * 1024)
     }
 
     fn model(&self, model_id: &str) -> Result<ModelEntry, String> {
@@ -352,11 +363,7 @@ fn machine_memory(state: State<'_, AppState>) -> MachineMemory {
     MachineMemory {
         installed_bytes: sysmem::installed_bytes().or_else(|| Some(system.total_memory())),
         available_bytes: Some(system.available_memory()),
-        device_budget_bytes: state
-            .capabilities()
-            .ok()
-            .and_then(|caps| caps.device_budget_mib())
-            .map(|mib| mib * 1024 * 1024),
+        device_budget_bytes: state.device_budget(),
     }
 }
 
@@ -474,11 +481,7 @@ fn activity_snapshot(state: State<'_, AppState>) -> activity::Activity {
     let (processes, total_cpu) = state.activity.poll(&known);
     activity.processes = processes;
     activity.total_cpu_percent = total_cpu;
-    activity.device_budget_bytes = state
-        .capabilities()
-        .ok()
-        .and_then(|caps| caps.device_budget_mib())
-        .map(|mib| mib * 1024 * 1024);
+    activity.device_budget_bytes = state.device_budget();
 
     // What the running launch asks of the GPU, priced at the context the server actually
     // accepted rather than at Auto, which names no number at all.
@@ -835,6 +838,41 @@ fn download_start(url: String, state: State<'_, AppState>) -> Result<Vec<Downloa
     state.downloads.start(&url, &dir, &options)
 }
 
+/// One listing call and a file tree for each row that needs one. Slow by the standards of
+/// this app's other commands — a couple of seconds — because the sizes exist nowhere else.
+#[tauri::command]
+fn discover_browse(
+    sort: hub::Sort,
+    search: Option<String>,
+    state: State<'_, AppState>,
+) -> Result<Vec<discover::Row>, String> {
+    discover::browse(&state.trees, sort, search, state.device_budget())
+}
+
+/// Hands the chosen quantisation to the queue that already exists. A shard set is several
+/// files and becomes several jobs, which is what the queue was built for.
+///
+/// Every URL is built by `hub::download_url` and then admitted by `download_start`'s own
+/// path, so `downloads::file_name_for` stays the only thing deciding what may land in the
+/// models directory.
+#[tauri::command]
+fn discover_download(
+    repo: String,
+    paths: Vec<String>,
+    state: State<'_, AppState>,
+) -> Result<Vec<DownloadJob>, String> {
+    let urls: Vec<String> = paths
+        .iter()
+        .map(|path| hub::download_url(&repo, path))
+        .collect::<Result<_, _>>()?;
+
+    let mut jobs = state.downloads.snapshot();
+    for url in urls {
+        jobs = download_start(url, state.clone())?;
+    }
+    Ok(jobs)
+}
+
 #[tauri::command]
 fn download_pause(id: String, state: State<'_, AppState>) -> Result<Vec<DownloadJob>, String> {
     state.downloads.pause(&id)
@@ -1012,6 +1050,7 @@ pub fn run() {
                 tray: Mutex::new(None),
                 orphan: Mutex::new(runner::detect_orphans(None)),
                 activity: activity::Monitor::new(),
+                trees: discover::Trees::default(),
             });
 
             // What finished came from the history file; what did not is on the disk, in
@@ -1107,6 +1146,8 @@ pub fn run() {
             pi_preview,
             pi_apply,
             download_start,
+            discover_browse,
+            discover_download,
             download_pause,
             download_resume,
             download_discard,

@@ -360,3 +360,35 @@ export interface PiPreview {
   sharingPort: string[];
   reasoning: boolean;
 }
+
+/// The four lists Discover offers. `trending` is Hugging Face's own trendingScore, which
+/// only ever sorts descending; `downloads` is its thirty-day figure, not the all-time one.
+export type DiscoverSort = "trending" | "downloads" | "likes";
+
+export interface QuantCandidate {
+  label: string;
+  /// One path, or every shard of a set in order.
+  paths: string[];
+  size: number;
+}
+
+export interface QuantPick {
+  candidate: QuantCandidate;
+  /// `null` when there is no ceiling to measure against, which is a real state: it means
+  /// llama-server has not been found, not that the file is too big.
+  fits: boolean | null;
+}
+
+export interface DiscoverRow {
+  id: string;
+  owner: string;
+  name: string;
+  downloads: number;
+  likes: number;
+  lastModified: string | null;
+  gated: boolean;
+  pick: QuantPick | null;
+  quants: number;
+  /// Why there is nothing to download, when there is nothing to download.
+  note: string | null;
+}
