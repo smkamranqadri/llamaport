@@ -282,8 +282,7 @@ export interface Settings {
 
 export interface TuneCandidate {
   ctx: number;
-  cacheK: string;
-  cacheV: string;
+  cache: string;
 }
 
 export interface TuneReading {

@@ -1,6 +1,8 @@
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::Mutex;
+use std::time::SystemTime;
 
 use serde::Serialize;
 
@@ -183,6 +185,65 @@ fn read_version(binary: &Path) -> Option<String> {
         })
 }
 
+const NOT_FOUND: &str = "llama-server was not found on PATH or in the usual locations. \
+     Install it with `brew install llama.cpp`, or set its path in Settings.";
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct Stamp {
+    modified: SystemTime,
+    len: u64,
+}
+
+fn stamp(binary: &Path) -> Option<Stamp> {
+    let meta = std::fs::metadata(binary).ok()?;
+    Some(Stamp {
+        modified: meta.modified().ok()?,
+        len: meta.len(),
+    })
+}
+
+struct Probed {
+    stamp: Option<Stamp>,
+    result: Result<Capabilities, String>,
+}
+
+/// The probe, kept until the binary it was read off changes. A Homebrew upgrade replaces
+/// the file in place, and flags probed off the old one would otherwise stand until the
+/// app was relaunched.
+#[derive(Default)]
+pub struct Cache(Mutex<Option<Probed>>);
+
+impl Cache {
+    pub fn get(&self, configured: Option<&str>) -> Result<Capabilities, String> {
+        let mut cached = self.0.lock().expect("caps lock");
+        if let Some(probed) = cached.as_ref() {
+            let unchanged = match (&probed.result, &probed.stamp) {
+                (Ok(caps), Some(seen)) => stamp(Path::new(&caps.binary)).as_ref() == Some(seen),
+                _ => true,
+            };
+            if unchanged {
+                return probed.result.clone();
+            }
+        }
+
+        // Stamped before the probe runs: a file replaced during it would otherwise be
+        // remembered under the old flags for good.
+        let (stamp, result) = match discover(configured) {
+            Some(binary) => (stamp(&binary), probe(&binary)),
+            None => (None, Err(NOT_FOUND.into())),
+        };
+        *cached = Some(Probed {
+            stamp,
+            result: result.clone(),
+        });
+        result
+    }
+
+    pub fn forget(&self) {
+        *self.0.lock().expect("caps lock") = None;
+    }
+}
+
 pub fn probe(binary: &Path) -> Result<Capabilities, String> {
     let output = Command::new(binary)
         .arg("--help")
@@ -314,6 +375,50 @@ Available devices:
         );
         assert_eq!(devices.len(), 1);
         assert_eq!(devices[0].total_mib, 100);
+    }
+
+    #[test]
+    fn a_replaced_binary_is_probed_again_and_an_unchanged_one_is_not() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let dir = std::env::temp_dir().join(format!("llamaport-probe-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("scratch dir");
+        let binary = dir.join("llama-server");
+        let calls = dir.join("calls");
+        let script = |flags: &str| {
+            format!(
+                "#!/bin/sh\necho x >> '{}'\necho '{flags}'\n",
+                calls.display()
+            )
+        };
+        let runs = || {
+            std::fs::read_to_string(&calls)
+                .map(|text| text.lines().count())
+                .unwrap_or(0)
+        };
+
+        std::fs::write(&binary, script("--ctx-size N")).expect("script");
+        std::fs::set_permissions(&binary, std::fs::Permissions::from_mode(0o755)).expect("mode");
+        let configured = binary.to_str();
+
+        let cache = Cache::default();
+        let first = cache.get(configured).expect("a probe");
+        assert!(first.has("--ctx-size"));
+        let after_first = runs();
+        assert!(after_first > 0, "the script was run");
+
+        let again = cache.get(configured).expect("a probe");
+        assert!(again.has("--ctx-size"));
+        assert_eq!(runs(), after_first, "an unchanged binary was probed again");
+
+        std::fs::write(&binary, script("--fit on")).expect("script");
+        let replaced = cache.get(configured).expect("a probe");
+        assert!(replaced.has("--fit"), "{:?}", replaced.flags);
+        assert!(!replaced.has("--ctx-size"), "the old probe was served");
+        assert!(runs() > after_first, "the replaced binary was not probed");
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

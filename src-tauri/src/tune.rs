@@ -45,14 +45,8 @@ pub const PORT: u16 = 9977;
 #[serde(rename_all = "camelCase")]
 pub struct Candidate {
     pub ctx: u64,
-    pub cache_k: String,
-    pub cache_v: String,
-}
-
-impl Candidate {
-    fn cache(&self) -> &str {
-        &self.cache_k
-    }
+    /// One type for K and V both: the ladder varies precision, never the split.
+    pub cache: String,
 }
 
 /// What a launch has to fit inside, or `None` where the build did not say — in which
@@ -88,8 +82,7 @@ pub fn candidates(md: &GgufMetadata, file_size: u64, caps: &Capabilities) -> Vec
             if fits(md, file_size, *ctx, cache, budget) {
                 fitting.push(Candidate {
                     ctx: *ctx,
-                    cache_k: cache.to_string(),
-                    cache_v: cache.to_string(),
+                    cache: cache.to_string(),
                 });
             }
         }
@@ -97,7 +90,7 @@ pub fn candidates(md: &GgufMetadata, file_size: u64, caps: &Capabilities) -> Vec
 
     let Some(widest) = fitting
         .iter()
-        .max_by_key(|c| (c.ctx, c.cache() == "f16"))
+        .max_by_key(|c| (c.ctx, c.cache == "f16"))
         .cloned()
     else {
         return Vec::new();
@@ -107,21 +100,21 @@ pub fn candidates(md: &GgufMetadata, file_size: u64, caps: &Capabilities) -> Vec
     if let Some(small) = fitting
         .iter()
         .filter(|c| c.ctx <= 8192)
-        .max_by_key(|c| (c.cache() == "f16", c.ctx))
+        .max_by_key(|c| (c.cache == "f16", c.ctx))
     {
         wanted.push(small.clone());
     }
     if let Some(mid) = fitting
         .iter()
         .filter(|c| (16384..=65536).contains(&c.ctx))
-        .max_by_key(|c| (c.cache() == "f16", c.ctx))
+        .max_by_key(|c| (c.cache == "f16", c.ctx))
     {
         wanted.push(mid.clone());
     }
     wanted.extend(
         fitting
             .iter()
-            .filter(|c| c.ctx == widest.ctx && c.cache() != widest.cache())
+            .filter(|c| c.ctx == widest.ctx && c.cache != widest.cache)
             .cloned(),
     );
 
@@ -248,8 +241,8 @@ impl Server {
 pub fn profile_for(base: &Profile, candidate: &Candidate) -> Profile {
     let mut profile = base.clone();
     profile.ctx = candidate.ctx;
-    profile.cache_type_k = candidate.cache_k.clone();
-    profile.cache_type_v = candidate.cache_v.clone();
+    profile.cache_type_k = candidate.cache.clone();
+    profile.cache_type_v = candidate.cache.clone();
     profile.port = PORT;
     profile
 }
@@ -609,7 +602,7 @@ mod tests {
             "the rule Tune exists to check goes first: {picked:?}"
         );
         assert!(
-            picked.iter().any(|c| c.cache() != widest.cache()),
+            picked.iter().any(|c| c.cache != widest.cache),
             "both cache types are measured, or the axis that beat the arithmetic on \
              Ornith is never tried: {picked:?}"
         );
@@ -624,15 +617,11 @@ mod tests {
         let widest = picked[0].clone();
 
         assert_eq!(widest.ctx, 262_144);
-        assert_eq!(
-            widest.cache(),
-            "f16",
-            "the more precise of two that both fit"
-        );
+        assert_eq!(widest.cache, "f16", "the more precise of two that both fit");
         assert!(
             picked
                 .iter()
-                .any(|c| c.ctx == widest.ctx && c.cache() == "q8_0"),
+                .any(|c| c.ctx == widest.ctx && c.cache == "q8_0"),
             "{picked:?}"
         );
     }
@@ -655,7 +644,7 @@ mod tests {
 
         for candidate in candidates(&md, 1_000_000_000, &caps) {
             assert!(
-                fits(&md, 1_000_000_000, candidate.ctx, candidate.cache(), budget),
+                fits(&md, 1_000_000_000, candidate.ctx, &candidate.cache, budget),
                 "{candidate:?} does not fit and would only measure a failure to load"
             );
         }
@@ -696,8 +685,7 @@ mod tests {
 
         let tiny = vec![Candidate {
             ctx: 4096,
-            cache_k: "f16".into(),
-            cache_v: "f16".into(),
+            cache: "f16".into(),
         }];
         assert!(prompt_for(&tiny).split_whitespace().count() >= 256);
     }
@@ -707,13 +695,11 @@ mod tests {
         let spread = vec![
             Candidate {
                 ctx: 262_144,
-                cache_k: "q8_0".into(),
-                cache_v: "q8_0".into(),
+                cache: "q8_0".into(),
             },
             Candidate {
                 ctx: 8192,
-                cache_k: "f16".into(),
-                cache_v: "f16".into(),
+                cache: "f16".into(),
             },
         ];
         let prompt = prompt_for(&spread);
@@ -744,8 +730,7 @@ mod tests {
                 Outcome {
                     candidate: Candidate {
                         ctx: 262_144,
-                        cache_k: "q8_0".into(),
-                        cache_v: "q8_0".into(),
+                        cache: "q8_0".into(),
                     },
                     reading: Some(Reading {
                         prompt_tokens: 3794.0,
@@ -758,8 +743,7 @@ mod tests {
                 Outcome {
                     candidate: Candidate {
                         ctx: 65_536,
-                        cache_k: "f16".into(),
-                        cache_v: "f16".into(),
+                        cache: "f16".into(),
                     },
                     reading: Some(Reading {
                         prompt_tokens: 3794.0,
@@ -772,8 +756,7 @@ mod tests {
                 Outcome {
                     candidate: Candidate {
                         ctx: 131_072,
-                        cache_k: "f16".into(),
-                        cache_v: "f16".into(),
+                        cache: "f16".into(),
                     },
                     reading: None,
                     error: Some("did not load".into()),

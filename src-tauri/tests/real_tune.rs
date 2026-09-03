@@ -53,8 +53,7 @@ fn machine(name: &str) -> Option<(ModelEntry, Capabilities)> {
 fn rung(ctx: u64, cache: &str) -> Candidate {
     Candidate {
         ctx,
-        cache_k: cache.into(),
-        cache_v: cache.into(),
+        cache: cache.into(),
     }
 }
 
@@ -72,7 +71,7 @@ fn the_candidates_agree_with_the_oracle() {
     let picked = tune::candidates(metadata, model.size_bytes, &caps);
     println!("{} on {}", model.file_name, caps.binary);
     for candidate in &picked {
-        println!("  {:>9} ctx / {}", candidate.ctx, candidate.cache_k);
+        println!("  {:>9} ctx / {}", candidate.ctx, candidate.cache);
     }
 
     assert_eq!(
@@ -113,7 +112,7 @@ fn the_ladder_reproduces_the_oracles_ordering() {
     for candidate in &picked {
         let profile = tune::profile_for(&base, candidate);
         let args = profile.args(&model.path, &caps);
-        print!("  {:>9} ctx / {:<5} ...", candidate.ctx, candidate.cache_k);
+        print!("  {:>9} ctx / {:<5} ...", candidate.ctx, candidate.cache);
         let reading = tune::measure(&caps.binary, &args, &prompt, &cancel, |_| {})
             .unwrap_or_else(|e| panic!("{candidate:?}: {e}"));
         let gen = reading.gen_tokens / reading.gen_seconds;
@@ -132,18 +131,18 @@ fn the_ladder_reproduces_the_oracles_ordering() {
     let (widest, widest_tps) = rows.first().expect("the arithmetic's pick");
     println!(
         "\n  fastest        : {:>9} ctx / {}  at {best:.1} tok/s",
-        fastest.ctx, fastest.cache_k
+        fastest.ctx, fastest.cache
     );
     println!(
         "  the arithmetic : {:>9} ctx / {}  at {widest_tps:.1} tok/s",
-        widest.ctx, widest.cache_k
+        widest.ctx, widest.cache
     );
 
     assert_eq!(
         fastest.ctx, 65_536,
         "measurement picked something other than what fits.py measured"
     );
-    assert_eq!(fastest.cache_k, "f16");
+    assert_eq!(fastest.cache, "f16");
     assert!(
         best > widest_tps,
         "the whole argument for Tune is that the widest that fits is not the fastest"

@@ -396,27 +396,18 @@ pub type Engine =
 /// `.part`, which is the only account of it that cannot go stale while it runs.
 pub type Persist = Arc<dyn Fn(&[DownloadJob]) + Send + Sync>;
 
-/// Everything a running transfer needs, in a form a thread can own.
+/// The job manager the commands drive: admission, the queue, and what settles.
 ///
-/// A settled transfer starts the next one in the queue, and it does that from its own
-/// thread long after the caller that admitted it has gone. It cannot borrow the manager,
-/// so what it needs is cloned into this instead.
+/// Cloned into every transfer it starts, because a settled transfer promotes the next one
+/// from its own thread, long after the caller that admitted it has gone.
 #[derive(Clone)]
-struct Runtime {
-    jobs: Arc<Mutex<Vec<Tracked>>>,
-    events: Events,
-    landed: Landed,
-    engine: Engine,
-    persist: Persist,
-}
-
 pub struct Downloads {
     jobs: Arc<Mutex<Vec<Tracked>>>,
     events: Events,
     landed: Landed,
     engine: Engine,
     persist: Persist,
-    next: AtomicU64,
+    next: Arc<AtomicU64>,
 }
 
 impl Downloads {
@@ -431,23 +422,13 @@ impl Downloads {
             landed,
             engine,
             persist: Arc::new(|_| {}),
-            next: AtomicU64::new(1),
+            next: Arc::new(AtomicU64::new(1)),
         }
     }
 
     pub fn persisting_with(mut self, persist: Persist) -> Self {
         self.persist = persist;
         self
-    }
-
-    fn runtime(&self) -> Runtime {
-        Runtime {
-            jobs: self.jobs.clone(),
-            events: self.events.clone(),
-            landed: self.landed.clone(),
-            engine: self.engine.clone(),
-            persist: self.persist.clone(),
-        }
     }
 
     pub fn snapshot(&self) -> Vec<DownloadJob> {
@@ -589,7 +570,7 @@ impl Downloads {
         self.announce();
         if !waiting {
             spawn(
-                self.runtime(),
+                self.clone(),
                 id,
                 url.to_string(),
                 dest,
@@ -665,7 +646,7 @@ impl Downloads {
         self.announce();
         if !waiting {
             spawn(
-                self.runtime(),
+                self.clone(),
                 id.to_string(),
                 url,
                 dest,
@@ -755,7 +736,7 @@ impl Downloads {
 /// Hands a job to the engine on a thread of its own. The transfer blocks for as long as it
 /// takes, which is hours, and hands the pipe to the queue when it is done.
 fn spawn(
-    rt: Runtime,
+    rt: Downloads,
     id: String,
     url: String,
     dest: PathBuf,
@@ -793,7 +774,7 @@ fn spawn(
 /// The loop is for the jobs it cannot start. A row admitted hours ago was checked against
 /// a models directory that has changed since, and one whose file has landed in the meantime
 /// is failed rather than allowed to overwrite it — then the next in line is considered.
-fn advance(rt: &Runtime) {
+fn advance(rt: &Downloads) {
     loop {
         let starting = {
             let mut jobs = rt.jobs.lock().expect("downloads lock");

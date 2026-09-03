@@ -453,16 +453,7 @@ pub(crate) fn valid_segment(segment: &str) -> bool {
 /// A tree path may carry directories — `BF16/model-00001-of-00002.gguf` — so slashes are
 /// allowed and traversal is not.
 fn valid_tree_path(path: &str) -> bool {
-    !path.is_empty()
-        && !path.starts_with('/')
-        && path.split('/').all(|segment| {
-            !segment.is_empty()
-                && segment != "."
-                && segment != ".."
-                && segment
-                    .bytes()
-                    .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_' | b'.'))
-        })
+    !path.is_empty() && path.split('/').all(valid_segment)
 }
 
 fn encoded(value: &str) -> String {
@@ -953,6 +944,25 @@ mod tests {
                 (".gitattributes", 4175, false),
             ]
         );
+    }
+
+    #[test]
+    fn a_tree_path_is_judged_one_segment_at_a_time() {
+        for path in ["model.gguf", "BF16/Model-00001-of-00002.gguf", "a/b/c.gguf"] {
+            assert!(valid_tree_path(path), "{path} was refused");
+        }
+        for path in [
+            "",
+            "/model.gguf",
+            "BF16//model.gguf",
+            "BF16/../model.gguf",
+            "./model.gguf",
+            "BF16/",
+            "a/b?c.gguf",
+            "a b.gguf",
+        ] {
+            assert!(!valid_tree_path(path), "{path} was accepted");
+        }
     }
 
     #[test]

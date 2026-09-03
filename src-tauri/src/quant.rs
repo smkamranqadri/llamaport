@@ -146,12 +146,17 @@ pub fn fits(size: u64, ceiling: Option<u64>) -> Option<bool> {
     ceiling.map(|ceiling| size <= ceiling.saturating_sub(HEADROOM))
 }
 
-/// One entry per quantisation, shard sets summed and ordered, sidecars gone.
+/// One entry per quantisation, shard sets summed and ordered, sidecars gone — and anything
+/// outside LFS gone with them. Hugging Face keeps every real model in LFS, so a git-tracked
+/// `.gguf` is a stub, and a stub wins the smallest-first fallback.
 pub fn candidates(entries: &[Entry]) -> Vec<Candidate> {
     let mut groups: Vec<Group> = Vec::new();
 
     for entry in entries {
-        if !entry.path.to_ascii_lowercase().ends_with(".gguf") || is_sidecar(&entry.path) {
+        if !entry.lfs
+            || !entry.path.to_ascii_lowercase().ends_with(".gguf")
+            || is_sidecar(&entry.path)
+        {
             continue;
         }
         let (directories, stem) = split_path(&entry.path);
@@ -269,6 +274,14 @@ mod tests {
             path: path.to_string(),
             size,
             lfs: true,
+        }
+    }
+
+    fn plain(path: &str, size: u64) -> Entry {
+        Entry {
+            path: path.to_string(),
+            size,
+            lfs: false,
         }
     }
 
@@ -416,6 +429,20 @@ mod tests {
             pick.fits, None,
             "no llama-server means no ceiling, and installed memory is not one"
         );
+    }
+
+    /// A file kept in git rather than LFS is a stub, not a model, and it is small enough that
+    /// the smallest-first fallback would reach for it first.
+    #[test]
+    fn a_file_outside_lfs_is_never_offered() {
+        let tree = [plain("tiny.gguf", 1), entry("Model-Q4_K_M.gguf", 30 * GB)];
+        let found = candidates(&tree);
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].label, "Q4_K_M");
+
+        let pick = pick(&tree, Some(GB)).expect("a pick");
+        assert_eq!(pick.candidate.label, "Q4_K_M");
+        assert_eq!(pick.fits, Some(false));
     }
 
     #[test]

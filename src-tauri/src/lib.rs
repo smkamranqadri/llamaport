@@ -54,12 +54,11 @@ struct TrayHandles {
 struct AppState {
     config: Mutex<Config>,
     models: Mutex<Vec<ModelEntry>>,
-    caps: Mutex<Option<Result<Capabilities, String>>>,
+    caps: probe::Cache,
     runner: Runner,
     tuner: Tuner,
     downloads: Downloads,
     tray: Mutex<Option<TrayHandles>>,
-    orphan: Mutex<Vec<Orphan>>,
     activity: activity::Monitor,
     trees: discover::Trees,
 }
@@ -94,26 +93,11 @@ impl AppState {
     }
 
     fn capabilities(&self) -> Result<Capabilities, String> {
-        let mut cached = self.caps.lock().expect("caps lock");
-        if let Some(result) = cached.as_ref() {
-            return result.clone();
-        }
-
         let configured = {
             let config = self.config.lock().expect("config lock");
             config.llama_server_path.clone()
         };
-
-        let result = match probe::discover(configured.as_deref()) {
-            Some(binary) => probe::probe(&binary),
-            None => Err(
-                "llama-server was not found on PATH or in the usual locations. \
-                 Install it with `brew install llama.cpp`, or set its path in Settings."
-                    .into(),
-            ),
-        };
-        *cached = Some(result.clone());
-        result
+        self.caps.get(configured.as_deref())
     }
 }
 
@@ -370,15 +354,15 @@ async fn model_delete(
 /// Installed memory is the fallback and the screen says which one it is sizing against —
 /// they differ by 7 GB on an M2 Pro, which is more than a whole model.
 #[tauri::command]
-fn machine_memory(state: State<'_, AppState>) -> MachineMemory {
+async fn machine_memory(state: State<'_, AppState>) -> Result<MachineMemory, String> {
     let mut system = sysinfo::System::new();
     system.refresh_memory();
 
-    MachineMemory {
+    Ok(MachineMemory {
         installed_bytes: sysmem::installed_bytes().or_else(|| Some(system.total_memory())),
         available_bytes: Some(system.available_memory()),
         device_budget_bytes: state.device_budget(),
-    }
+    })
 }
 
 #[tauri::command]
@@ -404,8 +388,11 @@ async fn set_models_dir(path: String, state: State<'_, AppState>) -> Result<DirI
         .map_err(|e| e.to_string())
 }
 
+/// `async` because the plan asks the port whether something is already listening, which
+/// is two HTTP calls with a timeout each when it is — and the form asks for a plan on
+/// every edit.
 #[tauri::command]
-fn launch_plan(
+async fn launch_plan(
     model_id: String,
     draft: Option<Profile>,
     state: State<'_, AppState>,
@@ -414,7 +401,7 @@ fn launch_plan(
 }
 
 #[tauri::command]
-fn set_llama_server_path(
+async fn set_llama_server_path(
     path: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<Settings, String> {
@@ -422,7 +409,7 @@ fn set_llama_server_path(
         let mut config = state.config.lock().expect("config lock");
         config.llama_server_path = path;
     }
-    *state.caps.lock().expect("caps lock") = None;
+    state.caps.forget();
     state.save_config()?;
     Ok(settings_view(&state))
 }
@@ -444,7 +431,10 @@ fn settings_view(state: &AppState) -> Settings {
 }
 
 #[tauri::command]
-fn set_download_options(options: Options, state: State<'_, AppState>) -> Result<Settings, String> {
+async fn set_download_options(
+    options: Options,
+    state: State<'_, AppState>,
+) -> Result<Settings, String> {
     let rate_limit = options.rate_limit;
     {
         let mut config = state.config.lock().expect("config lock");
@@ -463,7 +453,7 @@ fn set_download_options(options: Options, state: State<'_, AppState>) -> Result<
 /// rewriting what a model was actually launched with would be a different feature and a
 /// worse one.
 #[tauri::command]
-fn set_launch_defaults(
+async fn set_launch_defaults(
     defaults: Option<Profile>,
     state: State<'_, AppState>,
 ) -> Result<Settings, String> {
@@ -482,7 +472,7 @@ fn set_launch_defaults(
 /// is open — and a CPU figure is a difference between two polls, so the interval the
 /// screen chooses is the window it measures over.
 #[tauri::command]
-fn activity_snapshot(state: State<'_, AppState>) -> activity::Activity {
+async fn activity_snapshot(state: State<'_, AppState>) -> Result<activity::Activity, String> {
     let snapshot = state.runner.snapshot();
     let tune = state.tuner.report();
     let tune_pid = state.tuner.live_pid();
@@ -516,13 +506,16 @@ fn activity_snapshot(state: State<'_, AppState>) -> activity::Activity {
             .map(|estimate| estimate.total_bytes);
     }
 
-    activity
+    Ok(activity)
 }
 
 /// The palette and, for the built-in one, whether it follows macOS. Stored verbatim: the
 /// names live on the screen that draws them, and this side neither knows nor checks them.
 #[tauri::command]
-fn set_appearance(appearance: Appearance, state: State<'_, AppState>) -> Result<Settings, String> {
+async fn set_appearance(
+    appearance: Appearance,
+    state: State<'_, AppState>,
+) -> Result<Settings, String> {
     {
         let mut config = state.config.lock().expect("config lock");
         config.appearance = Some(appearance);
@@ -539,8 +532,8 @@ fn app_version(app: AppHandle) -> String {
 }
 
 #[tauri::command]
-fn get_settings(state: State<'_, AppState>) -> Settings {
-    settings_view(&state)
+async fn get_settings(state: State<'_, AppState>) -> Result<Settings, String> {
+    Ok(settings_view(&state))
 }
 
 #[tauri::command]
@@ -608,7 +601,7 @@ fn reveal_path(path: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn runner_start(
+async fn runner_start(
     model_id: String,
     draft: Option<Profile>,
     state: State<'_, AppState>,
@@ -715,27 +708,28 @@ fn runner_stop(app: AppHandle, state: State<'_, AppState>) -> Result<RunnerSnaps
 
 /// Rescans every time: servers appear and vanish outside this app's knowledge.
 #[tauri::command]
-fn orphan_status(state: State<'_, AppState>) -> Vec<Orphan> {
+async fn orphan_status(state: State<'_, AppState>) -> Result<Vec<Orphan>, String> {
     let ours = state.runner.snapshot().pid;
     // A server Tune is measuring right now is not something the user left behind.
     let measuring = state.tuner.live_pid();
-    let found: Vec<Orphan> = runner::detect_orphans(ours)
+    Ok(runner::detect_orphans(ours)
         .into_iter()
         .filter(|orphan| Some(orphan.pid) != measuring)
-        .collect();
-    *state.orphan.lock().expect("orphan lock") = found.clone();
-    found
+        .collect())
 }
 
 /// What this model has been seen to do, ranked where the runs earned it.
 #[tauri::command]
-fn speeds_for(model_id: String, state: State<'_, AppState>) -> speeds::Summary {
+async fn speeds_for(
+    model_id: String,
+    state: State<'_, AppState>,
+) -> Result<speeds::Summary, String> {
     let build = state.capabilities().ok().and_then(|caps| caps.version);
     let records: Vec<speeds::SpeedRecord> = store::load_speeds(&store::speeds_path())
         .into_iter()
         .filter(|record| record.key.model_id == model_id)
         .collect();
-    speeds::summarise(&records, build.as_deref())
+    Ok(speeds::summarise(&records, build.as_deref()))
 }
 
 /// What pi would be told, from the server that is actually answering.
@@ -795,7 +789,7 @@ fn tune_status(state: State<'_, AppState>) -> tune::Report {
 /// app runs one at a time, and a measurement is not worth stopping a server someone is
 /// talking to.
 #[tauri::command]
-fn tune_start(model_id: String, state: State<'_, AppState>) -> Result<tune::Report, String> {
+async fn tune_start(model_id: String, state: State<'_, AppState>) -> Result<tune::Report, String> {
     if state.runner.snapshot().state != RunState::Idle {
         return Err(
             "stop the running model first — Tune launches servers of its own and this app \
@@ -834,9 +828,9 @@ fn tune_cancel(state: State<'_, AppState>) -> tune::Report {
 }
 
 #[tauri::command]
-fn orphan_stop(pid: u32, state: State<'_, AppState>) -> Result<Vec<Orphan>, String> {
+async fn orphan_stop(pid: u32, state: State<'_, AppState>) -> Result<Vec<Orphan>, String> {
     runner::stop_orphan(pid)?;
-    Ok(orphan_status(state))
+    orphan_status(state).await
 }
 
 #[tauri::command]
@@ -1025,17 +1019,12 @@ fn update_tray(app: &AppHandle, snapshot: &RunnerSnapshot) {
     ));
 }
 
-/// Brings the window back to a usable state.
-///
-/// An unbundled dev binary with a tray icon can start without activating, and macOS may
-/// restore a frame far smaller than the configured minimum — observed at 91x97, which is
-/// indistinguishable from the app having no window at all. Assert a sane size rather than
-/// trusting what was restored.
 /// Asserts a usable main window, rebuilding it when there is none.
 ///
-/// Both failures have been seen: no window at all with an empty Window menu, and one at
-/// 60x60. Recovery cannot depend on the tray, because someone meeting the app for the
-/// first time has no reason to look there.
+/// Both failures have been seen: no window at all with an empty Window menu, and a frame
+/// restored far below the configured minimum — 91x97, then 60x60 — which is
+/// indistinguishable from having no window. Recovery cannot depend on the tray, because
+/// someone meeting the app for the first time has no reason to look there.
 fn show_main_window(app: &AppHandle) {
     let window = match app.get_webview_window("main") {
         Some(window) => window,
@@ -1099,12 +1088,11 @@ pub fn run() {
             app.manage(AppState {
                 config: Mutex::new(store::load()),
                 models: Mutex::new(Vec::new()),
-                caps: Mutex::new(None),
+                caps: probe::Cache::default(),
                 runner,
                 tuner,
                 downloads,
                 tray: Mutex::new(None),
-                orphan: Mutex::new(runner::detect_orphans(None)),
                 activity: activity::Monitor::new(),
                 trees: discover::Trees::default(),
             });

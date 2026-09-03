@@ -45,9 +45,6 @@ function binaryVerdict(
   return `${found} · version ${version} · this build has no ${missing.join(" and no ")}`;
 }
 
-/// What a model opens on before anyone has launched it. Mirrors `Profile::default()` in
-/// Rust; the two only have to agree on what the form shows, because a launch sends the
-/// whole profile rather than the fields that differ from it.
 export default function SettingsScreen({
   onModelsDirChanged,
 }: {

@@ -30,13 +30,13 @@ function contextWords(ctx: number) {
 }
 
 function candidateName(candidate: TuneCandidate) {
-  return `${contextWords(candidate.ctx)} · ${CACHE_WORDS[candidate.cacheK] ?? candidate.cacheK}`;
+  return `${contextWords(candidate.ctx)} · ${CACHE_WORDS[candidate.cache] ?? candidate.cache}`;
 }
 
 /// The figures the name is a translation of. They stay beside it: a person comparing two
 /// tries reads the words, and a person checking what was launched needs the arguments.
 function candidateExact(candidate: TuneCandidate) {
-  return `${candidate.ctx.toLocaleString()} · ${candidate.cacheK}`;
+  return `${candidate.ctx.toLocaleString()} · ${candidate.cache}`;
 }
 
 function keyText(key: SpeedKey) {
@@ -53,7 +53,7 @@ function tps(outcome: TuneOutcome, of: "gen" | "prompt"): number | null {
 }
 
 function sameCandidate(a: TuneCandidate, b: TuneCandidate) {
-  return a.ctx === b.ctx && a.cacheK === b.cacheK && a.cacheV === b.cacheV;
+  return a.ctx === b.ctx && a.cache === b.cache;
 }
 
 function sameKey(a: SpeedKey, b: SpeedKey) {
@@ -221,8 +221,8 @@ export default function TunePanel({
       const suggested = rows.find(
         (row) =>
           row.candidate.ctx === key.ctx &&
-          row.candidate.cacheK === key.cacheTypeK &&
-          row.candidate.cacheV === key.cacheTypeV,
+          row.candidate.cache === key.cacheTypeK &&
+          row.candidate.cache === key.cacheTypeV,
       );
       if (suggested != null) {
         marked = suggested;
@@ -249,7 +249,7 @@ export default function TunePanel({
   if (running && fastest != null) {
     const candidate = fastest.candidate;
     action = () =>
-      onApply({ ctx: candidate.ctx, cacheTypeK: candidate.cacheK, cacheTypeV: candidate.cacheV });
+      onApply({ ctx: candidate.ctx, cacheTypeK: candidate.cache, cacheTypeV: candidate.cache });
   } else if (!running && summary?.suggestion != null) {
     const key = summary.suggestion;
     actionLabel = "Use these settings";
@@ -268,8 +268,7 @@ export default function TunePanel({
   if (!running && summary?.suggestion != null && summary.suggestedTps != null) {
     verdict = `${summary.suggestedTps.toFixed(0)} tok/s at ${candidateName({
       ctx: summary.suggestion.ctx,
-      cacheK: summary.suggestion.cacheTypeK,
-      cacheV: summary.suggestion.cacheTypeV,
+      cache: summary.suggestion.cacheTypeK,
     })}`;
     if (summary.beats != null && summary.beatsByPercent != null) {
       verdict += ` — ${Math.round(summary.beatsByPercent)}% faster than ${keyText(summary.beats)}, which is what fitting the largest context would have chosen.`;
@@ -320,13 +319,13 @@ export default function TunePanel({
             note = outcome.error;
           } else if (index === 0) {
             note = "the largest that fits";
-          } else if (candidate.cacheK !== "f16" && candidate.cacheK !== "bf16") {
+          } else if (candidate.cache !== "f16" && candidate.cache !== "bf16") {
             note = "half the memory, slight quality trade";
           }
 
           return (
             <Try
-              key={`${candidate.ctx}-${candidate.cacheK}-${candidate.cacheV}`}
+              key={`${candidate.ctx}-${candidate.cache}`}
               candidate={candidate}
               outcome={outcome}
               state={state}
