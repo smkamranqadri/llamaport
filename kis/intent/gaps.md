@@ -25,9 +25,10 @@ below is the part that is not.
 
 ## Cheap, and nothing decided stands against them
 
-1. **No search in the Library.** They filter the list on a substring and focus
-   the box with `/`. `Library.tsx` has no filter at all, which is fine at twenty
-   models and not at two hundred.
+1. **CLOSED 2026-09-02, noticed 2026-09-04.** *No search in the Library.* The
+   redesign's Library (`5727e8a`) carries a search box matching display name and
+   file name; this note stayed open for two days after. No `/` shortcut, which
+   belongs with item 2.
 
 2. **No keyboard map.** Theirs: `↑↓`/`kj` to move, `Enter` to expand, `L`/`U` to
    load and unload, `S` to save, `Esc` to close. This app has no key handlers.

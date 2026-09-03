@@ -40,9 +40,10 @@ Blocker:  none. Open and not blocking:
             ([intent/release.md](../intent/release.md)).
 
 Next:     **Nothing chosen.** The author's call. Candidates, none ahead of the
-          others: the two picker rulings, the window bug as its own task,
-          Library search ([intent/gaps.md](../intent/gaps.md)), and the Show HN
-          that has sat drafted since August ([intent/release.md](../intent/release.md)).
+          others: the two picker rulings, the window bug as its own task, and
+          the Show HN that has sat drafted since August
+          ([intent/release.md](../intent/release.md)). Library search was
+          listed here and had shipped on 2026-09-02.
 
 Where the project stands: [intent/roadmap.md](../intent/roadmap.md).
 What the app is for: [intent/direction.md](../intent/direction.md).
