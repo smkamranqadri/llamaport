@@ -417,7 +417,17 @@ shipped hub, which calls it from their frontend.
   `expand=gguf`, which had been true one decision earlier. **A stale assertion is worse
   than no assertion: it reports success for the thing it was written to forbid.**
 
-  **The suite has now caught two of the thirty-five, both after the fact.**
+  **Four more from the sidebar vibrancy, and they are a different kind again.** The
+  effect shipped defaulted off, which is the option the author had *not* chosen and
+  meant a transparent window painting over every pixel of itself; then at a 72% tint
+  that hid what was left; then flattening on every app switch, because the material
+  followed the window's focus. A launch flash is still open. **Thirty-nine.**
+
+  **None of those four could have been caught by the usual render** — see the note on
+  window effects above. They are the first defects here where the author's look was the
+  only check available rather than the last one.
+
+  **The suite has caught two of the thirty-nine, both after the fact.**
   `real_models.rs` went red on a speech model Discover had offered and the author had
   downloaded; and a live test caught the dead MoE mark, but only once the author's own
   find prompted someone to write it.
@@ -444,6 +454,32 @@ shipped hub, which calls it from their frontend.
   faithfully would have shipped a false sentence in the app's voice. Every claim
   a mockup makes about behaviour is checked against the code or the phase file
   that proved it, and corrected in place when it is wrong.
+
+- **macOS vibrancy costs a private API, and the config flag alone does not enable it.**
+  `transparent: true` needs `macOSPrivateApi: true` in `tauri.conf.json` *and* the
+  `macos-private-api` Cargo feature on the `tauri` dependency. The Tauri CLI adds that
+  feature to `Cargo.toml` when it next runs the app, which is how it arrived here —
+  swept into a commit unnoticed. **A private API bars the App Store permanently**;
+  accepted, because this app has always shipped unsigned through GitHub.
+
+- **Three knobs, and they are tuned against each other.** The material
+  (`windowEffects.effects`), its state, and the CSS tint over it.
+  - `sidebar` is the semantically right material for a sidebar and one of the most
+    opaque; under a 72% palette tint the effect read as though nothing had happened.
+    `underWindowBackground` lets considerably more through. Changing one without the
+    other overshoots.
+  - **`state: "followsWindowActiveState"` flattens the material whenever the app goes
+    to the back.** That is native — a Finder sidebar does it — and on a fixed chrome
+    surface it reads as a glitch. Pin it to `active`.
+  - The ground is painted on `:root`, so a transparent window needs it moved to the
+    content pane or the whole window goes through, not a fifth of it.
+
+- **A window effect cannot be checked the way every other UI change here is.** Headless
+  Chrome will not draw an `NSVisualEffectView`, so the render proves the CSS stops
+  painting and nothing about the blur. This is the one kind of change where the author's
+  look is the *first* check rather than the last, and it showed: the effect shipped
+  defaulted off, then with a tint that hid it, then flattening on every app switch, and
+  a launch flash is still open.
 
 - **Every request this app makes goes through Rust, and that is worth keeping.** The
   webview loads nothing remote — an `<img src>` at a CDN would have been the first

@@ -86,3 +86,49 @@ because the derived tokens resolve on the element that declares them and a first
 attempt putting `data-theme` on a `div` rendered every ported theme with
 near-white cards. That is what found the unreadable accent buttons. The author's
 word on the result: "all good".
+
+
+## Vibrancy, 2026-09-03
+
+Asked for from a Codex screenshot: "can we add this sidebar blur transparent
+like effect". Built in `8ef7078` and corrected three times the same evening
+(`13c96ba`, `80a9e94`, `335fa13`).
+
+**It belongs here rather than in a file of its own.** It is a fifth thing the
+Appearance section owns, stored in the same `appearance` block of `config.json`,
+and the reason it is tinted at all is this phase's palettes.
+
+## Decisions
+
+- **The window is transparent at every launch, and a toggle decides whether that
+  shows.** `transparent` is set at window creation and cannot be changed after,
+  so an Appearance setting is the only way to have an off switch without a
+  rebuild. Put to the author against shipping it always-on and against shipping
+  it dark; he chose always-on with the toggle, **and the first build shipped it
+  defaulted off**, which is the option he had not chosen.
+- **Tinted, not clear.** Four of the five palettes are ported and their colour is
+  most of what distinguishes them; at full transparency the sidebar would be the
+  desktop on all five and this section's swatches would describe something the
+  window no longer shows.
+- **A config written before the setting existed gets the effect.** An absent key
+  means it predates the field, not that anybody turned it off. `Default` is
+  written out rather than derived, because `derive(Default)` gives `false` for a
+  bool and that is the wrong way round here.
+
+## What it cost, and what is still open
+
+The private API is the durable cost: `transparent` needs `macOSPrivateApi`, which
+**bars the App Store permanently**. Accepted — this app has always shipped
+unsigned through GitHub — and recorded in
+[knowledge/technical.md](../knowledge/technical.md) with the rest of the
+mechanics.
+
+**A flash on launch is unresolved.** Pinning the material to `active` stopped it
+swapping on focus change, so what remains is something else — most likely the
+webview compositing a frame before `theme.ts` sets `data-translucent`, which it
+does from cache before first render but after the window is already on screen.
+That predicts a flash on launch and reload rather than on app switch, which is
+how it would be told apart. Dropped by the author rather than fixed.
+
+**Two numbers are untuned**: the 40% tint and the `underWindowBackground`
+material were set against each other and then only one of them moved.

@@ -7,7 +7,8 @@ Branch:   `main`, working tree clean. **`v0.6.1` is tagged at `5d8957d` and HEAD
           written here, because the commit that records it increments it. Why
           it matters is in [knowledge/technical.md](../knowledge/technical.md).
 
-Task:     **Discover is built**, in two commits on 2026-09-03 (`7c9369f`,
+Task:     **Discover is built and the sidebar can be translucent.** Discover
+          landed in two commits on 2026-09-03 (`7c9369f`,
           `ba4a8f6`) and all five parcels
           ([intent/discover.md](../intent/discover.md)). It is a live screen over
           the Hugging Face API: a sort, filters that combine, a parameter band,
@@ -24,12 +25,16 @@ Task:     **Discover is built**, in two commits on 2026-09-03 (`7c9369f`,
           corrected four facts and supplied the fit badge this project then
           refused.
 
-          **The author has looked five times and asked for eighteen things; all
+          **The author has looked six times and asked for nineteen things; all
           are built** (`d9ed796`, `ca5d7af`, `8c8db9d`, `951fd98`, `3c3bbd8`,
-          `4073600`). Sorts and filters now split, which is the shape offered
-          while planning and declined — using it is what changed the answer. The
-          last round added an owner's picture to all three list screens, cached
-          on disk under Application Support.
+          `4073600`, `8ef7078`…`335fa13`). Sorts and filters now split, which is
+          the shape offered while planning and declined — using it is what
+          changed the answer. Then an owner's picture on all three list screens,
+          cached on disk. Then **macOS vibrancy behind the sidebar**
+          ([intent/appearance.md](../intent/appearance.md)), which took four
+          commits because **a window effect cannot be checked the way every other
+          UI change here is** — headless Chrome will not draw an
+          `NSVisualEffectView`.
 
           **Two of the fifteen were things nobody reported.** Discover was
           offering models `llama-server` cannot run, one GGUF repository in six,
@@ -48,23 +53,35 @@ Mode:     Standard. Nothing is part-finished.
 
 Blocker:  none.
 
-          Three things are open and none blocks: **the two picker calls the
+          Four things are open and none blocks: **a flash when the window opens**
+          — the vibrancy settles rather than appearing, dropped by the author
+          rather than fixed, with the suspect and the way to tell it apart in
+          [intent/appearance.md](../intent/appearance.md); **the two picker calls the
           author has not ruled on** (below); **the unusable-window bug**, whose
           sightings, sizes, falsified hypotheses, scripted recovery and two traps
           are in [intent/roadmap.md](../intent/roadmap.md) risks — it wants its
           own task; and **the checks nobody has run**, in
           [intent/release.md](../intent/release.md).
 
-Next:     **A sixth look.** Five rounds, eighteen things, and the rate is not
+Next:     **A seventh look.** Six rounds, nineteen things, and the rate is not
           obviously falling. Unseen running: the split controls, the parameter
           band, the MoE badge — which has never once worked in a build the author
           has opened — the loading state, the confirmation and the sidebar count.
-          **Avatars are the exception: the author's own run on 2026-09-03 filled
-          the cache with 16 owners at 140 KB**, so that much is known to work.
+          Avatars and the vibrancy are the exceptions; both were seen on the
+          author's own machine.
 
-          Nothing about Discover is planned beyond answering the next look. The
-          screen has taken five rounds of correction and none of them came from
-          the plan.
+          **Two numbers in the vibrancy are untuned** — the 40% tint and the
+          `underWindowBackground` material were set against each other and only
+          one of them moved. Neither is worth touching without a look.
+
+          Nothing is planned beyond answering the next look. Discover took five
+          rounds of correction and the sidebar four, and none of the nine came
+          from a plan.
+
+          **A release is the standing next thing after that**, and it now carries
+          Discover, the avatars, the vibrancy and a private API
+          ([release.md](../intent/release.md)). The README screenshots are still
+          owed and still predate everything.
 
           **`parakeet-tdt-0.6b-v3.q8_0.gguf` is still in the models directory**
           and Llamaport cannot run it. Nothing deletes it — that is the author's
@@ -98,7 +115,7 @@ What the app is for: [intent/direction.md](../intent/direction.md).
 ## Proof
 
 The four commands green, each status captured on its own line and never after a
-pipe. **308 tests**, from 261 before Discover.
+pipe. **310 tests**, from 261 before Discover.
 
 Two suites need something this machine has and CI would not: `real_launch` and
 `real_tune` need the binary and a real model, and **`real_hub` needs the

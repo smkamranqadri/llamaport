@@ -48,9 +48,14 @@ to find that five releases were broken and the second to prove the fix.
 ## The next release
 
 **Nothing is tagged for Discover yet.** The next release is the first that would
-carry the redesign, the appearance work, `tauri-plugin-dialog` and now Discover —
-a new capability and this app's first read-only network client, so a minor rather
-than a patch. Two things it owes beyond the usual closing conditions:
+carry the redesign, the appearance work, `tauri-plugin-dialog`, Discover — a new
+capability and this app's first read-only network client — and a **private API**.
+A minor rather than a patch.
+
+**The private API is the one that changes what this project can do later.**
+`macOSPrivateApi` is required for the translucent sidebar and bars the App Store
+permanently ([appearance.md](appearance.md)). That was never a route this app was
+taking, but it stops being one. Two things it owes beyond the usual closing conditions:
 
 - **A security review of the network surface**, as v0.2.0 had and for the same
   reason: Discover parses third-party JSON into paths and URLs, and now renders a
