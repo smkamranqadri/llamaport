@@ -10,7 +10,8 @@ Branch:   `main`, working tree clean. **`v0.6.1` is tagged at `5d8957d` and HEAD
 Task:     **Discover is built**, in two commits on 2026-09-03 (`7c9369f`,
           `ba4a8f6`) and all five parcels
           ([intent/discover.md](../intent/discover.md)). It is a live screen over
-          the Hugging Face API: four named lists, a search whose results get the
+          the Hugging Face API: a sort, filters that combine, a parameter band,
+          a search whose results get the
           same quantisation pick and fit treatment as a browse row, and a
           Download that hands a shard set to the queue this app already had.
           **No sidebar entry is disabled any more.**
@@ -23,17 +24,18 @@ Task:     **Discover is built**, in two commits on 2026-09-03 (`7c9369f`,
           corrected four facts and supplied the fit badge this project then
           refused.
 
-          **The author has looked twice and found eleven things; all are
-          built** (`d9ed796`, `ca5d7af`). The worst of the first round was a row
-          reading "25.1 GB of 25.0 GB" *while claiming to fit*. The worst of the
-          second was not reported at all: the app **froze** on opening Discover,
-          because a synchronous Tauri command holds the main thread.
+          **The author has looked four times and found fifteen things; all are
+          built** (`d9ed796`, `ca5d7af`, `8c8db9d`, `951fd98`). Sorts and filters
+          now split, which is the shape offered while planning and declined —
+          using it is what changed the answer.
 
-          **And Discover was offering models `llama-server` cannot run** — one
-          GGUF repository in six. Found because the author downloaded a
-          speech-recognition model and `real_models.rs` went red on it, which is
-          the only time this project's suite has caught anything a look found
-          first.
+          **Two of the fifteen were things nobody reported.** Discover was
+          offering models `llama-server` cannot run, one GGUF repository in six,
+          found because a downloaded speech model turned `real_models.rs` red.
+          And **the MoE mark shipped dead in `8c8db9d`**: `expand=gguf` never
+          reached the listing URL, so every row came back unmarked, and an inline
+          test asserting the URL must *not* carry it kept the suite green. Both
+          are in [knowledge/technical.md](../knowledge/technical.md).
 
           **The app is the author's: never launch, capture or drive it** —
           everything here was rendered in headless Chrome, which goes before the
@@ -51,10 +53,11 @@ Blocker:  none.
           own task; and **the checks nobody has run**, in
           [intent/release.md](../intent/release.md).
 
-Next:     **A third look at Discover.** Two rounds have each found five or six
-          things and the rate is not obviously falling. Unseen so far: the
-          loading state, the download confirmation, the sidebar count, and
-          whether the non-text filter leaves the lists looking right.
+Next:     **A fifth look at Discover.** Four rounds have found fifteen things and
+          the rate is not obviously falling. Unseen running: the split controls,
+          the parameter band, the MoE badge — which has never once worked in a
+          build the author has opened — the loading state, the confirmation and
+          the sidebar count.
 
           **`parakeet-tdt-0.6b-v3.q8_0.gguf` is still in the models directory**
           and Llamaport cannot run it. Nothing deletes it — that is the author's
@@ -88,11 +91,11 @@ What the app is for: [intent/direction.md](../intent/direction.md).
 ## Proof
 
 The four commands green, each status captured on its own line and never after a
-pipe. **298 tests**, from 261 before Discover.
+pipe. **300 tests**, from 261 before Discover.
 
 Two suites need something this machine has and CI would not: `real_launch` and
 `real_tune` need the binary and a real model, and **`real_hub` needs the
-network** — ten tests holding the assumptions the Hugging Face parsers rest
+network** — twelve tests holding the assumptions the Hugging Face parsers rest
 on, so a change at the API's end fails here rather than on screen.
 
 **`tests/stylesheet.rs` is the only test this project has of the frontend.**

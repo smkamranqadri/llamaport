@@ -9,6 +9,14 @@ will take less memory, am i wrong?"
 
 Live status is in [state/current.md](../state/current.md), not here.
 
+**Half a prerequisite arrived on 2026-09-03 without being planned for**: Discover
+marks which repositories are mixtures of experts and filters to them
+([discover.md](discover.md)), from the uploader's tag and the file's architecture
+together. That says *which* models this matters for. It says nothing about the
+measurement this is still blocked on — timing `-ncmoe` against the quant the
+author runs — and a mark on a model nobody has downloaded is not a launch
+setting.
+
 ## What is wrong
 
 **Every launch this app builds is fully offloaded, and for a MoE that is the

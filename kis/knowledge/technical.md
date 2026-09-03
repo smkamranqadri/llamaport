@@ -260,6 +260,26 @@ shipped hub, which calls it from their frontend.
   Embeddings, Image generation — and offers neither Coding nor Chat.
 - **No rate-limit headers come back unauthenticated.** The budget is unadvertised,
   not absent.
+- **A mixture of experts needs two signals and neither is close to complete.** Over 300
+  GGUF repositories sampled 2026-09-03: the uploader's `moe` tag covers **35**, an
+  architecture whose name contains `moe` covers **34**, **only 13 carry both**, and the
+  union is **56**. The tag catches `deepseek4`, `laguna` and `qwen4exp`, whose
+  architectures say nothing — `qwen4exp` is a 131B-A6B — and the architecture catches
+  `unsloth/Qwen3-Coder-30B-A3B-Instruct-GGUF`, which nobody tagged. Each alone misses
+  about two in five. Hugging Face's own `?other=moe` is `filter=gguf,moe` on the API and
+  is the tag half only.
+
+  Neither is a guess from a repository's name: a tag is a claim its uploader made and an
+  architecture is read out of the file, where `-A3B` in a title is a naming habit.
+  Certainty for a model on disk stays `gguf::Metadata::is_moe`, which reads a real
+  expert count the index does not carry.
+
+- **`num_parameters=min:20B,max:40B` is a real API filter, and its figure is better than
+  ours.** `gguf.total` is read off one file, so a repository whose first GGUF is an MTP
+  drafter reports **1.86B for a 27B model** — and that same repository still lands
+  correctly in the API's 20–40B band. Filter by parameters at the server and never by
+  arithmetic over `gguf.total`. `min:` and `max:` are independently optional.
+
 - **One GGUF repository in six is not a language model.** Over 300 sampled 2026-09-03
   across all three sorts: 104 `image-text-to-text`, 97 `text-generation`, **48 with no
   `pipeline_tag` at all** — `unsloth/Qwen3.8-27B-GGUF` among them — and 51 that
@@ -355,7 +375,29 @@ shipped hub, which calls it from their frontend.
   one section down. "Small & fast" listed a 229 GB model, because it ordered the
   trending page by size and filtered nothing. And the stray-server banner had a top
   margin and no bottom, so it sat four pixels off whatever followed it on every
-  screen. **Twenty-eight now, and the suite has still found none of them.**
+  screen. **Twenty-eight.**
+
+  **Four more from the second look, same day**: the app froze on opening Discover,
+  because a synchronous Tauri command holds the main thread; the download confirmation
+  named a quantisation and no model, on a screen the reader had just been thrown back
+  to; the sidebar showed nothing for a queued transfer, which the artboard had drawn;
+  and the detail page gave a name where nine repositories from nine owners publish the
+  same model. **Thirty-two.**
+
+  **Two more from the third**: a search left the old rows on screen underneath the
+  loading state, and the search box could not be cleared. **Thirty-four.**
+
+  **And a thirty-fifth of a kind not seen before: a feature that shipped dead.** The
+  MoE mark went out in `8c8db9d` doing nothing at all — `expand=gguf` never reached the
+  listing URL, so the architecture was always absent and every row came back unmarked.
+  It stayed green because an inline test asserted the URL must *not* carry
+  `expand=gguf`, which had been true one decision earlier. **A stale assertion is worse
+  than no assertion: it reports success for the thing it was written to forbid.**
+
+  **The suite has now caught two of the thirty-five, both after the fact.**
+  `real_models.rs` went red on a speech model Discover had offered and the author had
+  downloaded; and a live test caught the dead MoE mark, but only once the author's own
+  find prompted someone to write it.
 
   **A twenty-fifth was caught before it could be one, on 2026-09-03**: Discover
   painted its chips with `--muted`, and rendering the screen's own DOM against
@@ -386,6 +428,19 @@ shipped hub, which calls it from their frontend.
   never appeared and the app read as frozen. `async fn` moves a command to the async
   runtime. Anything here that touches the network is `async` for this reason and not for
   tidiness.
+
+- **An edit whose anchor does not match changes nothing and says nothing.** Four times
+  in one session: `.sort-select` written twice before it existed, `expand=gguf` added to
+  a listing URL it never reached, and a memory file left saying the wrong number. The
+  cause each time was an anchor that `cargo fmt` or an earlier edit had already
+  reformatted — a one-line array split across lines, a margin changed from 4px to 8px.
+  **Assert that every anchor is present and unique before replacing it**, and read back
+  what landed rather than what was intended. Rust catches none of this: an absent
+  `expand` leaves an `Option` that is simply always `None`.
+
+- **`select` is `width: 100%` across this stylesheet**, for the forms the app is mostly
+  made of. A select that sits beside something — a chip row, a status line — has to opt
+  out and re-state the right padding, because the shared rule paints the chevron there.
 
 - **A `var(--x)` with nothing behind it is invisible, and this project writes one about
   once a quarter.** The redesign shipped three greys painted with `--muted` and a highlight

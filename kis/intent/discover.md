@@ -54,7 +54,9 @@ owns that. Arithmetic choosing a launch is what [tune.md](tune.md) measured as
 picking the slowest of three; arithmetic choosing which file to download is a
 different and much weaker claim.
 
-**Four chips, all backed**: Fits this Mac, Small & fast, Most downloaded, Most
+**Four chips, all backed** — *SUPERSEDED 2026-09-03 by "The third and fourth
+looks" below, which splits sorts from filters. The reasoning here still holds and
+is why Coding and Chat are absent from both shapes.* Fits this Mac, Small & fast, Most downloaded, Most
 liked. The heading renames itself to the chip, so "Trending on Hugging Face" is
 shown only when the list really is `trendingScore` — the artboard's "Popular
 this week" is a window HF does not document.
@@ -127,8 +129,9 @@ It stays the only choke point.
 
 ## Acceptance
 
-- The four chips return four different lists, each from the sort the chip names,
-  and the heading matches the chip.
+- ~~The four chips return four different lists, each from the sort the chip names,
+  and the heading matches the chip.~~ *Superseded: the sort and the filters are
+  separate controls, and the heading matches the sort.*
 - No row prints "fits". A row prints its size against the ceiling and warns only
   when the weights alone exceed it.
 - A gated repo is marked from the listing's own flag and its Download is refused
@@ -291,3 +294,46 @@ is refused. The counts are in Knowledge.
 `real_models.rs` stops asserting that a speech model is a language model, says
 which files it set aside, and refuses to pass on a directory holding none — so
 it cannot go quiet by having nothing left to check.
+
+
+## The third and fourth looks, 2026-09-03
+
+**The controls split.** Sort — Trending, Most downloaded, Most liked, Smallest
+first — says what order; Fits this Mac and MoE say what is left, and they
+combine. **This is the shape offered while planning and declined**; using the
+version where one widget did both is what changed the answer, which is the same
+route every good change in this project has taken. Smallest first is a sort
+because ordering by size is an ordering, and that avoids inventing a number for
+what small means.
+
+Two defects with it: a search left the old rows on screen underneath the loading
+state, and the box could not be cleared.
+
+**Then the author found the mechanism I had ruled out.** Hugging Face has an
+`?other=moe` tag — `filter=gguf,moe` on the API — and it catches models whose
+architecture says nothing. It does not replace the architecture: over 300
+repositories the tag covers 35, the architecture 34, only 13 both, and the union
+56. The counts and the reasoning are in
+[knowledge/technical.md](../knowledge/technical.md).
+
+**A parameter band** came with it, and the API applies it better than this app
+could: `num_parameters=min:XB,max:YB`, against a figure that survives the sidecar
+trap `gguf.total` falls into. Five bands. Both narrowings run before the tree
+fan-out, so a filtered-out row never costs a call — turning a filter on makes the
+page faster.
+
+## The MoE mark shipped dead
+
+`8c8db9d` claimed MoE marking and delivered nothing. `expand=gguf` never reached
+the listing URL — the edit's anchor was a one-line array `cargo fmt` had already
+split — so `architecture` was always absent and every row came back unmarked.
+
+**It stayed green because an inline test asserted the URL must *not* carry
+`expand=gguf`**, which had been true exactly one decision earlier. Nothing in the
+suite could fail: an absent `expand` leaves an `Option` that is simply always
+`None`, and the hand-written render used to check the look showed a badge the
+real app would never produce.
+
+Three lessons, all in [knowledge/technical.md](../knowledge/technical.md): assert
+every edit's anchor; a stale assertion reports success for the thing it forbids;
+and a rendered mock proves the stylesheet, never the data behind it.
