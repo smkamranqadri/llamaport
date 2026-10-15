@@ -4,19 +4,22 @@ set -euo pipefail
 usage() {
   cat <<'EOF'
 Usage:
-  install-anchor.sh [--target <project-root>] [--settings <path>] [--instructions <path>]...
-                    [--no-hook] [--no-instructions] [--check] [--remove]
+  install-anchor.sh [--target <project-root>] [--settings <path>] [--hooks-json <path>]
+                    [--instructions <path>]... [--no-hook] [--no-instructions]
+                    [--check] [--remove]
 
 Installs the KIS re-anchor layer into a project:
   - a Claude SessionStart hook that injects current State at session start, resume, clear, and compact
+  - an Antigravity PreInvocation hook that injects current State once per conversation
   - a marked KIS block in the project instruction files that every host loads automatically
 
 Options:
   --target <path>        Project root. Defaults to current directory.
   --settings <path>      Claude settings file. Defaults to <target>/.claude/settings.json.
+  --hooks-json <path>    Antigravity hooks file. Defaults to <target>/.agents/hooks.json.
   --instructions <path>  Instruction file to carry the KIS block. Repeatable.
                          Defaults to AGENTS.md, plus CLAUDE.md when it already exists.
-  --no-hook              Skip the Claude SessionStart hook.
+  --no-hook              Skip both session hooks.
   --no-instructions      Skip the instruction file block.
   --check                Report what is installed and change nothing.
   --remove               Remove the hook entry and the instruction block.
@@ -31,6 +34,7 @@ die() {
 
 target_root="."
 settings_file=""
+hooks_json_file=""
 instruction_files=()
 want_hook="true"
 want_instructions="true"
@@ -46,6 +50,11 @@ while [[ $# -gt 0 ]]; do
     --settings)
       [[ $# -ge 2 ]] || die "--settings requires a path"
       settings_file="$2"
+      shift 2
+      ;;
+    --hooks-json)
+      [[ $# -ge 2 ]] || die "--hooks-json requires a path"
+      hooks_json_file="$2"
       shift 2
       ;;
     --instructions)
@@ -83,6 +92,7 @@ command -v ruby >/dev/null 2>&1 || die "ruby is required to edit settings and in
 
 target_root="$(mkdir -p "$target_root" && cd "$target_root" && pwd -P)"
 [[ -n "$settings_file" ]] || settings_file="$target_root/.claude/settings.json"
+[[ -n "$hooks_json_file" ]] || hooks_json_file="$target_root/.agents/hooks.json"
 
 if [[ ${#instruction_files[@]} -eq 0 ]]; then
   instruction_files=("$target_root/AGENTS.md")
@@ -93,6 +103,14 @@ fi
 
 hook_command='"$CLAUDE_PROJECT_DIR"/.agents/skills/kis/hooks/session-anchor.sh'
 hook_marker='kis/hooks/session-anchor.sh'
+
+antigravity_hook_name="kis-anchor"
+if [[ "$hooks_json_file" == "$target_root/.agents/hooks.json" ]]; then
+  # Antigravity runs a hook command from the directory holding hooks.json.
+  antigravity_hook_command="./skills/kis/hooks/antigravity-anchor.sh"
+else
+  antigravity_hook_command="$target_root/.agents/skills/kis/hooks/antigravity-anchor.sh"
+fi
 
 apply_hook() {
   ruby -rjson -e '
@@ -150,6 +168,53 @@ apply_hook() {
   ' "$settings_file" "$hook_command" "$hook_marker" "$mode"
 }
 
+apply_antigravity_hook() {
+  ruby -rjson -e '
+    hooks_path, hook_name, hook_command, mode = ARGV
+    data = {}
+    if File.file?(hooks_path)
+      raw = File.read(hooks_path).strip
+      unless raw.empty?
+        begin
+          data = JSON.parse(raw)
+        rescue JSON::ParserError => e
+          abort("cannot parse #{hooks_path}: #{e.message}")
+        end
+      end
+      abort("#{hooks_path} is not a JSON object") unless data.is_a?(Hash)
+    end
+
+    installed = data.key?(hook_name)
+
+    case mode
+    when "check"
+      puts(installed ? "Antigravity PreInvocation hook: installed" : "Antigravity PreInvocation hook: missing")
+      exit 0
+    when "remove"
+      unless installed
+        puts "Antigravity PreInvocation hook: nothing to remove"
+        exit 0
+      end
+      data.delete(hook_name)
+      if data.empty? && File.file?(hooks_path)
+        File.delete(hooks_path)
+        puts "Antigravity PreInvocation hook: removed #{hooks_path}"
+        exit 0
+      end
+      puts "Antigravity PreInvocation hook: removed from #{hooks_path}"
+    else
+      data[hook_name] = {
+        "PreInvocation" => [{ "type" => "command", "command" => hook_command, "timeout" => 15 }]
+      }
+      puts "Antigravity PreInvocation hook: #{installed ? "refreshed in" : "added to"} #{hooks_path}"
+    end
+
+    require "fileutils"
+    FileUtils.mkdir_p(File.dirname(hooks_path))
+    File.write(hooks_path, JSON.pretty_generate(data) + "\n")
+  ' "$hooks_json_file" "$antigravity_hook_name" "$antigravity_hook_command" "$mode"
+}
+
 apply_instructions() {
   local file
   for file in "${instruction_files[@]}"; do
@@ -170,7 +235,8 @@ apply_instructions() {
         - Synchronize the KIS layers that changed when work finishes.
         - Full instructions: `.agents/skills/kis/SKILL.md`.
         - Commands live in `.agents/skills/kis/commands/`: start, plan, act, sync, check, init.
-          Claude `/kis:start`, Pi `/kis-start`, Codex `/prompts:kis-start`.
+          Claude `/kis:start`, Pi and OpenCode `/kis-start`, Codex `/prompts:kis-start`.
+          Antigravity has no custom slash commands: name the step and follow its command file.
         #{end_marker}
       BLOCK
 
@@ -206,6 +272,7 @@ apply_instructions() {
 
 if [[ "$want_hook" == "true" ]]; then
   apply_hook
+  apply_antigravity_hook
 fi
 
 if [[ "$want_instructions" == "true" ]]; then

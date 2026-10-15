@@ -1,0 +1,11 @@
+{
+  "kis-anchor": {
+    "PreInvocation": [
+      {
+        "type": "command",
+        "command": "./skills/kis/hooks/antigravity-anchor.sh",
+        "timeout": 15
+      }
+    ]
+  }
+}

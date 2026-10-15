@@ -107,5 +107,6 @@ This project uses KIS memory under `kis/`. Knowledge = stable facts. Intent = go
 - Synchronize the KIS layers that changed when work finishes.
 - Full instructions: `.agents/skills/kis/SKILL.md`.
 - Commands live in `.agents/skills/kis/commands/`: start, plan, act, sync, check, init.
-  Claude `/kis:start`, Pi `/kis-start`, Codex `/prompts:kis-start`.
+  Claude `/kis:start`, Pi and OpenCode `/kis-start`, Codex `/prompts:kis-start`.
+  Antigravity has no custom slash commands: name the step and follow its command file.
 <!-- kis:anchor:end -->

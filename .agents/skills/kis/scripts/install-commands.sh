@@ -4,14 +4,16 @@ set -euo pipefail
 usage() {
   cat <<'EOF'
 Usage:
-  install-commands.sh [--target <project-root>] [--skill-dir <path>] [--host project|claude|pi|codex|all]
+  install-commands.sh [--target <project-root>] [--skill-dir <path>]
+                      [--host project|claude|pi|opencode|codex|all]
                       [--codex-prompts-dir <path>] [--remove]
 
 Options:
   --target <path>             Project root. Defaults to current directory.
   --skill-dir <path>          Installed skill package. Defaults to <target>/.agents/skills/kis.
-  --host <name>               project (default: claude and pi), claude, pi, codex, or all.
-                              Only codex writes outside the project.
+  --host <name>               project (default: claude and pi), claude, pi, opencode, codex,
+                              or all. Only codex writes outside the project.
+                              Antigravity has no custom slash commands and needs no adapter.
   --codex-prompts-dir <path>  Codex prompts directory. Defaults to ${CODEX_HOME:-~/.codex}/prompts.
                               Codex prompts are user-level and are not shared through the repository.
   --remove                    Remove installed command adapters instead of creating them.
@@ -43,7 +45,7 @@ while [[ $# -gt 0 ]]; do
       shift 2
       ;;
     --host)
-      [[ $# -ge 2 ]] || die "--host requires project, claude, pi, codex, or all"
+      [[ $# -ge 2 ]] || die "--host requires project, claude, pi, opencode, codex, or all"
       host="$2"
       shift 2
       ;;
@@ -67,7 +69,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 case "$host" in
-  project|claude|pi|codex|all) ;;
+  project|claude|pi|opencode|codex|all) ;;
   *) die "unknown host: $host" ;;
 esac
 
@@ -76,6 +78,7 @@ target_root="$(mkdir -p "$target_root" && cd "$target_root" && pwd -P)"
 
 claude_link="$target_root/.claude/commands/kis"
 pi_prompts_dir="$target_root/.pi/prompts"
+opencode_command_dir="$target_root/.opencode/command"
 
 install_claude() {
   local commands_dir="$skill_dir/commands"
@@ -104,39 +107,63 @@ remove_claude() {
   fi
 }
 
-install_pi() {
+link_per_command_file() {
+  local dest_dir="$1"
   local commands_dir="$skill_dir/commands"
-  [[ -d "$commands_dir" ]] || { echo "Pi prompts: skipped (no commands/ in $skill_dir)"; return 0; }
 
-  mkdir -p "$pi_prompts_dir"
-  local relative_prefix=""
+  local relative_prefix="$commands_dir"
   if [[ "$skill_dir" == "$target_root/.agents/skills/kis" ]]; then
     relative_prefix="../../.agents/skills/kis/commands"
-  else
-    relative_prefix="$commands_dir"
   fi
 
+  mkdir -p "$dest_dir"
   local installed=0
   local file name
   while IFS= read -r file; do
     name="$(basename "$file" .md)"
-    rm -f "$pi_prompts_dir/kis-$name.md"
-    ln -s "$relative_prefix/$name.md" "$pi_prompts_dir/kis-$name.md"
+    rm -f "$dest_dir/kis-$name.md"
+    ln -s "$relative_prefix/$name.md" "$dest_dir/kis-$name.md"
     installed=$((installed + 1))
   done < <(find "$commands_dir" -maxdepth 1 -type f -name '*.md' | sort)
 
-  echo "Pi prompts: $installed link(s) in ${pi_prompts_dir#"$target_root/"}"
-  echo "Pi usage: /kis-start /kis-plan /kis-act /kis-sync /kis-check /kis-init"
+  echo "$installed"
 }
 
-remove_pi() {
+unlink_per_command_file() {
+  local dest_dir="$1"
   local removed=0
   local file
   while IFS= read -r file; do
     rm -f "$file"
     removed=$((removed + 1))
-  done < <(find "$pi_prompts_dir" -maxdepth 1 -name 'kis-*.md' 2>/dev/null | sort)
-  echo "Pi prompts: removed $removed link(s)"
+  done < <(find "$dest_dir" -maxdepth 1 -name 'kis-*.md' 2>/dev/null | sort)
+  echo "$removed"
+}
+
+install_pi() {
+  [[ -d "$skill_dir/commands" ]] || { echo "Pi prompts: skipped (no commands/ in $skill_dir)"; return 0; }
+
+  local installed
+  installed="$(link_per_command_file "$pi_prompts_dir")"
+  echo "Pi prompts: $installed link(s) in ${pi_prompts_dir#"$target_root/"}"
+  echo "Pi usage: /kis-start /kis-plan /kis-act /kis-sync /kis-check /kis-init"
+}
+
+remove_pi() {
+  echo "Pi prompts: removed $(unlink_per_command_file "$pi_prompts_dir") link(s)"
+}
+
+install_opencode() {
+  [[ -d "$skill_dir/commands" ]] || { echo "OpenCode commands: skipped (no commands/ in $skill_dir)"; return 0; }
+
+  local installed
+  installed="$(link_per_command_file "$opencode_command_dir")"
+  echo "OpenCode commands: $installed link(s) in ${opencode_command_dir#"$target_root/"}"
+  echo "OpenCode usage: /kis-start /kis-plan /kis-act /kis-sync /kis-check /kis-init"
+}
+
+remove_opencode() {
+  echo "OpenCode commands: removed $(unlink_per_command_file "$opencode_command_dir") link(s)"
 }
 
 install_codex() {
@@ -169,12 +196,16 @@ remove_codex() {
 
 want_claude="false"
 want_pi="false"
+want_opencode="false"
 want_codex="false"
 if [[ "$host" == "claude" || "$host" == "project" || "$host" == "all" ]]; then
   want_claude="true"
 fi
 if [[ "$host" == "pi" || "$host" == "project" || "$host" == "all" ]]; then
   want_pi="true"
+fi
+if [[ "$host" == "opencode" || "$host" == "all" ]]; then
+  want_opencode="true"
 fi
 if [[ "$host" == "codex" || "$host" == "all" ]]; then
   want_codex="true"
@@ -186,6 +217,9 @@ if [[ "$remove" == "true" ]]; then
   fi
   if [[ "$want_pi" == "true" ]]; then
     remove_pi
+  fi
+  if [[ "$want_opencode" == "true" ]]; then
+    remove_opencode
   fi
   if [[ "$want_codex" == "true" ]]; then
     remove_codex
@@ -200,6 +234,9 @@ if [[ "$want_claude" == "true" ]]; then
 fi
 if [[ "$want_pi" == "true" ]]; then
   install_pi
+fi
+if [[ "$want_opencode" == "true" ]]; then
+  install_opencode
 fi
 if [[ "$want_codex" == "true" ]]; then
   install_codex
